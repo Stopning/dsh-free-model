@@ -56,6 +56,23 @@ dsh plugin --profile web add /绝对路径/dsh-free-model
 不要再往 `cordis.patch.yml` 加条目：被 `dsh.profile.bundles` 引用的包，其自带 patch 层会自动生效，
 两处同时注册会报 `duplicate loader entry id: our-free-model`。
 
+### 覆盖安装到一个已经装过上游版本的 profile
+
+profile 是 `nodeLinker: hoisted` 时，`node_modules/dsh-our-free-model/` 是**真目录**，
+直接换内容即可（不动 `dependencies`：`^2.0.0` 已经匹配 2.1.0）：
+
+```bash
+P=~/.dsh/profiles/web/node_modules/dsh-our-free-model
+cp -a "$P" ~/backup/files/dsh-our-free-model-2.0.0-web-install-$(date +%Y%m%d)   # 先留回滚副本
+rm -rf "$P"; mkdir -p "$P"
+# 从 fork 复制：index.js client.js package.json cordis.patch.yml icon.svg LICENSE README*.md src/ locale/ vendor/
+```
+
+两点注意：
+
+- **宿主半身是进程内的**：换完文件要重启一次 dsh 才会加载新的 `index.js`；浏览器半身刷新页面即可（同版本客户端会被重新取用）。
+- **回滚**：把备份拷回去，或让 pnpm 按 lockfile 的 integrity 重新取 2.0.0。反过来说，**下次在这个 profile 里跑 `pnpm install`（例如插件管理器装/卸别的插件）会把 `node_modules` 按 lockfile 对齐，把你手工替换的 fork 覆盖回 registry 版 2.0.0** —— 要长期固化，得把这个 fork 发到某个 registry，或在 profile 里用 `file:`/`link:` 依赖（桌面端闸门不接受软链，命令行 web 可以）。
+
 ## 配置
 
 唯一的状态文件是 `~/.dsh/our-free-model/settings.json`（0600）。本 fork 只读这三个键：
