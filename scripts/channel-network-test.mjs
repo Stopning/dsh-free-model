@@ -140,8 +140,10 @@ try {
     })
   }
 
+  // Upstream also ran this against the standalone product's copy of the pack;
+  // that product was removed from this fork, so the plugin's bundle is the only
+  // subject left.
   const products = [pack]
-  if (packAt < 0) products.push(await import('../packages/standalone/channels/business.mjs'))
   for (const [productIndex, product] of products.entries()) await check(`${productIndex === 0 ? '插件' : '独立端'}实际渠道包：OAuth 落定、续期、项目探测与推理共用代理`, async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ofm-network-'))
     const keys = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy', 'ALL_PROXY', 'all_proxy', 'DSH_HOME', 'DSH_CHANNEL_PACK_STATE_DIR', 'DSH_OPENAI_GATEWAY_ENABLED', 'QODER_RUNTIME_INFO', 'QODER_MACHINE_TOKEN_PATH']

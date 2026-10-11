@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Our Free Model",
-    "description": "Free no-key models inside DeepSeek Harness: a roster that follows upstream, live regional availability, genuinely enforced thinking levels, a token dashboard, and an OpenAI-compatible local forward port."
+    "description": "Bring your own free-tier accounts into DeepSeek Harness: log in once and the models of thirteen channels (CodeArts, CodeBuddy / WorkBuddy, LobsterAI, Qoder, TRAE, Cline, Loomy, Raccoon, MiniMax, ZCode, Gemini) appear in the picker, with a token dashboard, a per-request log and a local OpenAI-compatible gateway."
   }
 }

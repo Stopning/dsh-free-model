@@ -169,34 +169,6 @@ try {
   console.log('ok  共享渠道余额：十三渠道能力、失败原因、重试、签到反馈和请求交错')
   console.log('ok  共享渠道卡片：批量开关、单次请求、重复点击保护和失败恢复')
 
-  // The retained OFM anonymous lane still enumerates and streams without any
-  // account, independently of the disabled vendored OpenCode provider.
-  globalThis.fetch = savedFetch
-  const { stubUpstream, chatFrames } = await import('./lib/fake-kernel.mjs')
-  const stub = await stubUpstream({ listing: ['mimo-v2.6-flash-free'], answer: () => ({ body: chatFrames('anonymous-ok') }) })
-  try {
-    process.env.OUR_FREE_MODEL_BASE = stub.base
-    const { FreeModelAdapter, ROUTE_MAIN } = await import('../src/adapter.js')
-    const { buildCatalog } = await import('../src/catalog.js')
-    const model = buildCatalog(['mimo-v2.6-flash-free'])[0]
-    const adapter = new FreeModelAdapter({
-      state: () => ({
-        catalog: [model], membership: { [ROUTE_MAIN]: [model.id] },
-        settings: { enabled: true }, attributionUserAgent: 'test/1.0',
-      }),
-      recordUsage() {}, warn() {},
-    })
-    assert.ok((await adapter.listModels(ROUTE_MAIN)).some(row => row.id === model.id))
-    const chunks = []
-    for await (const chunk of adapter.stream({
-      provider: ROUTE_MAIN, model: model.id,
-      messages: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
-    })) chunks.push(chunk)
-    assert.ok(JSON.stringify(chunks).includes('anonymous-ok'), 'anonymous response is delivered')
-    console.log('ok  retained OFM anonymous lane: model listing and streaming with no account')
-  } finally {
-    await stub.close()
-  }
 } finally {
   for (const cleanup of dispose.reverse()) await cleanup()
   globalThis.fetch = savedFetch

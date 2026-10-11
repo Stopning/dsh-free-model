@@ -1,92 +1,49 @@
 /**
  * Run every offline suite in one command.
  *
- *     node scripts/test-all.mjs [--mode all|contributor|release] [--only <name>]
+ *     node scripts/test-all.mjs [--only <name>]
  *
- * These are the checks that need no network and spend no free-lane quota: each
- * one mounts the real module against a local stand-in. The live end-to-end run
- * against the gateway is separate and costs minutes and quota, so it stays a
- * deliberate act: `node scripts/host-selftest.mjs`.
+ * These are the checks that need no network and spend no account quota: each one
+ * mounts the real module against a local stand-in. The live end-to-end run — a
+ * real profile, a real channel login — is a deliberate act and is not here.
  *
- * The default includes the manifest check because shipping a manifest that
- * disagrees with its files breaks the in-app upgrade for every user at once
- * (issue #1), and nothing else fails when that happens.
+ * Upstream ran 45 suites over the free lane, the co-paid lane, the aggregate
+ * lane, the token savers and the standalone product. This fork keeps the ones
+ * that still have a subject: the browser half's registration/copy/style
+ * contracts, the host's whole HTTP surface, the request fence, the egress
+ * outlet, the gateway relay, and the absorbed channel pack itself.
  */
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const scriptsDir = fileURLToPath(new URL('.', import.meta.url))
-const options = { mode: 'all', only: null }
+const options = { only: null }
 for (let index = 2; index < process.argv.length; index += 1) {
   const flag = process.argv[index]
-  if (!['--mode', '--only'].includes(flag) || !process.argv[index + 1] || process.argv[index + 1].startsWith('--')) {
-    console.error(`usage: node scripts/test-all.mjs [--mode all|contributor|release] [--only <name>] (invalid ${flag})`)
+  if (flag !== '--only' || !process.argv[index + 1] || process.argv[index + 1].startsWith('--')) {
+    console.error(`usage: node scripts/test-all.mjs [--only <name>] (invalid ${flag})`)
     process.exit(1)
   }
   options[flag.slice(2)] = process.argv[++index]
 }
-if (!['all', 'contributor', 'release'].includes(options.mode)) {
-  console.error(`unknown test mode "${options.mode}"`)
-  process.exit(1)
-}
-const { mode, only } = options
-const releaseSuites = new Set(['manifest', 'release', 'catalog'])
+const { only } = options
 
 const suites = [
-  ['manifest', 'build-manifest.mjs', ['--check']],
-  ['release', 'release-e2e.mjs', []],
-  ['release-preparation', 'release-preparation-test.mjs', []],
+  // The browser half: it registers, every copy key exists in both languages, and
+  // every style rule it declares is reachable from the code.
   ['client-lint', 'client-lint.mjs', []],
-  ['heatmap', 'heatmap-test.mjs', []],
+  // The host half: the whole /api/our-free-model surface, mounted offline, plus
+  // the routes the removed features must no longer answer.
+  ['host-smoke', 'host-smoke-test.mjs', []],
+  // The host modules that carry their own contracts.
   ['trust', 'trust-test.mjs', []],
-  ['sanitize', 'sanitize-test.mjs', []],
-  ['feed', 'feed-test.mjs', []],
-  ['updater', 'updater-test.mjs', []],
-  ['upgrade-ui', 'upgrade-ui-test.mjs', []],
-  ['forward', 'forward-test.mjs', []],
   ['chan-relay', 'chan-relay-test.mjs', []],
+  ['egress', 'egress-test.mjs', []],
+  // The absorbed pack: mount, provider set, credits, image pricing, proxy rules.
   ['channel-pack', 'channel-pack-test.mjs', []],
   ['channel-network', 'channel-network-test.mjs', []],
-  ['forward-boot', 'forward-boot-test.mjs', []],
-  ['standalone', 'standalone-test.mjs', []],
-  ['standalone-management', 'standalone-management-test.mjs', []],
-  ['standalone-frontend', 'standalone-frontend-test.mjs', []],
-  ['standalone-channels', 'standalone-channels-test.mjs', []],
-  ['egress', 'egress-test.mjs', []],
-  ['effort', 'effort-test.mjs', []],
-  ['projection', 'projection-test.mjs', []],
-  ['fingerprint', 'fingerprint-test.mjs', []],
-  ['sniff', 'sniff-test.mjs', []],
-  ['truncation', 'truncation-test.mjs', []],
-  ['recovery', 'recovery-test.mjs', []],
-  ['retry-safety', 'retry-safety-test.mjs', []],
-  ['speed-stat', 'speed-stat-test.mjs', []],
-  ['picker', 'picker-test.mjs', []],
-  ['tui', 'tui-test.mjs', []],
-  ['catalog', 'catalog-test.mjs', mode === 'contributor' ? ['--contributor'] : []],
-  ['vault', 'vault-test.mjs', []],
-  ['eac-auth', 'eac-auth-test.mjs', []],
-  ['eac-login', 'eac-login-test.mjs', []],
-  ['kilo', 'kilo-test.mjs', []],
-  ['offline', 'offline-test.mjs', []],
-  // The aggregated feature set: the token savers ported from the upstream
-  // routers, the provider registry, the failure/chain brain, the Anthropic
-  // wire, the local answers, and the aggregate lane driver. Each is a pure
-  // module with its own offline suite; `aggregate-wiring` is the one that
-  // proves the host actually reaches them.
-  ['rtk', 'rtk-test.mjs', []],
-  ['local-optimize', 'local-optimize-test.mjs', []],
-  ['registry', 'registry-test.mjs', []],
-  ['route', 'route-test.mjs', []],
-  ['combo-advance', 'combo-advance-test.mjs', []],
-  ['prompt-saver', 'prompt-saver-test.mjs', []],
-  ['anthropic', 'anthropic-test.mjs', []],
-  ['aggregate', 'aggregate-test.mjs', []],
-  ['aggregate-wiring', 'aggregate-wiring-test.mjs', []],
-].filter(([name]) => (mode === 'contributor' ? !['manifest', 'release'].includes(name)
-  : mode === 'release' ? releaseSuites.has(name) : true)
-  && (only === null || name.startsWith(only)))
+].filter(([name]) => only === null || name.startsWith(only))
 
 if (only !== null && suites.length === 0) {
   console.error(`--only "${only}" selected no suite`)
@@ -96,18 +53,19 @@ if (only !== null && suites.length === 0) {
 /**
  * A suite that hangs must leave enough output to identify where it stopped.
  *
- * One of these bound a fixed port, lost the race to a suite running beside it, and
- * then sat in a `fetch` whose socket nobody answered — three minutes of the
- * runner's own ceiling, after which it printed six `ok` lines as the "failure
- * detail" because buffered child output was unavailable. The deadline is well
- * above the slowest suite, and live output now identifies the last check seen.
+ * One of upstream's suites bound a fixed port, lost the race to a suite running
+ * beside it, and then sat in a `fetch` whose socket nobody answered — three
+ * minutes of the runner's own ceiling, after which it printed six `ok` lines as
+ * the "failure detail" because buffered child output was unavailable. The
+ * deadline is well above the slowest suite, and live output now identifies the
+ * last check seen.
  */
 const SUITE_TIMEOUT_MS = 60_000
 
 /**
  * Run a suite while forwarding its output as it arrives. Keeping the output
  * live is important here: a timeout kills the child before a buffered pipe can
- * be read, which used to erase the last check printed by recovery-test.mjs.
+ * be read, which erases the last check the suite printed.
  */
 function runSuite(script, args) {
   return new Promise(resolve => {
@@ -145,7 +103,7 @@ function runSuite(script, args) {
 }
 
 const results = []
-console.log(`test mode: ${mode}${mode === 'contributor' ? ' — code checks only; release readiness is checked separately' : ''}`)
+console.log('test mode: offline suites only')
 for (const [name, script, args] of suites) {
   const run = await runSuite(script, args)
   const output = `${run.stdout}${run.stderr}`.trimEnd().split('\n')

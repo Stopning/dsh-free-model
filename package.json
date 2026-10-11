@@ -3,7 +3,7 @@
   "version": "2.1.0",
   "private": true,
   "type": "module",
-  "description": "Our Free Model — 在 dsh 里装上这个插件即可，无需登录、注册或填 API Key，就能使用包括 DeepSeek V4.1 Flash、Kimi K3 在内的前沿模型，桌面端另有 EAC 协付渠道；2.0 起接入 CodeArts、CodeBuddy、WorkBuddy、LobsterAI、Qoder、TRAE、Cline、Loomy、Raccoon、MiniMax、ZCode、Gemini 十三个账号渠道（原有匿名免费通道保留）（登录、账号池、积分领取、本地 OpenAI 网关与局域网转发、数据看板与运行日志），六页毛玻璃界面统一呈现。",
+  "description": "Our Free Model（channels-only fork）——只保留白嫖模型接入：把 CodeArts、CodeBuddy / WorkBuddy、LobsterAI、Qoder / Qoder CN、TRAE、Cline、Loomy、Raccoon、MiniMax Code、ZCode、Gemini 十三个账号渠道接进 dsh 的模型选择器，并保留数据看板、运行日志与本地网关（含局域网中继）。上游 2.1.0 的匿名免费车道、EAC 协付车道、聚合渠道、省 Token、路由、公告/升级/热重载与独立 Web 产品已全部移除。",
   "main": "./index.js",
   "exports": {
     ".": "./index.js",
@@ -12,28 +12,13 @@
     "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
-    "pack:standalone": "node scripts/pack-standalone.mjs",
-    "test:package": "node scripts/standalone-package-test.mjs",
-    "start:standalone": "node packages/standalone/cli.mjs",
-    "test:standalone": "node scripts/standalone-test.mjs",
-    "test:management": "node scripts/standalone-management-test.mjs",
-    "build:standalone-channels": "node scripts/build-standalone-channels.mjs",
-    "build:standalone-ui": "node scripts/build-standalone-ui.mjs",
-    "typecheck:standalone": "npm --prefix packages/standalone run typecheck",
-    "test:standalone-channels": "node scripts/standalone-channels-test.mjs",
     "test": "node scripts/test-all.mjs",
-    "test:contributor": "node scripts/test-all.mjs --mode contributor",
-    "test:release": "node scripts/test-all.mjs --mode release",
-    "manifest": "node scripts/build-manifest.mjs",
-    "channel-pack": "node scripts/build-channel-pack.mjs",
-    "manifest:check": "node scripts/build-manifest.mjs --check",
-    "selftest": "node scripts/host-selftest.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "selftest": "node scripts/host-smoke-test.mjs",
+    "channel-pack": "node scripts/build-channel-pack.mjs"
   },
   "files": [
     "index.js",
     "client.js",
-    "adapter",
     "src",
     "vendor/channel-pack/pack.js",
     "vendor/channel-pack/qoder-auth-wasm.wasm",
@@ -48,6 +33,7 @@
     "dsh",
     "dsh-plugin",
     "free-model",
+    "account-channels",
     "llm-provider"
   ],
   "engines": {
@@ -59,7 +45,7 @@
     },
     "client": {
       "platform": "web",
-      "immediately": true,
+      "immediately": false,
       "inject": []
     }
   },
@@ -70,8 +56,5 @@
     "@deepseek-ai/dsh-credentials": "^0.1.2-rc.1 || ^0.1.7-rc.2 || ^0.2.0-rc.1",
     "@deepseek-ai/dsh-llm": "^0.1.2-rc.1 || ^0.1.7-rc.2 || ^0.2.0-rc.1",
     "@deepseek-ai/schemastery": "^3.18.4"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.2"
   }
 }

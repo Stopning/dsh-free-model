@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Our Free Model",
-    "description": "在 DeepSeek Harness 内直连免密免费模型：清单跟随上游更新、地区可用性自动探测、思考强度档位真实生效，并附 Token 用量看板与 OpenAI 兼容的本地转发端口。"
+    "description": "把各家的免费额度接进 DeepSeek Harness：登录一次，十三个渠道（CodeArts、CodeBuddy / WorkBuddy、LobsterAI、Qoder、TRAE、Cline、Loomy、Raccoon、MiniMax、ZCode、Gemini）的模型就出现在选择器里，附 Token 看板、逐条请求日志与本地 OpenAI 兼容网关。"
   }
 }

@@ -23,7 +23,7 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { homedir } from 'node:os'
-import { keyMatches } from './forward.js'
+import { keyMatches } from './key.js'
 
 /** Request loop breaker: present on hops this relay already forwarded once. */
 const HOP_HEADER = 'x-ofm-chan-relay-hop'
