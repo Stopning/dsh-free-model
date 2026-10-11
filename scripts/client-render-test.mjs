@@ -136,7 +136,8 @@ globalThis.document = {
 new Function('window', 'document', 'navigator', source)(globalThis.window, globalThis.document, { language: 'zh-CN' })
 
 const record = globalThis.__registered
-assert.equal(record?.id, 'dsh-our-free-model', 'the bundle did not register itself')
+const PKG_NAME = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name
+assert.equal(record?.id, PKG_NAME, 'the bundle did not register itself under the package name')
 const plugin = record.factory(name => (name === 'react' ? React : undefined))
 
 let slot = null

@@ -6,8 +6,9 @@
 > dashboard, a per-request log and a local gateway. Upstream's anonymous free lane, the EAC
 > co-paid lane, the aggregate lane, the token savers, the routing chains and the whole
 > release/update channel are gone.
-> The settings entry reads **模型接入** in Chinese, **Model Access** in English; the package name and bundle id
-> stay `dsh-our-free-model`, because that is the key the host registers.
+> The settings entry reads **模型接入** in Chinese, **Model Access** in English; the npm package is
+> `dsh-free-model` (same as the repository), while the cordis loader entry id stays `our-free-model`
+> — the settings namespace and the state directory hang off that id, so renaming the package moves no data.
 
 ## What survives
 
@@ -39,13 +40,16 @@ and the offline suites from 45 to 7.
 ## Install
 
 ```bash
-dsh plugin --profile web add /absolute/path/dsh-free-model
+dsh plugin --profile web add dsh-free-model            # from npm
+dsh plugin --profile web add /absolute/path/dsh-free-model   # or from a checkout
 ```
 
 Restart the app once. On the desktop build, do **not** use `link:` dependencies or junctions
 (the profile gate rejects them); copy a real directory into
-`<profile>/node_modules/dsh-our-free-model/`, add `"dsh-our-free-model": "2.1.0"` to
-`dependencies`, and append `"dsh-our-free-model"` to `dsh.profile.bundles`.
+`<profile>/node_modules/dsh-free-model/`, add `"dsh-free-model": "2.1.0"` to
+`dependencies`, and append `"dsh-free-model"` to `dsh.profile.bundles`.
+The loader entry id stays `our-free-model` (`id:` in `cordis.patch.yml`), so the settings
+namespace and the state directory `~/.dsh/our-free-model/` are unaffected by the package name.
 
 Note that upstream's `adapter/` directory no longer exists in this fork.
 

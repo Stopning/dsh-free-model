@@ -4,7 +4,7 @@
  *
  * 输入
  *   --root <dir>   被审的插件目录。默认＝本脚本所在仓库根目录；审装机副本时传
- *                  `--root ~/.dsh/profiles/web/node_modules/dsh-our-free-model`
+ *                  `--root ~/.dsh/profiles/web/node_modules/dsh-free-model`
  *   --tls          额外做一次联网验证：对源码里出现的每个非回环主机做 TLS 握手，
  *                  打印证书主体 / 签发者 / 是否通过校验。**默认关闭**（离线）。
  *   --json         以 JSON 输出（便于喂给别的工具）。默认输出人读文本。

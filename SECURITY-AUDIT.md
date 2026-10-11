@@ -1,15 +1,17 @@
 # 出网面安全审计（egress audit）
 
-> 审计对象：本 fork 装机副本 `~/.dsh/profiles/web/node_modules/dsh-our-free-model`（版本 `2.1.0`）。
+> 审计对象：本 fork 装机副本（当时装成 `~/.dsh/profiles/web/node_modules/dsh-our-free-model`，
+> 现已作为 npm 包 **`dsh-free-model@2.1.0`** 发布，装机路径随之变为 `~/.dsh/profiles/web/node_modules/dsh-free-model`）。
 > 审计日期：**2026-10-11**。审计方式：静态列出全部出网域名 + 对每个域名在本机直连握手看 TLS 证书主体。
 > 复跑工具：`node scripts/egress-audit.mjs --tls`（只读、不写文件、不修改系统）。
+> 2026-10-12 复核：只是**改包名**（`dsh-free-model`）与 id 引用，出网面零变化，域名表结论仍然有效；`client.js` 哈希已随改名更新。
 
 审计时的产物指纹（要复现同期结论请先比对）：
 
 | 文件 | sha256 |
 | --- | --- |
 | `index.js` | `179e679a7932fc0993d3bbc10785133d18304e583fb872e07e0322cbbd0aaec9` |
-| `client.js` | `1daf10bc6ebfaa51d99b10d7a9395102e732ef99dc957eb7fce0247259e8bdf8` |
+| `client.js` | `585ffeb810fb3bd7275e1ac7a8b5edd604e5955370ea94725c3c39fa19240bba` |
 | `vendor/channel-pack/pack.js` | `18c7629f2e65c894b46e24e95b6dfa45397fa1f4490590a645c1e1058264daa9` |
 
 ## 结论
@@ -99,7 +101,7 @@ node scripts/egress-audit.mjs
 node scripts/egress-audit.mjs --tls
 
 # 3) 审装机副本而不是仓库
-node scripts/egress-audit.mjs --root ~/.dsh/profiles/web/node_modules/dsh-our-free-model --tls
+node scripts/egress-audit.mjs --root ~/.dsh/profiles/web/node_modules/dsh-free-model --tls
 
 # 4) 运行时监听面（找有没有 0.0.0.0）
 ss -ltn

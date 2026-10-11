@@ -22,7 +22,7 @@
  * the page survives a scheme switch.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-our-free-model',
+  id: 'dsh-free-model',
   factory: require => {
     const module = { exports: {} }
     const exports = module.exports
@@ -2499,7 +2499,7 @@ window.__ModuleLoader__.load({
 
       ctx.effect(() => {
         const style = document.createElement('style')
-        style.setAttribute('data-plugin', 'dsh-our-free-model')
+        style.setAttribute('data-plugin', 'dsh-free-model')
         style.textContent = CSS
         document.head.appendChild(style)
         return () => style.remove()

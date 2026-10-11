@@ -13,6 +13,8 @@
 import fs from 'node:fs'
 
 const source = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8')
+/** The loader id must equal the published package name — read it, don't restate it. */
+const PKG_NAME = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name
 
 globalThis.window = { __ModuleLoader__: { load: record => { globalThis.__registered = record } } }
 globalThis.document = {
@@ -43,7 +45,7 @@ const record = globalThis.__registered
 if (record === undefined) {
   problems.push('the bundle never registered itself with the module loader')
 } else {
-  if (record.id !== 'dsh-our-free-model') problems.push(`registered id "${record.id}" must equal the package name`)
+  if (record.id !== PKG_NAME) problems.push(`registered id "${record.id}" must equal the package name ("${PKG_NAME}")`)
   if (typeof record.factory !== 'function') problems.push('factory is not a function')
   else {
     const exports = record.factory(name => {
