@@ -68,7 +68,6 @@ window.__ModuleLoader__.load({
         'forward.copied': '已复制',
         'nav.tab.channels': '白嫖模型接入',
         'chan.title': '白嫖模型接入',
-        'pref.hideChannels': '隐藏渠道模型',
         'chan.sub': '把各家的免费额度接进来：登录一次，模型就出现在对话框的模型选择器里。凭据只写入本机凭据库，页面永远拿不到明文。',
         'chan.pack.failed': '渠道包未挂载：{reason}（免费车道与 EAC 不受影响）',
         'chan.pack.hint': '渠道包由本插件内置（vendor/channel-pack），随插件一起升级。',
@@ -251,7 +250,6 @@ window.__ModuleLoader__.load({
         'forward.copied': 'Copied',
         'nav.tab.channels': 'Free channels',
         'chan.title': 'Free channel access',
-        'pref.hideChannels': 'Hide channel models',
         'chan.sub': 'Bring each vendor\'s free quota in: sign in once and its models appear in the composer\'s model picker. Credentials are written to the local credential store only — this page never sees them.',
         'chan.pack.failed': 'Channel pack not mounted: {reason} (the free and EAC lanes are unaffected)',
         'chan.pack.hint': 'The pack ships inside this plugin (vendor/channel-pack) and upgrades with it.',
@@ -1853,7 +1851,7 @@ window.__ModuleLoader__.load({
     }
 
     function ChannelsPage(props) {
-      const { t, ctx, summary, apply, busy } = props
+      const { t, ctx, summary } = props
       const { available, rpc } = useChannelRpc(ctx)
       // The pack runs a daily auto check-in engine across the credit channels;
       // this page is where it is switched and watched (usage.autoCheckin).
@@ -1930,8 +1928,6 @@ window.__ModuleLoader__.load({
             h(Pill, { tone: auto.running === true ? 'warn' : auto.ranToday === true ? 'ok' : '' },
               auto.running === true ? t('chan.auto.running') : auto.ranToday === true ? t('chan.auto.ran') : t('chan.auto.off')),
             typeof auto.lastResult === 'string' && auto.lastResult !== '' ? h('span', { className: 'ofm_note', title: auto.lastResult }, t('chan.auto.last').replace('{result}', auto.lastResult.length > 60 ? `${auto.lastResult.slice(0, 60)}…` : auto.lastResult)) : null)),
-          h('div', { className: 'ofm_row' },
-            h(Switch, { checked: summary?.settings?.hideChannelModels === true, label: t('pref.hideChannels'), disabled: busy, onChange: () => apply({ hideChannelModels: summary?.settings?.hideChannelModels !== true }) })),
         failed ? h('div', { className: 'ofm_callout ofm_error' },
           h('div', null, t('chan.pack.failed').replace('{reason}', pack.error ?? ''), h('div', { className: 'ofm_note' }, t('chan.pack.hint')))) : null,
         !available ? h('div', { className: 'ofm_callout' }, h('div', null, t('chan.rpc.unavailable'))) : null,
@@ -2481,7 +2477,7 @@ window.__ModuleLoader__.load({
           ? h(LogsPage, { t, ctx })
           : tab === 'gateway'
             ? h(GatewayPage, { t, ctx, settings: data.settings, apply, busy })
-            : h(ChannelsPage, { t, ctx, summary: data, apply, busy })
+            : h(ChannelsPage, { t, ctx, summary: data })
 
       return h('div', { className: 'ofm_root ofm_shell' }, nav, page)
     }
