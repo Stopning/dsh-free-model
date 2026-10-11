@@ -33,6 +33,9 @@ const suites = [
   // The browser half: it registers, every copy key exists in both languages, and
   // every style rule it declares is reachable from the code.
   ['client-lint', 'client-lint.mjs', []],
+  // ...and it actually renders: the four pages against host-shaped payloads, so a
+  // page that still referenced a deleted component cannot pass.
+  ['client-render', 'client-render-test.mjs', []],
   // The host half: the whole /api/our-free-model surface, mounted offline, plus
   // the routes the removed features must no longer answer.
   ['host-smoke', 'host-smoke-test.mjs', []],
