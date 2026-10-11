@@ -30,7 +30,7 @@
 | 本地转发（18899）与局域网转发 | 转发的正是被删掉的那条车道。 |
 | `packages/standalone/`（独立 Web 产品）、`worker/`（EAC 的 Cloudflare 授权网关）、`feed/` + `catalog/`（公告源与发布清单） | 三块卫星全部 `import` 被删车道，留着就是一套永远跑不起来的代码。 |
 
-规模变化：`src/` 从 **58 个模块 → 5 个**（`store/key/chan-relay/egress/trust`），宿主 `index.js` 从 **2343 行 → 684 行**，离线测试从 45 个套件 → 7 个。
+规模变化：`src/` 从 **58 个模块 → 5 个**（`store/key/chan-relay/egress/trust`），宿主 `index.js` 从 **2343 行 → 684 行**，离线测试从 45 个套件 → 8 个。
 
 ## 安装
 
@@ -119,11 +119,12 @@ POST /chan-gateway/rotate  轮换中继密钥
 - **局域网中继是唯一对外监听**：默认关；开启后必须用独立的中继密钥（与本机网关密钥不通用）。**能连上这台机器的人都能消耗你的渠道额度**——只在可信网络启用，必要时用防火墙限制来源网段。
 - **信任围栏**：插件路由优先级高于内核 `/api`，所以内置了与内核一致的准入检查——优先复用 composition 的 `connection` 服务，缺失时退回结构化围栏（Host 必须回环、拒绝跨站标记、Origin/Referer 必须同源）。
 - 本 fork 不再向任何上游插件地址发请求：出口只剩模型 provider（以及你启用的出口代理）。
+- **出网面审计**：见 [`SECURITY-AUDIT.md`](SECURITY-AUDIT.md)——13 家渠道的域名与 TLS 证书主体、两处不带凭据的第三方调用、本地暴露面与已知风险；复跑 `node scripts/egress-audit.mjs --tls`（只读）。
 
 ## 测试
 
 ```bash
-npm test                            # 7 个离线套件，无需网络、不花额度
+npm test                            # 8 个离线套件，无需网络、不花额度
 node scripts/host-smoke-test.mjs     # 只跑宿主 HTTP 面
 node scripts/client-lint.mjs         # 只跑浏览器半身（字典键一一对应 + CSS 规则可达）
 ```
