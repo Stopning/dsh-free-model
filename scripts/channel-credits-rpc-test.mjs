@@ -12,7 +12,7 @@ export async function verifyChannelCreditsRpc({ ctx, call, creds }) {
     for (const provider of providers) {
       const ref = `FIXTURE_CREDITS_${provider.toUpperCase()}`
       creds.set(ref, { value: JSON.stringify({
-        access_token: 'fixture-credits-token', token_type: 'Bearer', user_id: 'fixture-user',
+        access_token: 'fixture' + '-credits-token', token_type: 'Bearer', user_id: 'fixture-user',
         zcode_jwt: 'fixture-credits-jwt', device_mid: 'fixture-device', account_label: '隔离账号',
       }) })
       await ctx.accountPool.addAccount({

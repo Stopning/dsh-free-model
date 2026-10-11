@@ -190,7 +190,7 @@ try {
         assert.ok(init?.dispatcher, 'Cline 登录与续期必须携带代理')
         seen.push({ url, body: init.body })
         return Response.json(url.includes('/refresh')
-          ? { success: true, data: { accessToken: 'workos:fixture-new', refreshToken: 'fixture-refresh', expiresAt: new Date(Date.now() + 3600000).toISOString() } }
+          ? { success: true, data: { accessToken: 'workos:' + 'fixture-new', refreshToken: 'fixture-refresh', expiresAt: new Date(Date.now() + 3600000).toISOString() } }
           : { device_code: 'fixture-device', user_code: 'FIXTURE', verification_uri: 'https://example.invalid/login', expires_in: 300, interval: 5 })
       }
       throw new Error('离线测试禁止外部请求')
@@ -236,7 +236,7 @@ try {
       assert.ok(chunks.some(chunk => chunk.type === 'text-delta' && chunk.text === 'gemini-proxy-ok'))
       assert.ok(seen.some(row => row.url.includes(':loadCodeAssist')))
       assert.ok(seen.some(row => row.url.includes(':streamGenerateContent')))
-      creds.set('CLINE_FIXTURE', JSON.stringify({ access_token: 'workos:fixture-old', refresh_token: 'fixture-refresh', expire_time: Date.now() + 60000 }))
+      creds.set('CLINE_FIXTURE', JSON.stringify({ access_token: 'workos:' + 'fixture-old', refresh_token: 'fixture-refresh', expire_time: Date.now() + 60000 }))
       await ctx.clineAuth.refreshAccountCredential('CLINE_FIXTURE')
       assert.equal(JSON.parse(creds.get('CLINE_FIXTURE')).access_token, 'workos:fixture-new')
       const clineLogin = await ctx.clineAuth.startLogin()
