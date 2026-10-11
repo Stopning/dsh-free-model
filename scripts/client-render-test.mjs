@@ -150,6 +150,18 @@ const ctx = {
   },
 }
 plugin.apply(ctx)
+await await check('the settings entry is named 模型接入 / Model Access, not upstream\'s brand', () => {
+  assert.ok(source.includes("nav: '模型接入'"), 'the zh settings label is not 模型接入')
+  assert.ok(source.includes("title: '模型接入'"), 'the zh in-panel brand is not 模型接入')
+  assert.ok(source.includes("nav: 'Model Access'"), 'the en settings label is not Model Access')
+  assert.equal(source.includes('Our Free Model'), false, "upstream's brand is still in the browser half")
+})
+
+await check('no animation declaration and no keyframes survive', () => {
+  assert.equal(/animation\s*:/.test(source), false, 'an animation declaration is still declared')
+  assert.equal(source.includes('@keyframes'), false, 'a @keyframes block is still declared')
+})
+
 await check('the plugin registers the one settings section this fork keeps', () => {
   assert.equal(typeof slot, 'function', 'settings.section was not registered')
 })

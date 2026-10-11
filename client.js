@@ -1,5 +1,5 @@
 /**
- * Our Free Model — browser half, channels-only fork.
+ * 模型接入 — browser half, channels-only fork.
  *
  * Contributes one surface: a settings section (`settings.section`, id
  * `our-free-model`) holding the four pages this fork kept — the thirteen
@@ -35,8 +35,8 @@ window.__ModuleLoader__.load({
     // ── copy ──────────────────────────────────────────────────────────────────
     const DICT = {
       zh: {
-        nav: 'Our Free Model',
-        title: 'Our Free Model',
+        nav: '模型接入',
+        title: '模型接入',
         loading: '正在加载…',
         loadFailed: '无法连接插件后端',
         retry: '重试',
@@ -68,6 +68,7 @@ window.__ModuleLoader__.load({
         'forward.copied': '已复制',
         'nav.tab.channels': '白嫖模型接入',
         'chan.title': '白嫖模型接入',
+        'pref.hideChannels': '隐藏渠道模型',
         'chan.sub': '把各家的免费额度接进来：登录一次，模型就出现在对话框的模型选择器里。凭据只写入本机凭据库，页面永远拿不到明文。',
         'chan.pack.failed': '渠道包未挂载：{reason}（免费车道与 EAC 不受影响）',
         'chan.pack.hint': '渠道包由本插件内置（vendor/channel-pack），随插件一起升级。',
@@ -199,7 +200,6 @@ window.__ModuleLoader__.load({
         'gw.relayKey': '中继密钥',
         'gw.rotate': '轮换',
         'gw.relayNote': '中继只放行模型接口（/v1/*），并要求携带中继密钥；局域网绑定意味着同网段的设备都能访问到这个端口。',
-        'gw.freeLaneNote': '免费车道（Our Free Model）自己的转发端口在「免费模型」页的「本地转发」分区。',
         'chan.credits.left': '剩余积分',
         'chan.credits.tokens': '剩余 Token',
         'chan.credits.dollars': '剩余余额（USD）',
@@ -218,8 +218,8 @@ window.__ModuleLoader__.load({
         'chan.auto.last': '上次结果：{result}',
       },
       en: {
-        nav: 'Our Free Model',
-        title: 'Our Free Model',
+        nav: 'Model Access',
+        title: 'Model Access',
         loading: 'Loading…',
         loadFailed: 'Cannot reach the plugin backend',
         retry: 'Retry',
@@ -251,6 +251,7 @@ window.__ModuleLoader__.load({
         'forward.copied': 'Copied',
         'nav.tab.channels': 'Free channels',
         'chan.title': 'Free channel access',
+        'pref.hideChannels': 'Hide channel models',
         'chan.sub': 'Bring each vendor\'s free quota in: sign in once and its models appear in the composer\'s model picker. Credentials are written to the local credential store only — this page never sees them.',
         'chan.pack.failed': 'Channel pack not mounted: {reason} (the free and EAC lanes are unaffected)',
         'chan.pack.hint': 'The pack ships inside this plugin (vendor/channel-pack) and upgrades with it.',
@@ -382,7 +383,6 @@ window.__ModuleLoader__.load({
         'gw.relayKey': 'Relay key',
         'gw.rotate': 'Rotate',
         'gw.relayNote': 'The relay forwards only the model routes (/v1/*) and demands the relay key; binding to the LAN means every device on the network can reach that port.',
-        'gw.freeLaneNote': 'The free lane (Our Free Model) has its own forward port under "Local forward" on the Free models page.',
         'chan.credits.left': 'Credits left',
         'chan.credits.tokens': 'Tokens left',
         'chan.credits.dollars': 'Balance left (USD)',
@@ -413,7 +413,7 @@ window.__ModuleLoader__.load({
     // fallback for exactly that reason.
     const CSS = `
 /* ═══════════════════════════════════════════════════════════════════════
-   Our Free Model — visual system
+   模型接入 — visual system
    统一令牌：所有色值取自宿主 --dsw-alias-* 变量，昼夜由宿主切换。
    层级约定：layer-3 凹槽/页面底 · layer-2 面板 · layer-1 浮起元素。
    动效约定：transform/opacity 优先；常规 150–300ms、覆盖层 300–400ms。
@@ -522,13 +522,11 @@ window.__ModuleLoader__.load({
    scrim is therefore fixed to the viewport; the shell sets no transform, filter
    or contain on any ancestor, so nothing re-anchors it. Mask colour, blur and
    z-index mirror the Modal layer of the shell so this reads as first-party. */
-.ofm_scrim{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:var(--dsw-alias-bg-mask-1, rgb(0 0 0 / 32%));animation:ofm-fadein .24s ease}
-@keyframes ofm-fadein{from{opacity:0}to{opacity:1}}
-@keyframes ofm-popin{from{opacity:0;transform:translateY(16px) scale(.965)}to{opacity:1;transform:none}}
+.ofm_scrim{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:var(--dsw-alias-bg-mask-1, rgb(0 0 0 / 32%));}
 
 /* ══ Toast（fixed 到视口，浮在所有层之上） ════════════════════════════ */
 .ofm_toasts{position:fixed;right:18px;bottom:18px;z-index:1200;display:flex;flex-direction:column;gap:10px;max-width:min(380px,calc(100vw - 36px));font-family:inherit}
-.ofm_toast{position:relative;display:flex;flex-direction:column;gap:6px;padding:12px 14px 12px 16px;border-radius:13px;border:1px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 94%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 7%),0 14px 40px rgb(0 0 0 / 26%);font-size:12.5px;line-height:1.5;color:var(--dsw-alias-label-primary);animation:ofm-toast-rise .32s cubic-bezier(.16,1,.3,1);overflow:hidden}
+.ofm_toast{position:relative;display:flex;flex-direction:column;gap:6px;padding:12px 14px 12px 16px;border-radius:13px;border:1px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 94%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 7%),0 14px 40px rgb(0 0 0 / 26%);font-size:12.5px;line-height:1.5;color:var(--dsw-alias-label-primary);overflow:hidden}
 .ofm_toast{transform-origin:bottom right;will-change:transform}
 .ofm_toast::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dsw-alias-state-business-primary)}
 .ofm_toast.warn::before{background:var(--dsw-alias-state-warning-primary,#f0a441)}
@@ -543,9 +541,8 @@ window.__ModuleLoader__.load({
 .ofm_toastactions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .ofm_toastclose{margin-left:auto;background:transparent;border:0;color:var(--dsw-alias-label-tertiary);cursor:pointer;font:inherit;font-size:13px;padding:0 2px;transition:color .14s ease}
 .ofm_toastclose:hover{color:var(--dsw-alias-label-primary)}
-@keyframes ofm-toast-rise{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 /* ══ 模态 ══════════════════════════════════════════════════════════════ */
-.ofm_modal{width:min(520px,92vw);max-height:min(80vh,600px);border-radius:18px;border:1px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 95%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 8%),0 28px 80px rgb(0 0 0 / 42%);display:flex;flex-direction:column;overflow:hidden;animation:ofm-popin .34s cubic-bezier(.16,1,.3,1)}
+.ofm_modal{width:min(520px,92vw);max-height:min(80vh,600px);border-radius:18px;border:1px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 95%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 8%),0 28px 80px rgb(0 0 0 / 42%);display:flex;flex-direction:column;overflow:hidden;}
 .ofm_modalhead{padding:17px 20px 11px;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:720;letter-spacing:-.2px}
 .ofm_modalbody{padding:4px 20px 16px;overflow:auto;font-size:12.5px;line-height:1.7;color:var(--dsw-alias-label-secondary)}
 .ofm_modalbody p{margin:0 0 6px}
@@ -566,8 +563,7 @@ window.__ModuleLoader__.load({
 .ofm_tab:hover{color:var(--dsw-alias-label-primary)}
 .ofm_tab .ofm_tabnum{font-variant-numeric:tabular-nums;font-weight:600;color:var(--dsw-alias-label-tertiary);margin-left:6px;font-size:11px}
 .ofm_navspacer{display:none}
-.ofm_page{display:flex;flex-direction:column;gap:20px;animation:ofmpagein .4s cubic-bezier(.16,1,.3,1)}
-@keyframes ofmpagein{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.ofm_page{display:flex;flex-direction:column;gap:20px;}
 /* ── 玻璃表面：半透明叠层，大块面与小卡片共用一套底色 ─────────────── */
 .ofm_glass{background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 68%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-border-l2) 78%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 6%),0 12px 34px rgb(0 0 0 / 9%)}.ofm_root .ofm_hero,.ofm_root .ofm_panel,.ofm_root .ofm_modal{background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 70%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 7%),0 14px 40px rgb(0 0 0 / 10%)}
 /* ══ 渠道接入页 ════════════════════════════════════════════════════════ */
@@ -654,7 +650,7 @@ window.__ModuleLoader__.load({
 .ofm_btn[aria-busy="true"]{position:relative;color:transparent !important;pointer-events:none}
 .ofm_btn[aria-busy="true"]::after{content:"";position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;border:2px solid color-mix(in srgb,currentColor 30%,var(--dsw-alias-label-secondary));border-top-color:var(--dsw-alias-label-primary);}
 
-@media (prefers-reduced-motion:reduce){.ofm_root *,.ofm_root *::before,.ofm_root *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}}
+@media (prefers-reduced-motion:reduce){.ofm_root *,.ofm_root *::before,.ofm_root *::after{transition-duration:.01ms !important}}
 /* ═══ 精密仪器精修层（世界观：原厂仪器手感）：颜色听宿主，质感在阻尼。曲线 --ease-instrument 冲得快落得稳，--ease-settle 极轻过冲。退场比进场快。 ═══ */
 .ofm_glass{transition:border-color .22s var(--ease-instrument),box-shadow .26s var(--ease-instrument),transform .22s var(--ease-instrument),background .22s var(--ease-instrument)}
 .ofm_glass:hover{border-color:color-mix(in srgb,var(--dsw-alias-border-l2) 92%,var(--dsw-alias-state-business-primary));box-shadow:0 1px 2px rgb(0 0 0 / 5%),0 10px 28px -14px color-mix(in srgb,var(--dsw-alias-state-business-primary) 18%,transparent)}
@@ -750,14 +746,6 @@ window.__ModuleLoader__.load({
 .ofm_root .ofm_table td{
   font-variant-numeric: tabular-nums !important;
 }
-/* 表针走格：离散百分比快照模拟 steps 顿挫——同值连帧=停格，瞬间跳格=机械感；@keyframes 里用不了 steps() 函数，用帧堆出来 */
-@keyframes pl5-tick{
-  0%,24%{ transform: translateY(0); }
-  25%,54%{ transform: translateY(-1.5px); }
-  55%,79%{ transform: translateY(-.75px); }
-  80%,100%{ transform: translateY(0); }
-}
-
 /* ── 昼(not-dark)收敛：高光更哑、拉丝更隐、回弹更小 ─────────────── */
 @media not (prefers-color-scheme: dark){.ofm_root .ofm_panel{
     background:
@@ -789,10 +777,10 @@ window.__ModuleLoader__.load({
   }
   /* 呼吸灯停跳，但保留颜色状态 */
   .ofm_root .ofm_dot.ok{
-    animation: none !important;
+    
     opacity: 1 !important;
   }.ofm_root .ofm_kpi:hover .ofm_kpivalue{
-    animation: none !important;
+    
   }
 }
 
@@ -937,10 +925,10 @@ window.__ModuleLoader__.load({
 }.ofm_root .ofm_kpivalue{
   display: inline-block !important;
 }.ofm_root .ofm_kpi:hover .ofm_kpivalue{
-  animation: pl5-tick .34s var(--ease-instrument) 1 !important;
+  
 }
 
-@media (prefers-reduced-motion:reduce){.ofm_page{animation:none}.ofm_kpi,.ofm_chan{transition:none}}
+@media (prefers-reduced-motion:reduce){.ofm_kpi,.ofm_chan{transition:none}}
 `
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -1865,7 +1853,7 @@ window.__ModuleLoader__.load({
     }
 
     function ChannelsPage(props) {
-      const { t, ctx, summary } = props
+      const { t, ctx, summary, apply, busy } = props
       const { available, rpc } = useChannelRpc(ctx)
       // The pack runs a daily auto check-in engine across the credit channels;
       // this page is where it is switched and watched (usage.autoCheckin).
@@ -1942,6 +1930,8 @@ window.__ModuleLoader__.load({
             h(Pill, { tone: auto.running === true ? 'warn' : auto.ranToday === true ? 'ok' : '' },
               auto.running === true ? t('chan.auto.running') : auto.ranToday === true ? t('chan.auto.ran') : t('chan.auto.off')),
             typeof auto.lastResult === 'string' && auto.lastResult !== '' ? h('span', { className: 'ofm_note', title: auto.lastResult }, t('chan.auto.last').replace('{result}', auto.lastResult.length > 60 ? `${auto.lastResult.slice(0, 60)}…` : auto.lastResult)) : null)),
+          h('div', { className: 'ofm_row' },
+            h(Switch, { checked: summary?.settings?.hideChannelModels === true, label: t('pref.hideChannels'), disabled: busy, onChange: () => apply({ hideChannelModels: summary?.settings?.hideChannelModels !== true }) })),
         failed ? h('div', { className: 'ofm_callout ofm_error' },
           h('div', null, t('chan.pack.failed').replace('{reason}', pack.error ?? ''), h('div', { className: 'ofm_note' }, t('chan.pack.hint')))) : null,
         !available ? h('div', { className: 'ofm_callout' }, h('div', null, t('chan.rpc.unavailable'))) : null,
@@ -2394,8 +2384,7 @@ window.__ModuleLoader__.load({
                   kind: 'ghost', disabled: relayBusy,
                   onClick: async () => { try { setRelayKey((await post('/chan-gateway/rotate')).key ?? '') } catch (error) { setNotice(String(error?.message ?? error)) } },
                 }, t('gw.rotate'))),
-              h('p', { className: 'ofm_note' }, t('gw.relayNote')),
-              h('p', { className: 'ofm_note' }, t('gw.freeLaneNote')))),
+              h('p', { className: 'ofm_note' }, t('gw.relayNote')))),
         h(Section, { title: t('section.egress'), hint: t('section.egressHint') }, h(Egress, { settings, t, onApply: apply, busy })))
     }
 
@@ -2492,7 +2481,7 @@ window.__ModuleLoader__.load({
           ? h(LogsPage, { t, ctx })
           : tab === 'gateway'
             ? h(GatewayPage, { t, ctx, settings: data.settings, apply, busy })
-            : h(ChannelsPage, { t, ctx, summary: data })
+            : h(ChannelsPage, { t, ctx, summary: data, apply, busy })
 
       return h('div', { className: 'ofm_root ofm_shell' }, nav, page)
     }

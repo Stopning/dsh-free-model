@@ -1,10 +1,12 @@
-# Our Free Model — channels-only fork
+# Model Access (Our Free Model) — channels-only fork
 
 > A trimmed fork of [`Ebony-Vinyl/dsh-our-free-model`](https://github.com/Ebony-Vinyl/dsh-our-free-model) **2.1.0**.
 > One lane survives: **bring your own account channels** — thirteen providers, plus a token
 > dashboard, a per-request log and a local gateway. Upstream's anonymous free lane, the EAC
 > co-paid lane, the aggregate lane, the token savers, the routing chains and the whole
 > release/update channel are gone.
+> The settings entry reads **模型接入** in Chinese, **Model Access** in English; the package name and bundle id
+> stay `dsh-our-free-model`, because that is the key the host registers.
 
 ## What survives
 

@@ -1,8 +1,10 @@
-# Our Free Model — channels-only fork
+# 模型接入 (Our Free Model) — channels-only fork
 
 > [`Ebony-Vinyl/dsh-our-free-model`](https://github.com/Ebony-Vinyl/dsh-our-free-model) **2.1.0** 的精简 fork。
 > 只保留「把外部账号接进来」这一条车道：**十三个账号渠道 + 数据看板 + 运行日志 + 本地网关**。
 > 上游的匿名免费车道、EAC 协付车道、聚合渠道、省 Token、路由与发布/更新通道全部移除。
+> 设置页里的入口名是 **模型接入**（英文界面 **Model Access**）；包名与 bundle id 仍是 `dsh-our-free-model`，
+> 那是宿主注册的键，改名会连带 `cordis.patch.yml`，没有收益。
 
 ## 保留了什么
 
