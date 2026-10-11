@@ -1,5 +1,6 @@
 # 模型接入 (Our Free Model) — channels-only fork
 
+> **DSH 插件**（DeepSeek Harness · cordis bundle，`dsh-plugin`）——
 > [`Ebony-Vinyl/dsh-our-free-model`](https://github.com/Ebony-Vinyl/dsh-our-free-model) **2.1.0** 的精简 fork。
 > 只保留「把外部账号接进来」这一条车道：**十三个账号渠道 + 数据看板 + 运行日志 + 本地网关**。
 > 上游的匿名免费车道、EAC 协付车道、聚合渠道、省 Token、路由与发布/更新通道全部移除。
