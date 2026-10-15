@@ -2,6 +2,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import Schema from '@deepseek-ai/schemastery'
+import { broadcastCatalogChanged } from './catalog-broadcast.js'
+import { isPrewarmSpacingValid, startCatalogPrewarm } from './catalog-prewarm.js'
+import { isRemoteCatalogComplete } from './models.js'
+import { isBuddyCatalogComplete } from './buddy-oauth.js'
 import { registerCodeArtsLlm, PROVIDER as CODEARTS_PROVIDER } from './llm-adapter.js'
 import { registerBuddyLlm } from './buddy-adapter.js'
 import { registerLobsteraiLlm } from './lobsterai-adapter.js'
@@ -60,8 +64,21 @@ import type { MinimaxCredential } from './minimax.js'
 import { GeminiAuth } from './gemini-auth.js'
 import { registerGeminiLlm } from './gemini-adapter.js'
 import { GEMINI } from './gemini.js'
+// Accio（阿里 Accio Work）：适配器 + 产品配置 + 鉴权服务 + 凭据工具。
+// 标准 OAuth 2.0 + PKCE（公开客户端 `accio-work`、无 secret），**完全脱离 IDE** ——
+// 不读本机 `credentials.enc`、不需要 DPAPI、不需要 SecurityGuard 签名（实测）。
+import { AccioAuth } from './accio-auth.js'
+import { registerAccioLlm } from './accio-adapter.js'
+import { ACCIO } from './accio-product.js'
+import type { AccioCredential } from './accio.js'
 import type { GeminiCredential } from './gemini.js'
 import { createGeminiSigStore } from './gemini-sigstore.js'
+// OfficeAce（华为 ModelArts MaaS 云端直连）：适配器 + 产品配置 + 鉴权模块。
+// 登录 / 推理 / 续期 / 余额 / 倍率全部直连云端，**不依赖 OfficeAce 客户端**。
+import { registerOfficeAceLlm } from './officeace-adapter.js'
+import { OFFICEACE } from './officeace-product.js'
+import * as officeaceAuth from './officeace-auth.js'
+import { createOfficeAceCredentialProvider } from './officeace-lock.js'
 import { registerOpencodeLlm } from './opencode-adapter.js'
 // ⚠️ opencode 的 RPC 由 `channel-pack-rpc.ts` 的 handleMethod 统一分派
 // （它调 handleOpencodeRpc），本文件**不再**单独注册端点 —— 详见
@@ -292,6 +309,10 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     'llm-minimax', 'llm-zcode', 'llm-gemini',
   )
   const service = new CodeArtsAuth(ctx)
+  // 各来源成败的**原地出参对象**（上游 issue IKJVTF）：`refreshModels` 每轮写入，
+  // 适配器的 `catalogComplete` 桥接读它。构造时先给「全失败」的保守值 ——
+  // 不能默认成「完整」，否则首拉之前就把残缺判成完整。
+  service.lastCatalogOutcome = { gatewayOk: false, builtinOk: false }
   const pool = new AccountPool(ctx)
 
   // 「已失效模型」剔除：注入 ctx 只为把日志接进 DSH logger 并复用同一份 home
@@ -363,6 +384,18 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       if (available) await service.refreshAccountCredential(available.entry.credentialRef, pool, available.entry.id)
     },
     fetchRemoteModels: () => service.refreshModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器
+    //    可能一直停在兜底表上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
+    // ⚠️ 完整性由 `service.refreshModels` 每轮**原地写入**该对象（两来源各自的
+    //    成败）。适配器据此判「这次目录完不完整」，决定要不要永久缓存 ——
+    //    只看「列表非空」会让残缺目录固化，只能重启 DSH。
+    catalogComplete: () => {
+      const outcome = service.lastCatalogOutcome
+      return outcome === undefined ? undefined : isRemoteCatalogComplete(outcome)
+    },
     accountPool: pool,
   })
 
@@ -546,6 +579,9 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
   }
 
   const buddy = new BuddyAuth(ctx)
+  // 各来源成败的**原地出参对象**（上游 issue IKJVTF）：`fetchModels` 每轮写入，
+  // 适配器的 `catalogComplete` 桥接读它。构造时先给「全失败」的保守值。
+  buddy.lastCatalogOutcome = { scopedOk: false, configOk: false }
   const buddyAdapter = registerBuddyLlm(ctx, {
     credentialRef: credentialRef(BUDDY_CREDENTIAL_REF),
     resolveCredential: async (modelId?: string) => {
@@ -588,6 +624,18 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     // 并自锁。详见 createPoolRefresh 的注释。
     refresh: createPoolRefresh(pool, 'buddy', buddy),
     fetchRemoteModels: () => buddy.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器
+    //    可能一直停在兜底表上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
+    // ⚠️ 完整性由 `buddy.fetchModels` 每轮**原地写入**该对象（scoped 与
+    //    `/v3/config` 各自的成败）。只看「列表非空」会让残缺目录固化 ——
+    //    用户症状就是「hy4 preview 在 IDE 免费、我们这儿还是 0.29」。
+    catalogComplete: () => {
+      const outcome = buddy.lastCatalogOutcome
+      return outcome === undefined ? undefined : isBuddyCatalogComplete(outcome)
+    },
     readImage: makeReadImage(ctx),
     // 图片请求版本（缩放）桥接：issue !IKITT9。不可用时适配器自动回退原图。
     readImageRequest: makeReadImageRequest(ctx),
@@ -601,6 +649,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
   // ctx.buddyAuth / ctx.workbuddyAuth，互不覆盖。
   // 同样不注册斜杠命令：入口在 Channel Pack 的 WorkBuddy 面板。
   const workbuddy = new BuddyAuth(ctx, { product: WORKBUDDY })
+  workbuddy.lastCatalogOutcome = { scopedOk: false, configOk: false }
   const workbuddyAdapter = registerBuddyLlm(ctx, {
     credentialRef: credentialRef(WORKBUDDY.defaultCredentialRef),
     resolveCredential: async (modelId?: string) => {
@@ -641,6 +690,12 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     // 这条正是「workbuddy + deepseek-v4.1-flash 一直报未配置凭据」的根因。
     refresh: createPoolRefresh(pool, 'workbuddy', workbuddy),
     fetchRemoteModels: () => workbuddy.fetchModels(pool),
+    // 同 buddy：广播 + 完整性桥接（两个端点各自成败）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
+    catalogComplete: () => {
+      const outcome = workbuddy.lastCatalogOutcome
+      return outcome === undefined ? undefined : isBuddyCatalogComplete(outcome)
+    },
     readImage: makeReadImage(ctx),
     readImageRequest: makeReadImageRequest(ctx),
     accountPool: pool,
@@ -693,6 +748,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       else await lobsterai.refresh()
     },
     fetchRemoteModels: () => lobsterai.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
     resolveClientVersion: () => lobsterai.resolveClientVersion(),
     readImage: makeReadImage(ctx),
     // 图片请求版本（缩放）桥接：issue !IKITT9。该家实测 13 张原图（≈50 MiB）
@@ -864,6 +924,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       else await trae.refresh()
     },
     fetchRemoteModels: () => trae.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
     // 图片字节桥接：TRAE 上游**支持图片**（见 Issue #IKHDKC 的实测记录），
     // 但模态按模型判定（远端 `display_config.multimodal`），故这里只负责读字节。
     readImage: makeReadImage(ctx),
@@ -1095,6 +1160,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       if (!response.ok) return []
       return parseLoomyRemoteModels(await response.json())
     },
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
     // 图片字节桥接：按模型能力判定（远端 capabilities.input_modalities 含 image）。
     readImage: makeReadImage(ctx),
     accountPool: pool,
@@ -1160,6 +1230,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     // visible 过滤 + raccoonDisplayName 生成含倍率的展示名）。
     // 失败时返回空数组，由适配器回退兜底表。
     fetchRemoteModels: () => raccoon.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
     // 图片字节桥接：按模型能力判定（远端 tags 含 vision）。
     readImage: makeReadImage(ctx),
     // ⚠️ raccoon 尤其需要请求版本：该网关按**请求体字节**设限
@@ -1235,6 +1310,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     // 照抄内置表会漏掉 `MiniMax-M3.1-Flash-Preview`（用户截图里选中的那个）。
     // 失败时返回兜底表（适配器侧也有兜底）。
     fetchRemoteModels: () => minimax.fetchRemoteModelsOnly(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
     // 图片字节桥接：模态按模型判定（远端 `modalities.input` 含 image，
     // 只有 M3.1-Flash-Preview 与 M3 是）。适配器声明不支持时会**报错**，
     // 不会把图片发出去让服务端 400。
@@ -1570,6 +1650,11 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
   // 模型目录用静态白名单（实测可用的两个）—— 上游模型池含
   // 实测返回空响应的两条（GLM-5-Turbo / GLM-5.2），故不枚举远端。
   fetchRemoteModels: () => zcode.fetchRemoteModelsOnly(),
+  // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+  //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+  //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+  //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+  onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
   accountPool: pool,
   product: ZCODE,
   // 就绪判据 = 有可用凭据（插件自存的）。
@@ -1687,6 +1772,13 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
     // ⚠️ 漏了这一行定时器不武装：凭据到期后**不会自动续期**，
     // 用户会看到「每隔一小时就要重新登录」，且日志里一个字都没有。
     ['gemini', (p) => gemini.refreshAll(p)],
+    // ⚠️ OfficeAce **可续期**（华为云 STS 的 refresh_token grant，STS 凭据约 2 小时）。
+    // 与 gemini 同一课教训：**漏这一行 = 定时器不武装它**，凭据到期后不会自动续期，
+    // 用户看到「每隔约两小时要重新登录」，且日志里一个字都没有。
+    // 它是模块级函数（无 Service 实例），签名收 `pool`。
+    ['officeace', (p) => officeaceAuth.refreshAll(p)],
+    // Accio **可续期**（标准 OAuth refresh_token grant）。同款教训见上两行。
+    ['accio', (p) => accio.refreshAll(p)],
   ]
 
   async function refreshAllCredentials(): Promise<void> {
@@ -1931,6 +2023,133 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
       return adapter
     }
   }
+  // ===== Accio（阿里 Accio Work）=====
+  //
+  // 与其余 provider 的**三处实测差异**（引上游 `docs/agent-notes/providers-accio.md`，
+  // 本 fork 未复测）：
+  //   1. 标准 OAuth 2.0 + PKCE（`client_id='accio-work'`，公开客户端）⇒ 完全脱离 IDE；
+  //   2. **不需要** SecurityGuard 签名（不带 `pctb-x-*` 同样 200）；
+  //   3. 但 **token 必须放 body 的 `token` 字段** —— 放 `Authorization` 头恒
+  //      **流内 402**（HTTP 仍是 200 ⇒ 不看流内 `error_code` 会误判成「成功但没内容」）。
+  const accio = new AccioAuth(ctx, { fetcher: network.fetch })
+  const accioAdapter = registerAccioLlm(ctx, {
+    // ⚠️ provider 实参用 ACCIO.id 而非字面量（同 minimax / gemini 的既有约定）。
+    // ⚠️ `modelId` 必须透传：否则模型级限流标记被忽略（见 buddy 处说明）。
+    resolveCredential: async (modelId?: string) => {
+      const available = await pool.getAvailableAccount(ACCIO.id, modelId ?? '')
+      if (available) {
+        reportLedgerAccount(ACCIO.id, available.entry.id)
+        return available.credential as unknown as AccioCredential
+      }
+      // 兜底是**裸 JSON.parse**（与上游同款历史形态，逐字保留）。
+      const resolved = await ctx.credentials.resolve(credentialRef(ACCIO.defaultCredentialRef))
+      if (!resolved) return undefined
+      try {
+        return JSON.parse(resolved.value) as AccioCredential
+      } catch {
+        return undefined
+      }
+    },
+    refresh: async () => {
+      // ⚠️ 必须刷新**解析凭据时所用的那一个**账号，而不是默认单凭据 ref ——
+      // 否则续期的是另一份凭据，用户会看到「刚登录好却一直认证失败」。
+      // ⚠️ `AccioAuth` **没有**无参 `refresh()`（与 buddy / trae 那几家不同），
+      // 它的续期入口一律是 `refreshAccountCredential(refName, …)`。
+      const available = await pool.getAvailableAccount(ACCIO.id, '')
+      if (available) {
+        // ⚠️ 必须传 pool + entry.id：续期成功后要把新的 `expiresAt` 写回账号池，
+        // 否则 UI 一直显示「已过期」而实际能正常发消息（上游 issue !IKIRTT）。
+        await accio.refreshAccountCredential(
+          available.entry.credentialRef, pool, available.entry.id,
+        )
+      } else {
+        await accio.refreshAccountCredential(ACCIO.defaultCredentialRef)
+      }
+    },
+    // 远端模型目录：`POST /api/llm/config/v2`（token 在 body）。
+    // 失败或未登录一律返回空数组，由适配器回退 `ACCIO.fallbackModels`。
+    fetchRemoteModels: () => accio.fetchModels(pool),
+    accountPool: pool,
+    product: ACCIO,
+    // ⚠️ 图片通路：上游原生收图（Gemini 风格 `parts[].inline_data`），
+    // `multimodal: true` 的模型实测四色全对、`false` 的**静默忽略图片**
+    // ⇒ `inputModalities` 必须按**逐模型**的 `supportsImage` 如实声明。
+    readImage: makeReadImage(ctx),
+    readImageRequest: makeReadImageRequest(ctx),
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
+  })
+
+  // ===== OfficeAce（华为 ModelArts MaaS，云端直连）=====
+  //
+  // 形态与前面所有 provider 相同：进程内 LlmAdapter 直发远端，无子进程、无端口。
+  //
+  // 独有语义：**凭据完全自主** —— 登录走华为云 OAuth（PKCE + DPoP），推理用
+  // `model_app_key:secret` 的 Basic 鉴权，STS 用 refresh_token 续期。全程
+  // **不经过 OfficeAce 客户端**（协议见 `officeace-auth.ts` 模块头）。
+  //
+  // ⚠️ **本渠道由本 fork 从 gitee 上游移植**（`officeace-*.ts` + `dsml.ts` 逐文件搬入，
+  //    仅改了引用注释里的文件名）。本批只移植这一个渠道 —— Accio 依赖
+  //    `model-catalog.ts` 骨架、代价更大，另行评估。
+  /** 「启用中的 OfficeAce 账号」清单（顺序 = 用户拖拽的手动优先级）。 */
+  const enabledOfficeAceAccounts = () => pool.listAccountsByProvider(OFFICEACE.id)
+    .filter((entry) => entry.enabled !== false)
+
+  /**
+   * 「不理会锁定」的取号路径（未锁定态推理 + 只读目录探测**共用这一份**）。
+   *
+   * ⚠️ 目录探测必须走它而不是 `credentialProvider`：后者在「锁定 + 只剩永久桶」
+   * 时会抛错，而 `listModels` 的调用方全都不接这个错 ⇒ 症状是一串与锁定无关的
+   * 「读取模型列表失败 / 关不掉供应商 / 分组消失」。只读端点不扣积分。
+   */
+  const resolveOfficeAceCredential = async () => {
+    const available = await pool.getAvailableAccount(OFFICEACE.id, '')
+    const ref = available?.entry?.credentialRef
+      ?? enabledOfficeAceAccounts()[0]?.credentialRef
+    if (ref === undefined) return officeaceAuth.readStoredCredential()
+    return officeaceAuth.readCredential(ref, ctx.credentials as never)
+  }
+
+  const officeAceAdapter = registerOfficeAceLlm(ctx, {
+    disabledModels: () => pool.disabledModelsFor(OFFICEACE.id),
+    // ⚠️ 锁定态必须在这里分道：`permanentLocked()` 若无人读就是**哑锁**
+    //（上游 IKLTHB 第 ① 条）。判定逻辑全在 `officeace-lock.ts`，这里只装配。
+    credentialProvider: createOfficeAceCredentialProvider({
+      permanentLocked: () => pool.permanentLocked(OFFICEACE.id),
+      accounts: () => enabledOfficeAceAccounts()
+        .map((entry) => ({ id: entry.id, credentialRef: entry.credentialRef })),
+      resolveUnlocked: resolveOfficeAceCredential,
+      readCredential: (ref) => officeaceAuth.readCredential(ref, ctx.credentials as never),
+      readStoredCredential: () => officeaceAuth.readStoredCredential(),
+      // ⚠️ 必须带 ref（云侧按 ref 直读；缺了会让多账号判成同一份余额）。
+      summaryOf: async (credential, ref) => {
+        try {
+          const summary = await officeaceAuth.fetchSubscriptionSummary(48, ref, credential)
+          return summary === undefined
+            ? { ok: false, error: '读不到订阅摘要（未登录 / 云侧查询失败）' }
+            : { ok: true, summary }
+        } catch (error) {
+          return { ok: false, error: `订阅摘要查询失败：${String(error)}` }
+        }
+      },
+    }),
+    probeCredential: resolveOfficeAceCredential,
+    readImage: makeReadImage(ctx),
+    // ⚠️ 必须注入：漏接的症状是该渠道账号永不过期（重新登录后旧凭据仍被用），
+    // 且日志里一个字都没有。**必须走账号池**，与其余渠道同款。
+    refresh: async () => {
+      const available = await pool.getAvailableAccount(OFFICEACE.id, '')
+      if (available) {
+        await officeaceAuth.refreshAccountCredential(
+          available.entry.credentialRef, pool, available.entry.id,
+        )
+        return
+      }
+      await officeaceAuth.refreshStoredCredential()
+    },
+    accountPool: pool,
+    onCatalogLoaded: () => { broadcastCatalogChanged(ctx) },
+  })
+
   const modelAdapters: Record<string, { listAllModels(): readonly { id: string; name: string }[] }> = {
     // `codearts` 是 registerCodeArtsLlm 返回的**适配器实例**（与 CodeArtsAuth
     // 服务实例 `service` 不同名，故这里可以简写）。
@@ -1946,6 +2165,8 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
     raccoon: pruned(RACCOON.id, raccoonAdapter),
     minimax: pruned(MINIMAX.id, minimaxAdapter),
     gemini: pruned(GEMINI.id, geminiAdapter),
+    officeace: pruned(OFFICEACE.id, officeAceAdapter),
+    accio: pruned(ACCIO.id, accioAdapter),
     zcode: pruned(ZCODE.id, zcodeAdapter),
     ...(opencodeAdapter === undefined ? {} : { opencode: pruned(OPENCODE.id, opencodeAdapter) }),
   }
@@ -1955,14 +2176,46 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
   // 丢的却是「下一轮工具调用能不能带上签名」。
   ctx.effect(() => () => { void geminiSigStore.flush().catch(() => {}) })
 
-  registerChannelPackRpc(ctx, pool, service, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, modelAdapters, config)
+  registerChannelPackRpc(ctx, pool, service, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, officeaceAuth, accio, modelAdapters, config)
   // 网关是旁路功能：这里传 `pool` 只为读设置页里的开关，其内部任何失败都已
   // 自行降级为日志，绝不会让插件 apply() 失败。
   mountOpenAiGateway(ctx, pool)
+
+  // ── 冷启动的有界目录预热（上游 issue IKJVTF 缺陷①的自愈路径）─────────────
+  //
+  // 为什么需要：冷启动时凭据可能还没就绪、或首次连接不稳定 —— 首拉失败后
+  // `remoteModels` 保持 undefined，适配器回落到**静态兜底表**。此后客户端把这份
+  // 兜底目录缓存成 `status: 'ready'`，而**没有任何东西会在冷却到期后再试一次**，
+  // 只有用户主动操作才可能触发下一次读取 ⇒ 「远端其实早就拿到了，只是没人再问」
+  // 会一直持续到用户碰巧触发重读。
+  //
+  // ⚠️ **间隔必须大于 `RemoteCatalogGate` 的 30 秒失败冷却**，否则重试被闸门
+  // 原样挡回、什么也不做（等于没预热）。该约束由 `catalog-prewarm.ts` 的
+  // `CATALOG_PREWARM_DELAYS_MS` 与 `isPrewarmSpacingValid` 共同守着。
+  //
+  // ⚠️ 走 `ctx.llm.listModels` 而不是适配器私有方法：它会走完整路径
+  // （账号门控 → `ensureRemoteModels` → 闸门），目录已就绪时是**零网络**的，
+  // 且对 `withDeadModelPruning` 包装透明（直接拿原始实例会绕过那层收敛）。
+  //
+  // ⚠️ **不 await**：`apply()` 是同步函数，预热会发网络请求。停止函数挂
+  // `ctx.effect`，插件释放后停手。
+  if (isPrewarmSpacingValid()) {
+    ctx.effect(() => startCatalogPrewarm({
+      providers: Object.keys(modelAdapters),
+      warm: (provider) => ctx.llm.listModels(provider),
+      logger: { warn: (message) => ctx.logger?.warn?.(message) },
+    }))
+  } else {
+    // 静默无效是最糟的失败形态（没有任何报错，只是目录一直补不回来）——
+    // 故间隔不合法时**明确报错**，而不是照常启动一个被闸门全挡回的预热。
+    ctx.logger?.warn?.('[channel-pack] 目录预热间隔不大于闸门冷却，已跳过预热（该配置无效）')
+  }
+
   // 思考死循环被中止后的**自动续跑**：把此前必须由用户手打「继续」的那一步
   // 自动化（真实报障 2026-10-04，见 `loop-recovery.ts` 模块头）。
   // ⚠️ 它依赖 `agents` 服务，故内部用 `ctx.inject(['agents'], …)` 挂载：
   // 该服务缺席的 profile 里本功能整体不生效，不会让插件永久 pending。
   installLoopResume(ctx)
+
   ctx.provide('accountPool', pool)
 }

@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { getRandomValues, randomUUID, randomBytes } from 'node:crypto'
 import type { CodeArtsCredential, CodeArtsCredentialResponse, LoginFlowOptions, LoginFlowResult } from './types.js'
 import {
@@ -453,5 +454,99 @@ export async function runOAuthFlow(options: LoginFlowOptions = {}): Promise<Logi
     return await started.result
   } finally {
     await started.close()
+  }
+}
+
+/**
+ * 读 Windows 上「默认浏览器」的可执行文件路径。
+ *
+ * ⚠️ 只用 `reg.exe`、不引第三方依赖：注册表读取是本功能唯一的平台相关调用，
+ * 为它加 native 依赖不划算（且本插件的 peer 约束不允许）。非 Windows 返回
+ * `undefined`（无痕开窗目前只在 Windows 上实测过）。
+ */
+function defaultBrowserExecutable(): string | undefined {
+  if (process.platform !== 'win32') return undefined
+  const query = (key: string, value: string): string | undefined => {
+    try {
+      const out = execFileSync('reg', ['query', key, '/v', value], {
+        encoding: 'utf8', timeout: 5000, windowsHide: true,
+      })
+      const m = /REG_SZ\s+(.+?)\s*$/m.exec(out)
+      return m?.[1]?.trim()
+    } catch {
+      return undefined
+    }
+  }
+  const progId = query(
+    'HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice',
+    'ProgId',
+  )
+  if (progId === undefined || progId.length === 0) return undefined
+  // ⚠️ 三个位置都要试：`UserChoice` 的 ProgId 可能只注册在 HKCR（合并视图）
+  //    或 `HKCU\Software\Classes`（用户级安装）。
+  for (const root of [
+    `HKCR\\${progId}\\shell\\open\\command`,
+    `HKCU\\SOFTWARE\\Classes\\${progId}\\shell\\open\\command`,
+    `HKLM\\SOFTWARE\\Classes\\${progId}\\shell\\open\\command`,
+  ]) {
+    try {
+      const out = execFileSync('reg', ['query', root, '/ve'], {
+        encoding: 'utf8', timeout: 5000, windowsHide: true,
+      })
+      const m = /REG_SZ\s+(.+?)\s*$/m.exec(out)
+      const raw = m?.[1]
+      if (raw === undefined) continue
+      // 取命令行里**第一个**被引号包裹的路径；没有引号则取到第一个空格前。
+      const quoted = /^"([^"]+)"/.exec(raw)
+      const exe = quoted?.[1] ?? raw.split(' ')[0]
+      if (exe !== undefined && exe.length > 0 && existsSync(exe)) return exe
+    } catch { /* 试下一个位置 */ }
+  }
+  return undefined
+}
+
+/**
+ * 用**无痕窗口**打开 URL（华为云 OAuth 换账号登录用，OfficeAce 渠道）。
+ *
+ * ## 为什么必须无痕（上游实测，2026-10-13）
+ *
+ * 华为 `authui` 会**静默复用**浏览器已有的登录会话：带着已登录 cookie 打开
+ * 授权页会直接放行、**看不到登录框**，于是「新建账号」永远只能建出同一个号。
+ * 实测三条：带 `prompt=login` 仍复用会话（authui 忽略该参数）；只有
+ * `logout` 或**换一个 cookie jar** 两条路。选后者 —— `logout` 的作用域是
+ * 整个 `auth.huaweicloud.com` 域，会**连带登出用户日常浏览器里的华为云控制台**；
+ * 无痕窗口是全新 cookie jar，不碰用户既有会话。
+ *
+ * ⚠️ 客户端**无法**自己做（`window.open` 不能请求无痕模式，那是进程级启动参数），
+ * 故必须由宿主 spawn 浏览器可执行文件。
+ *
+ * @returns 是否成功以无痕方式拉起（`false` 时调用方应回退到 `openBrowser`）。
+ */
+export function openIncognitoWindow(url: string): boolean {
+  // ⚠️ **测试环境断路器**（上游踩过的真实污染）：本函数会真的 spawn 浏览器，
+  // 而走真实 `account.create` 的用例带着桩 URL ⇒ 每跑一次测试就弹一个窗口。
+  // 判据按**运行环境**一刀切（不是按 URL 打补丁 —— 下一个用例换 URL 就复发）。
+  // **返回 false 而不是抛错**：调用方据此走正常的回退分支，断言形态与生产一致。
+  if (process.env.NODE_ENV === 'test') return false
+  const exe = defaultBrowserExecutable()
+  if (exe === undefined) return false
+  // ⚠️ **不要用「app 模式」开关**（上游真机实测证伪，阻断级）：在 360 极速浏览器 X
+  // 上窗口开了但页面显示「域名解析错误」—— 它把该开关后面的值当域名解析了。
+  // 换取账号这个核心目的不依赖 app 模式，而它带来的失败是阻断级（用户看到错误页）。
+  // 故只用无痕开关，窗口形态交给浏览器。
+  const isFirefox = /firefox\.exe$/i.test(exe)
+  const args = isFirefox ? ['-private-window', url] : ['--incognito', '--new-window', url]
+  try {
+    const child = spawn(exe, args, { detached: true, stdio: 'ignore' })
+    // ⚠️ 必须挂 'error' 监听器 + unref：spawn 的失败是**异步 'error' 事件**，
+    // 外层 try/catch 接不住；无监听器时会变成未捕获异常把宿主带走。
+    child.on('error', (error) => {
+      console.error('[channel-pack] failed to open incognito window:', error)
+    })
+    child.unref()
+    return true
+  } catch (error) {
+    console.error('[channel-pack] failed to open incognito window:', error)
+    return false
   }
 }

@@ -188,6 +188,30 @@ export interface BuddyAdapterOptions {
   /** 动态拉取远端模型列表（含上下文窗口与能力，若远端下发）；失败时调用方回退到静态列表。 */
   fetchRemoteModels?: () => Promise<BuddyRemoteModel[]>
   /**
+   * 本次目录是否**两个端点都拿全了**（上游 issue IKJVTF）。
+   *
+   * ⚠️ 用**回调**而非直接读 auth 的内部状态：适配器不该依赖 `BuddyAuth` 的字段
+   * 形状（它由 `index.ts` 接线，且单测用替身）。接线层把它桥接成
+   * 「读 `buddy.lastCatalogOutcome`」。
+   *
+   * 返回 `undefined` 时按「无法判定」处理 —— 与 `normalizeLoadResult` 的
+   * 向后兼容口径一致（`complete = got`）。
+   */
+  catalogComplete?: () => boolean | undefined
+  /** 目录加载闸门的失败冷却（毫秒，测试用）。 */
+  catalogCooldownMs?: number
+  /** 时钟注入（测试用），默认 `Date.now`。 */
+  now?: () => number
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
+  /**
    * 读取一张图片的原始字节（图片输入必需）。
    *
    * 由调用方桥接 `ctx.attachments.readImage(ref)`。**失败必须抛错**：
@@ -839,7 +863,16 @@ export class BuddyAdapter extends LlmAdapter {
    * 目录加载闸门：并发去重 + 失败/空结果冷却。
    * 依据见 `src/remote-catalog-gate.ts`（首屏「加载模型巨长」的实测归因）。
    */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
+  /**
+   * 远端目录是否**已完整**（scoped 与 `/v3/config` 都取到了）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**，
+   * 只能重启 DSH 才能恢复。用户可见症状正是报障原话「hy4 preview 现在 ide 是
+   * 免费我们还是 0.29」—— 促销倍率只由**失败的那个端点**下发。
+   */
+  private remoteComplete = false
   /** 远端下发的模型元数据（id → 能力），listModels/resolveModel/stream 共用。 */
   private remoteMeta: ReadonlyMap<string, BuddyRemoteModel> = new Map()
   /** 远端下发的模型上下文窗口（/v3/config data.models[].maxInputTokens）。 */
@@ -858,6 +891,11 @@ export class BuddyAdapter extends LlmAdapter {
     this.product = options.product ?? CODEBUDDY
     this.fetchImpl = options.fetchImpl ?? fetch
     this.sessionId = options.sessionId ?? crypto.randomUUID().replace(/-/g, '')
+    this.catalogGate = new RemoteCatalogGate({
+      ...options.now === undefined ? {} : { now: options.now },
+      ...options.catalogCooldownMs === undefined ? {} : { cooldownMs: options.catalogCooldownMs },
+      ...options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    })
     const fallback = this.product.fallbackModels ?? []
     this.productFallbackIndex = new Map(fallback.map((model) => [model.id, model]))
     this.productFallbackContextWindows = new Map(
@@ -960,7 +998,8 @@ export class BuddyAdapter extends LlmAdapter {
 
   private async ensureRemoteModels(): Promise<void> {
     const fetchRemote = this.options.fetchRemoteModels
-    if (this.remoteModels !== undefined || fetchRemote === undefined) return
+    // ⚠️ 短路判据是「已**完整**」而非「已定义」（见 `remoteComplete`）。
+    if (this.remoteComplete || fetchRemote === undefined) return
     // 闸门：并发去重 + 失败/空结果冷却（详见 src/remote-catalog-gate.ts 的
     // 实测依据）。Buddy 的目录端点超时上限 60s，失败不冷却会让首屏在
     // 「每个模型重试一次」的放大下长时间空转。
@@ -978,7 +1017,11 @@ export class BuddyAdapter extends LlmAdapter {
           .filter((model) => model.contextWindow !== undefined)
           .map((model) => [model.id, model.contextWindow as number]),
       )
-      return true
+      // ⚠️ 完整性由接线层桥接的数据源上报（scoped + /v3/config 各自的成败）。
+      // 拿不到判定时退回 `got`（= 旧行为），避免把「判不出」当成「残缺」
+      // 而让该 provider 反复重拉。
+      this.remoteComplete = this.options.catalogComplete?.() ?? true
+      return { got: true, complete: this.remoteComplete }
     })
   }
 

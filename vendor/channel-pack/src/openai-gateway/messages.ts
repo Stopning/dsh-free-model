@@ -29,6 +29,32 @@ export interface OpenAiToolCall {
   function?: { name?: unknown; arguments?: unknown }
 }
 
+/**
+ * 网关自有的消息来源标识。
+ *
+ * ⚠️ 0.2.0 的 `MessageSourceMap` **删除了共享的 `plugin` 包装**，改为由每个
+ * 生产者自己声明 kind（`dsh-llm` 的原文：「no shared catch-all `plugin` kind」）。
+ * 网关正是一个生产者，故如实署名。
+ *
+ * ⚠️ **本 fork 的两条上游对同一问题给了两种写法，这里跟 gitee 侧**：
+ * fork 父仓库用 `{ kind: 'plugin:dsh-openai-gateway' }`，而 gitee 上游用
+ * 「裸 kebab-case kind + 模块增强」。装着的 `dsh-llm@0.2.1-alpha.2`（以及
+ * `0.2.1-alpha.3`、回溯到 `0.1.7-rc.2`）都**只有**裸 kind 这种形态 ——
+ * 全仓约 20 个 `MessageSourceMap` 增强（`plan-mode`、`goal`、`compact-checkpoint` …）
+ * 一律是裸 kebab-case，且**没有任何 `plugin:` 前缀的先例**。故取 gitee 写法。
+ *
+ * ⚠️ 网关造出的消息**只进 `llm.stream()`**（`server.ts`），**不落盘**
+ * （没有 `session.append` 调用），故这个 kind 不会出现在会话日志里。
+ */
+export const GATEWAY_SOURCE_KIND = 'openai-gateway'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** 由 OpenAI 兼容网关（`/v1/chat/completions`、`/v1/responses`）合成的入站消息。 */
+    'openai-gateway': { readonly kind: 'openai-gateway' }
+  }
+}
+
 export interface OpenAiChatMessage {
   role?: unknown
   content?: unknown
@@ -306,9 +332,7 @@ async function convertMessage(
     return createGatewayMessage('system', [{
       type: 'text',
       text: rewriteTencentContentFingerprints(textFromContent(value.content), provider),
-    }], {
-      kind: 'plugin', plugin: 'dsh-openai-gateway',
-    })
+    }], { kind: GATEWAY_SOURCE_KIND })
   }
   if (role === 'user') {
     // ⚠️ user 消息走 parts：图片在这里被真正接收（其它角色不接受图片）。

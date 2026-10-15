@@ -17,6 +17,7 @@ import {
   fetchModels,
   refreshToken,
   runBuddyLoginFlow,
+  type BuddyCatalogOutcome,
   type BuddyLoginFlowOptions,
 } from './buddy-oauth.js'
 import { RefreshScheduler } from './refresh.js'
@@ -441,14 +442,45 @@ export class BuddyAuth extends Service {
     // 优先账号池
     if (pool) {
       const available = await pool.getAvailableAccount(this.product.id, '')
-      if (available) return fetchModels(available.credential as BuddyCredential, this.fetchImpl, undefined, this.product)
+      if (available) {
+        return fetchModels(
+          available.credential as BuddyCredential,
+          this.fetchImpl,
+          undefined,
+          this.product,
+          this.lastCatalogOutcome,
+        )
+      }
     }
     const resolved = await this.ctx.credentials.resolve(credentialRef(this.credentialRefName))
-    if (!resolved) return []
+    if (!resolved) {
+      // 无凭据 ⇒ 两个端点都没取到 ⇒ 不能判成「完整」（否则残缺目录永久固化）。
+      if (this.lastCatalogOutcome !== undefined) {
+        this.lastCatalogOutcome.scopedOk = false
+        this.lastCatalogOutcome.configOk = false
+      }
+      return []
+    }
     const credential = parseCredential(resolved.value)
-    if (!credential) return []
-    return fetchModels(credential, this.fetchImpl, undefined, this.product)
+    if (!credential) {
+      if (this.lastCatalogOutcome !== undefined) {
+        this.lastCatalogOutcome.scopedOk = false
+        this.lastCatalogOutcome.configOk = false
+      }
+      return []
+    }
+    return fetchModels(credential, this.fetchImpl, undefined, this.product, this.lastCatalogOutcome)
   }
+
+  /**
+   * 最近一次 {@link fetchModels} 的各来源成败（上游 issue IKJVTF，审计 I3）。
+   *
+   * ⚠️ 由 `index.ts` 在**构造时**注入一个空对象，此后 `fetchModels`
+   * 每轮原地写入 —— 适配器在 `fetchRemoteModels()` 返回后读它，即可判
+   * 「这次目录完不完整」。用「出参对象」而不是改 `fetchModels` 的返回类型：
+   * 该签名被既有调用方与单测按「返回数组」使用，改形状会波及它们。
+   */
+  lastCatalogOutcome: BuddyCatalogOutcome | undefined
 
   /** 注入的 fetch（测试用）；默认为全局 fetch。 */
   private get fetchImpl(): typeof fetch {

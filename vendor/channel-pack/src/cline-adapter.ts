@@ -227,6 +227,15 @@ export interface ClineAdapterOptions {
    * ⚠️ 注入后单测可完全离线 —— 与 `loadModels` 同款理由。
    */
   loadModelsDev?: () => Promise<Map<string, ClineModelsDevEntry>>
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
 }
 
 /**
@@ -241,6 +250,18 @@ export class ClineAdapter extends LlmAdapter {
   private remoteModels: ClineModel[] | undefined
   /** 正在进行中的目录加载（避免并发重复请求）。 */
   private loading: Promise<void> | undefined
+  /**
+   * 远端目录是否**已完整**（两个来源都取到了）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**
+   * （此后连预热重试都在短路处直接返回），只能重启 DSH 才能恢复。
+   *
+   * ⚠️⚠️ 还有一层更隐蔽的：`RemoteCatalogGate` 的冷却在生产里**只有闸门自己
+   * 那一处调用点**，而它排在短路**之后** ⇒ 只把 `complete` 传对是**没用的**，
+   * 短路照样命中、`cooling()` 永远读不到。故短路判据本身必须一起改。
+   */
+  private remoteComplete = false
   /**
    * models.dev 目录（`模型 id → 条目`，含名字/窗口/图片能力）。
    *
@@ -260,13 +281,18 @@ export class ClineAdapter extends LlmAdapter {
    * 此前这里只有 in-flight 去重（`private loading`），失败后立刻允许重试 ⇒
    * `buildModelCatalog` 的「每模型一次 resolveModel」会把一次失败放大成 N 次。
    * 详见 `src/remote-catalog-gate.ts` 的实测依据。
+   *
+   * ⚠️ 通知挂在**闸门**上（各适配器的单点收口），理由见 `catalog-broadcast.ts`。
    */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
 
   constructor(private readonly options: ClineAdapterOptions) {
     super()
     this.product = options.product ?? CLINE
     this.fetchImpl = options.fetchImpl ?? fetch
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    )
     this.loadModelsDev = options.loadModelsDev ?? makeClineModelsDevLoader({ fetcher: this.fetchImpl })
   }
 
@@ -315,7 +341,8 @@ export class ClineAdapter extends LlmAdapter {
    * 不去重会打出多份重复的远端请求（两个端点各一次，乘以并发数）。
    */
   private async ensureRemoteModels(): Promise<void> {
-    if (this.remoteModels !== undefined) return
+    // ⚠️ 短路判据是「已**完整**」而非「已定义」（见 `remoteComplete`）。
+    if (this.remoteComplete) return
     await this.catalogGate.run(async () => {
       try {
         // 目录加载路径**没有**目标模型（它要一次列出全部模型），故不传 modelId：
@@ -351,8 +378,14 @@ export class ClineAdapter extends LlmAdapter {
         }
         if (!gotRemote) return false
         this.remoteModels = merged
-        return true
-        return true
+        // ⚠️ 完整性取**数据源显式上报**的 `remote.complete`（两个来源各自的
+        // 「请求成功 + 形状可识别」），不由 `warnings` 反推 ——「主动跳过」与
+        // 「取到了」在 warnings 上同形，反推会把残缺判成完整并永久缓存。
+        // ⚠️ 还要**并上 models.dev**：它是目录的第三个来源，超时/失败时
+        // `remoteComplete` 必须保持 false，否则那个短路会挡住闸门、目录永远
+        // 补不齐 models.dev 补的那几条。
+        this.remoteComplete = (remote?.complete ?? true) && this.modelsDev !== undefined
+        return { got: true, complete: this.remoteComplete }
       } catch (error) {
         // 拉取失败保持未定义，后续 listModels/resolveModel 仍回退静态兜底表。
         // eslint-disable-next-line no-console

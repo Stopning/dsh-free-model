@@ -32,7 +32,7 @@ import {
   splitLoomyRate,
   type LoomyCredential,
 } from './loomy.js'
-import { LOOMY, type LoomyFallbackModel, type LoomyProduct } from './loomy-product.js'
+import { LOOMY, loomyContextWindow, type LoomyFallbackModel, type LoomyProduct } from './loomy-product.js'
 import {
   registerAdapterIdempotent,
 } from './llm-register-compat.js'
@@ -161,7 +161,12 @@ export function parseLoomyRemoteModels(payload: unknown): LoomyRemoteModel[] {
     models.push({
       id,
       name: loomyDisplayName(rawName),
-      contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 0,
+      // ⚠️⚠️ **必须过 `loomyContextWindow`**（上游 issue IKJW31）：远端对
+      // `spark-x` 虚报 1048576，真实墙在 262144。只改兜底表是**无效**的 ——
+      // 远端可用时走的就是这里。判据与证据见 `loomy-product.ts` 的覆盖表注释。
+      contextWindow: Number.isFinite(contextWindow) && contextWindow > 0
+        ? loomyContextWindow(id, contextWindow)
+        : 0,
       supportsImage: readInputModalities(entry).includes('image'),
       supportsThinking: capabilities.reasoning === true,
       // ⚠️ 档位缺失时**不写这两个键**（而不是写空数组）：下游据此区分
@@ -180,7 +185,9 @@ function fallbackToRemote(model: LoomyFallbackModel): LoomyRemoteModel {
   return {
     id: model.id,
     name: model.name,
-    contextWindow: model.contextWindow,
+    // ⚠️ 兜底表的值同样过一遍覆盖表（两条路径**同一判据**，别让它们分叉 ——
+    // 覆盖表本身就是对「照抄声明值」的纠正，与值来自哪条路径无关）。
+    contextWindow: loomyContextWindow(model.id, model.contextWindow),
     // 兜底表不声明图片能力：宁可少报（用户改用文本描述），
     // 也不要报一个服务端可能不认的模态。
     supportsImage: false,
@@ -222,6 +229,15 @@ export interface LoomyAdapterOptions {
   product?: LoomyProduct
   /** 注入的 fetch（测试用）。 */
   fetchImpl?: typeof fetch
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
 }
 
 /** Loomy 模型适配器。chat 端点用 Bearer，业务端点用 token。 */
@@ -233,10 +249,13 @@ export class LoomyAdapter extends LlmAdapter {
   /** 远端模型缓存（含展示名与能力）；未拉取时为 undefined。 */
   private remoteModels: LoomyRemoteModel[] | undefined
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
 
   constructor(private readonly options: LoomyAdapterOptions) {
     super()
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    )
     this.product = options.product ?? LOOMY
     this.fetchImpl = options.fetchImpl ?? fetch
     this.fallbackIndex = new Map(this.product.fallbackModels.map((model) => [model.id, model]))

@@ -8,7 +8,7 @@
  * first-run announcement feed, a remote-published self-updater and a hot reload.
  *
  * This fork keeps exactly one of them: the absorbed channel pack
- * (`vendor/channel-pack`), which carries the thirteen 白嫖 account providers
+ * (`vendor/channel-pack`), which carries the fourteen 白嫖 account providers
  * (CodeArts, CodeBuddy / WorkBuddy, LobsterAI, Qoder / Qoder CN, TRAE, Cline,
  * Loomy, Raccoon, MiniMax Code, ZCode, Gemini) and their OpenAI-compatible
  * loopback gateway. Everything that hung off the plugin's own model adapter is

@@ -34,6 +34,38 @@ const BENEFIT_NOT_FOUND_CODE = 'BENEFIT_NOT_FOUND'
 /** CodeArts 在账号没有 benefit 包时下发的事件 error_code。 */
 const CODEARTS_BENEFIT_NOT_FOUND_ERROR_CODE = 'InferHub.4004.200'
 
+/**
+ * CodeArts 的思考档位声明 —— **唯一定义处**（上游 issue IKLIDV）。
+ *
+ * ## 为什么顺序是「关闭 → 开启」
+ *
+ * DSH 的契约把该数组当**展示顺序**：`dsh-llm` 的类型注释原文写
+ * `adapter-preferred display order`，宿主 `normalizeModelInfo` 用 `.map` **原序保留**
+ * （只校验 + 去重，**不排序**），客户端也是直接 `[...reasoning.efforts.map(...)]` 渲染。
+ * ⇒ 任何「按数组顺序铺成一条横向轴」的渲染都会左右颠倒：**默认档排首位**
+ * 会让「开启」贴最左（左强右弱）。
+ *
+ * 强度序的权威是本仓库 `reasoning-ladder.ts` 的 `REASONING_EFFORT_RANK`
+ * （`off: 0` / `on: 5`），即要求 `off` 在前。旁证同向：DSH 自家 `dsh-llm-deepseek`
+ * 声明 `[off, low, high, max]`。故这里按**弱 → 强**声明。
+ *
+ * ⚠️ `defaultEffort` 与数组位置是**两件事**：默认档仍由 {@link CODEARTS_DEFAULT_EFFORT}
+ * 表达（保持 `on`），改顺序**不改变**任何默认行为。
+ *
+ * ⚠️ 抽成常量的理由：上游同文件曾有**两份**逐字相同的 `['on','off']` 字面量
+ * （`resolveModel` 与未知模型分支）—— 那正是「一文件两套同义判据」的形态：只改
+ * 一处，用户**手填模型 id** 时看到的档位轴方向会与已知模型相反。本仓库当前只有
+ * `resolveModel` 一处出口，但仍按常量声明，避免将来新增出口时再次分叉。
+ */
+export const CODEARTS_REASONING_EFFORTS: readonly { id: ReturnType<typeof ReasoningEffortId>; name: string }[] =
+  Object.freeze([
+    { id: ReasoningEffortId('off'), name: '关闭' },
+    { id: ReasoningEffortId('on'), name: '开启' },
+  ])
+
+/** CodeArts 的默认思考档（见 {@link CODEARTS_REASONING_EFFORTS} 的说明）。 */
+export const CODEARTS_DEFAULT_EFFORT = 'on'
+
 // DeepSeek V4（CodeArts Agent 模型列表新增，UI 标注"每日 1000 万免费 Tokens"福利）：
 //
 // 修正（2026-09-23，对齐 deveco-code-rust fb1b4a2）：早期注释称
@@ -76,6 +108,26 @@ export interface CodeArtsAdapterOptions {
   refresh: () => Promise<void>
   /** 动态拉取远端模型列表；失败时调用方回退到静态列表。 */
   fetchRemoteModels?: () => Promise<Array<{ id: string; name: string }>>
+  /**
+   * 本次目录是否**两个来源都拿全了**（上游 issue IKJVTF）。
+   *
+   * ⚠️ 用**回调**而非直接读 `service` 的内部状态：适配器不该依赖 `CodeArtsAuth`
+   * 的字段形状（它由 `index.ts` 接线，且单测用替身）。接线层把它桥接成
+   * 「读 `service.lastCatalogOutcome`」，见 `index.ts`。
+   *
+   * 返回 `undefined` 时按「无法判定」处理 —— 与 `normalizeLoadResult` 的
+   * 向后兼容口径一致（`complete = got`）。
+   */
+  catalogComplete?: () => boolean | undefined
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
   fetchImpl?: typeof fetch
   chatId?: string
   sessionId?: string
@@ -898,6 +950,9 @@ export class CodeArtsAdapter extends LlmAdapter {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.chatId = options.chatId ?? crypto.randomUUID().replace(/-/g, '')
     this.sessionId = options.sessionId ?? crypto.randomUUID().replace(/-/g, '')
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    )
   }
 
   /**
@@ -917,14 +972,25 @@ export class CodeArtsAdapter extends LlmAdapter {
   private remoteModels: Array<{ id: string; name: string }> | undefined
 
   /**
+   * 远端目录是否**已完整**（两来源都拿全）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**
+   * （此后连预热重试都在短路处直接返回），只能重启 DSH 才能恢复。
+   */
+  private remoteComplete = false
+
+  /**
    * 目录加载闸门：并发去重 + 失败冷却。
    *
    * ⚠ **不能省**：DSH 的 `buildModelCatalog` 对每个 provider `await listModels()`
    * 后再对每个模型 `await resolveModelInfo()`，两处都会走到这里。原实现失败
    * 直接返回（不落缓存）⇒ 一次网络故障被放大成「每模型重试一次」，每次顶着
    * 10s 超时（`src/models.ts:55 FETCH_TIMEOUT_MS`），首屏因此长时间空转。
+   *
+   * ⚠️ 通知挂在**闸门**上（各适配器的单点收口），理由见 `catalog-broadcast.ts`。
    */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
 
   /**
    * 懒加载远端模型目录。resolveModel 可能先于 listModels 被调用
@@ -932,14 +998,19 @@ export class CodeArtsAdapter extends LlmAdapter {
    */
   private async ensureRemoteModels(): Promise<void> {
     const fetchRemote = this.options.fetchRemoteModels
-    if (this.remoteModels !== undefined || fetchRemote === undefined) return
+    // ⚠️ 短路判据是「已**完整**」而非「已定义」（见 `remoteComplete`）。
+    if (this.remoteComplete || fetchRemote === undefined) return
     await this.catalogGate.run(async () => {
       const models = await fetchRemote()
       // 空目录同样算「没拿到」：既不应落缓存（否则再也拉不回来），
       // 也不应立刻重试（否则每个模型都打一次空请求）。
       if (models.length === 0) return false
       this.remoteModels = models
-      return true
+      // ⚠️ 完整性由接线层桥接的数据源上报（两来源各自的成败）。
+      // 拿不到判定时退回 `got`（= 旧行为），避免把「判不出」当成「残缺」
+      // 而让该 provider 反复重拉。
+      this.remoteComplete = this.options.catalogComplete?.() ?? true
+      return { got: true, complete: this.remoteComplete }
     })
   }
 
@@ -1002,11 +1073,8 @@ export class CodeArtsAdapter extends LlmAdapter {
     // 上报的 reasoning_tokens，落在基线噪声内；`none` 也照常思考）。
     // 故这里只声明「开启 / 关闭」两档，**不**臆造 low/high/max 强度阶梯。
     resolved.reasoning = {
-      efforts: [
-        { id: ReasoningEffortId('on'), name: '开启' },
-        { id: ReasoningEffortId('off'), name: '关闭' },
-      ],
-      defaultEffort: ReasoningEffortId('on'),
+      efforts: [...CODEARTS_REASONING_EFFORTS],
+      defaultEffort: ReasoningEffortId(CODEARTS_DEFAULT_EFFORT),
     }
     return resolved
   }

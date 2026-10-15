@@ -363,13 +363,13 @@ function checkKeyType(entry, key, usage) {
   return isCryptoKey(key) ? [CRYPTO, key] : [KEYOBJECT, key];
 }
 function cached(key, alg, value) {
-  cache2 ||= /* @__PURE__ */ new WeakMap();
-  const entry = cache2.get(key);
+  cache ||= /* @__PURE__ */ new WeakMap();
+  const entry = cache.get(key);
   if (value) {
     if (entry) {
       entry[alg] = value;
     } else {
-      cache2.set(key, { __proto__: null, [alg]: value });
+      cache.set(key, { __proto__: null, [alg]: value });
     }
   }
   return value ?? entry?.[alg];
@@ -405,7 +405,7 @@ async function prepareKey(entry, key, usage) {
     }
   }
 }
-var tag, jwkMatchesOp, BYTES, CRYPTO, KEYOBJECT, JWK, cache2, nist, handleJWK, handleKeyObject;
+var tag, jwkMatchesOp, BYTES, CRYPTO, KEYOBJECT, JWK, cache, nist, handleJWK, handleKeyObject;
 var init_key = __esm({
   "vendor/channel-pack/node_modules/jose/dist/webapi/lib/key.js"() {
     init_invalid_key_input();
@@ -824,10 +824,10 @@ async function createSignature(input, key) {
   const joseHeader = { ...protectedHeader, ...unprotectedHeader };
   validateCritDuplicates(JWSInvalid, protectedHeader);
   const extensions = validateCrit(JWSInvalid, JWS_RECOGNIZED, input.crit, protectedHeader, joseHeader);
-  let b64 = true;
+  let b642 = true;
   if (extensions.includes("b64")) {
-    b64 = protectedHeader.b64;
-    if (typeof b64 !== "boolean") {
+    b642 = protectedHeader.b64;
+    if (typeof b642 !== "boolean") {
       throw new JWSInvalid('The "b64" (base64url-encode payload) Header Parameter must be a boolean');
     }
   }
@@ -838,7 +838,7 @@ async function createSignature(input, key) {
   const entry = jwsAlgorithm(alg);
   let payloadS;
   let payloadB;
-  if (b64) {
+  if (b642) {
     const encoded = input.encoded ??= [];
     encoded[0] ??= encode2(input.payload);
     encoded[1] ??= encode(encoded[0]);
@@ -1173,10 +1173,10 @@ var init_webapi = __esm({
 });
 
 // vendor/channel-pack/src/oauth.ts
-import { createHash as createHash4, randomBytes as randomBytes3 } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 function generatePkcePair() {
-  const codeVerifier = randomBytes3(48).toString("base64url");
-  const codeChallenge = createHash4("sha256").update(codeVerifier).digest("base64url");
+  const codeVerifier = randomBytes(48).toString("base64url");
+  const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
   return { codeVerifier, codeChallenge };
 }
 async function generateDpopKeyPair() {
@@ -1192,7 +1192,7 @@ async function signDpopJws(keyPair, htm, htu) {
     htm,
     htu,
     iat: Math.floor(Date.now() / 1e3),
-    jti: randomBytes3(32).toString("hex")
+    jti: randomBytes(32).toString("hex")
   };
   return new SignJWT(payload).setProtectedHeader({ alg: "ES256", typ: "dpop+jwt", jwk: keyPair.publicKeyJwk }).sign(key);
 }
@@ -1301,6 +1301,7 @@ __export(login_exports, {
   expiresFromCredential: () => expiresFromCredential,
   generateRandomSecret: () => generateRandomSecret,
   openBrowser: () => openBrowser,
+  openIncognitoWindow: () => openIncognitoWindow,
   parseCredentialResponse: () => parseCredentialResponse,
   pollForCredential: () => pollForCredential,
   runLoginFlow: () => runLoginFlow,
@@ -1310,8 +1311,9 @@ __export(login_exports, {
   startOAuthFlow: () => startOAuthFlow
 });
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
-import { getRandomValues, randomUUID as randomUUID2, randomBytes as randomBytes4 } from "node:crypto";
+import { spawn, execFileSync } from "node:child_process";
+import { existsSync as existsSync2 } from "node:fs";
+import { getRandomValues, randomUUID, randomBytes as randomBytes2 } from "node:crypto";
 function generateRandomSecret() {
   const bytes = getRandomValues(new Uint8Array(32));
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -1428,13 +1430,13 @@ function startCallbackServer(ticketId, secret, options) {
     resolveResult = resolve2;
     rejectResult = reject;
   });
-  const server = createServer((request2, response) => {
-    const url = new URL(request2.url ?? "/", `http://127.0.0.1:${request2.socket.localPort}`);
+  const server = createServer((request3, response) => {
+    const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort}`);
     if (url.pathname !== "/authentication" && !url.pathname.startsWith("/authentication")) {
       response.writeHead(404).end("Not found");
       return;
     }
-    if (request2.method === "OPTIONS") {
+    if (request3.method === "OPTIONS") {
       response.writeHead(204, CORS_HEADERS).end();
       return;
     }
@@ -1483,7 +1485,7 @@ function startCallbackServer(ticketId, secret, options) {
   });
 }
 async function runLoginFlow(options = {}) {
-  const ticketId = randomUUID2();
+  const ticketId = randomUUID();
   const secret = generateRandomSecret();
   const { port, server, result } = await startCallbackServer(ticketId, secret, options);
   const { loginUrl } = buildLoginUrl(port, ticketId);
@@ -1509,13 +1511,13 @@ function startOAuthCallbackServer(ticketId, pkce, keyPair, options) {
     resolveResult = resolve2;
     rejectResult = reject;
   });
-  const server = createServer((request2, response) => {
-    const url = new URL(request2.url ?? "/", `http://127.0.0.1:${request2.socket.localPort}`);
+  const server = createServer((request3, response) => {
+    const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort}`);
     if (url.pathname !== REDIRECT_PATH && !url.pathname.startsWith(REDIRECT_PATH)) {
       response.writeHead(404).end("Not found");
       return;
     }
-    if (request2.method === "OPTIONS") {
+    if (request3.method === "OPTIONS") {
       response.writeHead(204, CORS_HEADERS).end();
       return;
     }
@@ -1535,7 +1537,7 @@ function startOAuthCallbackServer(ticketId, pkce, keyPair, options) {
     }
     const code = url.searchParams.get("code");
     if (code) {
-      void exchangeAuthorizationCode(code, pkce.codeVerifier, request2.socket.localPort ?? 0, keyPair, options.fetcher).then(
+      void exchangeAuthorizationCode(code, pkce.codeVerifier, request3.socket.localPort ?? 0, keyPair, options.fetcher).then(
         (token) => {
           const credential = credentialFromTokenResponse(token, pkce, keyPair);
           response.writeHead(307, { ...CORS_HEADERS, Location: buildPortalLoginResultUrl(true) }).end();
@@ -1573,7 +1575,7 @@ function listenOnCallbackPort(server) {
   });
 }
 async function startOAuthFlow(options = {}) {
-  const ticketId = randomBytes4(32).toString("hex");
+  const ticketId = randomBytes2(32).toString("hex");
   const pkce = generatePkcePair();
   const keyPair = await generateDpopKeyPair();
   const { port, server, result } = await startOAuthCallbackServer(ticketId, pkce, keyPair, options);
@@ -1605,6 +1607,66 @@ async function runOAuthFlow(options = {}) {
     return await started.result;
   } finally {
     await started.close();
+  }
+}
+function defaultBrowserExecutable() {
+  if (process.platform !== "win32") return void 0;
+  const query = (key, value) => {
+    try {
+      const out = execFileSync("reg", ["query", key, "/v", value], {
+        encoding: "utf8",
+        timeout: 5e3,
+        windowsHide: true
+      });
+      const m = /REG_SZ\s+(.+?)\s*$/m.exec(out);
+      return m?.[1]?.trim();
+    } catch {
+      return void 0;
+    }
+  };
+  const progId = query(
+    "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice",
+    "ProgId"
+  );
+  if (progId === void 0 || progId.length === 0) return void 0;
+  for (const root of [
+    `HKCR\\${progId}\\shell\\open\\command`,
+    `HKCU\\SOFTWARE\\Classes\\${progId}\\shell\\open\\command`,
+    `HKLM\\SOFTWARE\\Classes\\${progId}\\shell\\open\\command`
+  ]) {
+    try {
+      const out = execFileSync("reg", ["query", root, "/ve"], {
+        encoding: "utf8",
+        timeout: 5e3,
+        windowsHide: true
+      });
+      const m = /REG_SZ\s+(.+?)\s*$/m.exec(out);
+      const raw = m?.[1];
+      if (raw === void 0) continue;
+      const quoted = /^"([^"]+)"/.exec(raw);
+      const exe = quoted?.[1] ?? raw.split(" ")[0];
+      if (exe !== void 0 && exe.length > 0 && existsSync2(exe)) return exe;
+    } catch {
+    }
+  }
+  return void 0;
+}
+function openIncognitoWindow(url) {
+  if (process.env.NODE_ENV === "test") return false;
+  const exe = defaultBrowserExecutable();
+  if (exe === void 0) return false;
+  const isFirefox = /firefox\.exe$/i.test(exe);
+  const args = isFirefox ? ["-private-window", url] : ["--incognito", "--new-window", url];
+  try {
+    const child = spawn(exe, args, { detached: true, stdio: "ignore" });
+    child.on("error", (error) => {
+      console.error("[channel-pack] failed to open incognito window:", error);
+    });
+    child.unref();
+    return true;
+  } catch (error) {
+    console.error("[channel-pack] failed to open incognito window:", error);
+    return false;
   }
 }
 var CODEARTS_LOGIN_BASE, HUAWEI_AUTH_BASE, CREDENTIAL_ENDPOINT, PLUGIN_NAME, PLUGIN_VERSION, CORS_HEADERS, PORTAL_AUTHORIZE_BASE, PORTAL_LOGIN_BASE, LOGIN_PLUGIN_NAME, LOGIN_PLUGIN_VERSION, OAUTH_THEME, OAUTH_LOCALE, OAUTH_CALLBACK_TIMEOUT_MS, MIN_CALLBACK_PORT;
@@ -2641,7 +2703,7 @@ var require_util = __commonJS({
     var { kDestroyed, kBodyUsed, kListeners, kBody } = require_symbols();
     var { IncomingMessage } = __require("node:http");
     var stream = __require("node:stream");
-    var net = __require("node:net");
+    var net2 = __require("node:net");
     var { stringify } = __require("node:querystring");
     var { EventEmitter: EE, addAbortListener: addAbortListenerNative } = __require("node:events");
     var timers = require_timers();
@@ -2743,14 +2805,14 @@ var require_util = __commonJS({
         }
         const port = url.port != null ? url.port : url.protocol === "https:" ? 443 : 80;
         let origin = url.origin != null ? url.origin : `${url.protocol || ""}//${url.hostname || ""}:${port}`;
-        let path2 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
+        let path3 = url.path != null ? url.path : `${url.pathname || ""}${url.search || ""}`;
         if (origin[origin.length - 1] === "/") {
           origin = origin.slice(0, origin.length - 1);
         }
-        if (path2 && path2[0] !== "/") {
-          path2 = `/${path2}`;
+        if (path3 && path3[0] !== "/") {
+          path3 = `/${path3}`;
         }
-        return new URL(`${origin}${path2}`);
+        return new URL(`${origin}${path3}`);
       }
       if (!isHttpOrHttpsPrefixed(url.origin || url.protocol)) {
         throw new InvalidArgumentError("Invalid URL protocol: the URL must start with `http:` or `https:`.");
@@ -2780,7 +2842,7 @@ var require_util = __commonJS({
       }
       assert(typeof host === "string");
       const servername = getHostname(host);
-      if (net.isIP(servername)) {
+      if (net2.isIP(servername)) {
         return "";
       }
       return servername;
@@ -3311,10 +3373,10 @@ var require_util = __commonJS({
       }
       return obj;
     }
-    function errorRequest(client, request2, err) {
+    function errorRequest(client, request3, err) {
       try {
-        request2.onResponseError(err);
-        assert(request2.aborted);
+        request3.onResponseError(err);
+        assert(request3.aborted);
       } catch (err2) {
         client.emit("error", err2);
       }
@@ -3589,9 +3651,9 @@ var require_diagnostics = __commonJS({
         "undici:client:sendHeaders",
         (evt) => {
           const {
-            request: { method, path: path2, origin }
+            request: { method, path: path3, origin }
           } = evt;
-          debugLog("sending request to %s %s%s", method, origin, path2);
+          debugLog("sending request to %s %s%s", method, origin, path3);
         }
       );
     }
@@ -3609,14 +3671,14 @@ var require_diagnostics = __commonJS({
         "undici:request:headers",
         (evt) => {
           const {
-            request: { method, path: path2, origin },
+            request: { method, path: path3, origin },
             response: { statusCode }
           } = evt;
           debugLog(
             "received response to %s %s%s - HTTP %d",
             method,
             origin,
-            path2,
+            path3,
             statusCode
           );
         }
@@ -3625,23 +3687,23 @@ var require_diagnostics = __commonJS({
         "undici:request:trailers",
         (evt) => {
           const {
-            request: { method, path: path2, origin }
+            request: { method, path: path3, origin }
           } = evt;
-          debugLog("trailers received from %s %s%s", method, origin, path2);
+          debugLog("trailers received from %s %s%s", method, origin, path3);
         }
       );
       diagnosticsChannel.subscribe(
         "undici:request:error",
         (evt) => {
           const {
-            request: { method, path: path2, origin },
+            request: { method, path: path3, origin },
             error
           } = evt;
           debugLog(
             "request to %s %s%s errored - %s",
             method,
             origin,
-            path2,
+            path3,
             error.message
           );
         }
@@ -3796,7 +3858,7 @@ var require_request = __commonJS({
     };
     var Request2 = class {
       constructor(origin, {
-        path: path2,
+        path: path3,
         method,
         body,
         headers,
@@ -3813,11 +3875,11 @@ var require_request = __commonJS({
         maxRedirections,
         typeOfService
       }, handler) {
-        if (typeof path2 !== "string") {
+        if (typeof path3 !== "string") {
           throw new InvalidArgumentError("path must be a string");
-        } else if (path2[0] !== "/" && !(path2.startsWith("http://") || path2.startsWith("https://")) && method !== "CONNECT") {
+        } else if (path3[0] !== "/" && !(path3.startsWith("http://") || path3.startsWith("https://")) && method !== "CONNECT") {
           throw new InvalidArgumentError("path must be an absolute URL or start with a slash");
-        } else if (invalidPathRegex.test(path2)) {
+        } else if (invalidPathRegex.test(path3)) {
           throw new InvalidArgumentError("invalid request path");
         }
         if (typeof method !== "string") {
@@ -3892,7 +3954,7 @@ var require_request = __commonJS({
         this.completed = false;
         this.aborted = false;
         this.upgrade = upgrade || null;
-        this.path = query ? serializePathWithQuery(path2, query) : path2;
+        this.path = query ? serializePathWithQuery(path3, query) : path3;
         this.origin = origin;
         this.protocol = getProtocolFromUrlString(origin);
         this.idempotent = idempotent == null ? method === "HEAD" || method === "GET" || method === "QUERY" : idempotent;
@@ -4080,7 +4142,7 @@ var require_request = __commonJS({
         return this;
       }
     };
-    function processHeader(request2, key, val) {
+    function processHeader(request3, key, val) {
       if (val && (typeof val === "object" && !Array.isArray(val))) {
         throw new InvalidArgumentError(`invalid ${key} header`);
       } else if (val === void 0) {
@@ -4127,24 +4189,24 @@ var require_request = __commonJS({
         }
       }
       if (headerName === "host") {
-        if (request2.host !== null) {
+        if (request3.host !== null) {
           throw new InvalidArgumentError("duplicate host header");
         }
         if (typeof val !== "string") {
           throw new InvalidArgumentError("invalid host header");
         }
-        request2.host = val;
+        request3.host = val;
       } else if (headerName === "content-length") {
-        if (request2.contentLength !== null) {
+        if (request3.contentLength !== null) {
           throw new InvalidArgumentError("duplicate content-length header");
         }
         if (!isValidContentLengthHeaderValue(val)) {
           throw new InvalidArgumentError("invalid content-length header");
         }
-        request2.contentLength = parseInt(val, 10);
-      } else if (request2.contentType === null && headerName === "content-type") {
-        request2.contentType = val;
-        request2.headers.push(key, val);
+        request3.contentLength = parseInt(val, 10);
+      } else if (request3.contentType === null && headerName === "content-type") {
+        request3.contentType = val;
+        request3.headers.push(key, val);
       } else if (headerName === "transfer-encoding" || headerName === "keep-alive" || headerName === "upgrade") {
         throw new InvalidArgumentError(`invalid ${headerName} header`);
       } else if (headerName === "connection") {
@@ -4158,13 +4220,13 @@ var require_request = __commonJS({
             throw new InvalidArgumentError("invalid connection header");
           }
           if (trimmed === "close") {
-            request2.reset = true;
+            request3.reset = true;
           }
         }
       } else if (headerName === "expect") {
         throw new NotSupportedError("expect header not supported");
       } else {
-        request2.headers.push(key, val);
+        request3.headers.push(key, val);
       }
     }
     module.exports = Request2;
@@ -4388,7 +4450,7 @@ var require_dispatcher_base = __commonJS({
 var require_connect = __commonJS({
   "vendor/channel-pack/node_modules/undici/lib/core/connect.js"(exports, module) {
     "use strict";
-    var net = __require("node:net");
+    var net2 = __require("node:net");
     var assert = __require("node:assert");
     var util = require_util();
     var { InvalidArgumentError, ConnectTimeoutError } = require_errors();
@@ -4441,7 +4503,7 @@ var require_connect = __commonJS({
       const sessionCache = new SessionCache(maxCachedSessions == null ? 100 : maxCachedSessions);
       timeout = timeout == null ? 1e4 : timeout;
       allowH2 = allowH2 != null ? allowH2 : true;
-      return function connect({ hostname, host, protocol, port, servername, localAddress, httpSocket }, callback) {
+      return function connect2({ hostname, host, protocol, port, servername, localAddress, httpSocket }, callback) {
         let socket;
         if (protocol === "https:") {
           if (!tls) {
@@ -4479,7 +4541,7 @@ var require_connect = __commonJS({
             port,
             host: hostname
           };
-          const family = net.isIP(hostname);
+          const family = net2.isIP(hostname);
           if (family !== 0 && servername && servername !== hostname) {
             connectOptions.host = servername;
             connectOptions.lookup = (_hostname, lookupOptions, cb) => {
@@ -4490,7 +4552,7 @@ var require_connect = __commonJS({
               }
             };
           }
-          socket = net.connect(connectOptions);
+          socket = net2.connect(connectOptions);
           if (useH2c === true) {
             socket.alpnProtocol = "h2";
           }
@@ -6524,11 +6586,11 @@ var require_util2 = __commonJS({
     function normalizeBinaryStringToUtf8(value) {
       return Buffer.from(value, "binary").toString("utf8");
     }
-    function requestCurrentURL(request2) {
-      return request2.urlList[request2.urlList.length - 1];
+    function requestCurrentURL(request3) {
+      return request3.urlList[request3.urlList.length - 1];
     }
-    function requestBadPort(request2) {
-      const url = requestCurrentURL(request2);
+    function requestBadPort(request3) {
+      const url = requestCurrentURL(request3);
       if (urlIsHttpHttpsScheme(url) && badPortsSet.has(url.port)) {
         return "blocked";
       }
@@ -6566,10 +6628,10 @@ var require_util2 = __commonJS({
       }
       return policy;
     }
-    function setRequestReferrerPolicyOnRedirect(request2, actualResponse) {
+    function setRequestReferrerPolicyOnRedirect(request3, actualResponse) {
       const policy = parseReferrerPolicy(actualResponse);
       if (policy !== "") {
-        request2.referrerPolicy = policy;
+        request3.referrerPolicy = policy;
       }
     }
     function crossOriginResourcePolicyCheck() {
@@ -6589,33 +6651,33 @@ var require_util2 = __commonJS({
       header = httpRequest.mode;
       httpRequest.headersList.set("sec-fetch-mode", header, true);
     }
-    function appendRequestOriginHeader(request2) {
-      let serializedOrigin = request2.origin;
+    function appendRequestOriginHeader(request3) {
+      let serializedOrigin = request3.origin;
       if (serializedOrigin === "client" || serializedOrigin === void 0) {
         return;
       }
-      if (request2.responseTainting === "cors" || request2.mode === "websocket") {
-        request2.headersList.append("origin", serializedOrigin, true);
-      } else if (request2.method !== "GET" && request2.method !== "HEAD") {
-        switch (request2.referrerPolicy) {
+      if (request3.responseTainting === "cors" || request3.mode === "websocket") {
+        request3.headersList.append("origin", serializedOrigin, true);
+      } else if (request3.method !== "GET" && request3.method !== "HEAD") {
+        switch (request3.referrerPolicy) {
           case "no-referrer":
             serializedOrigin = null;
             break;
           case "no-referrer-when-downgrade":
           case "strict-origin":
           case "strict-origin-when-cross-origin":
-            if (request2.origin && urlHasHttpsScheme(request2.origin) && !urlHasHttpsScheme(requestCurrentURL(request2))) {
+            if (request3.origin && urlHasHttpsScheme(request3.origin) && !urlHasHttpsScheme(requestCurrentURL(request3))) {
               serializedOrigin = null;
             }
             break;
           case "same-origin":
-            if (!sameOrigin(request2, requestCurrentURL(request2))) {
+            if (!sameOrigin(request3, requestCurrentURL(request3))) {
               serializedOrigin = null;
             }
             break;
           default:
         }
-        request2.headersList.append("origin", serializedOrigin, true);
+        request3.headersList.append("origin", serializedOrigin, true);
       }
     }
     function coarsenTime(timestamp, crossOriginIsolatedCapability) {
@@ -6669,18 +6731,18 @@ var require_util2 = __commonJS({
         referrerPolicy: policyContainer.referrerPolicy
       };
     }
-    function determineRequestsReferrer(request2) {
-      const policy = request2.referrerPolicy;
+    function determineRequestsReferrer(request3) {
+      const policy = request3.referrerPolicy;
       assert(policy);
       let referrerSource = null;
-      if (request2.referrer === "client") {
+      if (request3.referrer === "client") {
         const globalOrigin = getGlobalOrigin();
         if (!globalOrigin || globalOrigin.origin === "null") {
           return "no-referrer";
         }
         referrerSource = new URL(globalOrigin);
-      } else if (webidl.is.URL(request2.referrer)) {
-        referrerSource = request2.referrer;
+      } else if (webidl.is.URL(request3.referrer)) {
+        referrerSource = request3.referrer;
       }
       let referrerURL = stripURLForReferrer(referrerSource);
       const referrerOrigin = stripURLForReferrer(referrerSource, true);
@@ -6698,14 +6760,14 @@ var require_util2 = __commonJS({
         case "unsafe-url":
           return referrerURL;
         case "strict-origin": {
-          const currentURL = requestCurrentURL(request2);
+          const currentURL = requestCurrentURL(request3);
           if (isURLPotentiallyTrustworthy(referrerURL) && !isURLPotentiallyTrustworthy(currentURL)) {
             return "no-referrer";
           }
           return referrerOrigin;
         }
         case "strict-origin-when-cross-origin": {
-          const currentURL = requestCurrentURL(request2);
+          const currentURL = requestCurrentURL(request3);
           if (sameOrigin(referrerURL, currentURL)) {
             return referrerURL;
           }
@@ -6715,17 +6777,17 @@ var require_util2 = __commonJS({
           return referrerOrigin;
         }
         case "same-origin":
-          if (sameOrigin(request2, referrerURL)) {
+          if (sameOrigin(request3, referrerURL)) {
             return referrerURL;
           }
           return "no-referrer";
         case "origin-when-cross-origin":
-          if (sameOrigin(request2, referrerURL)) {
+          if (sameOrigin(request3, referrerURL)) {
             return referrerURL;
           }
           return referrerOrigin;
         case "no-referrer-when-downgrade": {
-          const currentURL = requestCurrentURL(request2);
+          const currentURL = requestCurrentURL(request3);
           if (isURLPotentiallyTrustworthy(referrerURL) && !isURLPotentiallyTrustworthy(currentURL)) {
             return "no-referrer";
           }
@@ -6792,7 +6854,7 @@ var require_util2 = __commonJS({
       if (url.protocol === "blob:") return true;
       return isOriginPotentiallyTrustworthy(url.origin);
     }
-    function tryUpgradeRequestToAPotentiallyTrustworthyURL(request2) {
+    function tryUpgradeRequestToAPotentiallyTrustworthyURL(request3) {
     }
     function sameOrigin(A, B) {
       if (A.origin === B.origin && A.origin === "null") {
@@ -7171,7 +7233,7 @@ var require_util2 = __commonJS({
       }
       return gettingDecodingSplitting(value);
     }
-    function hasAuthenticationEntry(request2) {
+    function hasAuthenticationEntry(request3) {
       return false;
     }
     function includesCredentials(url) {
@@ -8505,11 +8567,11 @@ var require_client_h1 = __commonJS({
           util.destroy(socket, new SocketError("bad response", util.getSocketInfo(socket)));
           return -1;
         }
-        const request2 = client[kQueue][client[kRunningIdx]];
-        if (!request2) {
+        const request3 = client[kQueue][client[kRunningIdx]];
+        if (!request3) {
           return -1;
         }
-        request2.onResponseStarted();
+        request3.onResponseStarted();
         return 0;
       }
       /**
@@ -8576,9 +8638,9 @@ var require_client_h1 = __commonJS({
         assert(!socket.destroyed);
         assert(!this.paused);
         assert((headers.length & 1) === 0);
-        const request2 = client[kQueue][client[kRunningIdx]];
-        assert(request2);
-        assert(request2.upgrade || request2.method === "CONNECT");
+        const request3 = client[kQueue][client[kRunningIdx]];
+        assert(request3);
+        assert(request3.upgrade || request3.method === "CONNECT");
         this.statusCode = 0;
         this.statusText = "";
         this.shouldKeepAlive = false;
@@ -8595,9 +8657,9 @@ var require_client_h1 = __commonJS({
         client[kQueue][client[kRunningIdx]++] = null;
         client.emit("disconnect", client[kUrl], [client], new InformationalError("upgrade"));
         try {
-          request2.onRequestUpgrade(statusCode, headers, socket, statusText);
+          request3.onRequestUpgrade(statusCode, headers, socket, statusText);
         } catch (err) {
-          util.errorRequest(client, request2, err);
+          util.errorRequest(client, request3, err);
           util.destroy(socket, err);
         }
         client[kResume]();
@@ -8617,8 +8679,8 @@ var require_client_h1 = __commonJS({
           util.destroy(socket, new SocketError("bad response", util.getSocketInfo(socket)));
           return -1;
         }
-        const request2 = client[kQueue][client[kRunningIdx]];
-        if (!request2) {
+        const request3 = client[kQueue][client[kRunningIdx]];
+        if (!request3) {
           return -1;
         }
         assert(!this.upgrade);
@@ -8627,23 +8689,23 @@ var require_client_h1 = __commonJS({
           util.destroy(socket, new SocketError("bad response", util.getSocketInfo(socket)));
           return -1;
         }
-        if (upgrade && !request2.upgrade) {
+        if (upgrade && !request3.upgrade) {
           util.destroy(socket, new SocketError("bad upgrade", util.getSocketInfo(socket)));
           return -1;
         }
         assert(this.timeoutType === TIMEOUT_HEADERS);
         this.statusCode = statusCode;
         this.shouldKeepAlive = shouldKeepAlive || // Override llhttp value which does not allow keepAlive for HEAD.
-        request2.method === "HEAD" && !socket[kReset] && this.connectionKeepAlive;
+        request3.method === "HEAD" && !socket[kReset] && this.connectionKeepAlive;
         if (this.statusCode >= 200) {
-          const bodyTimeout = request2.bodyTimeout != null ? request2.bodyTimeout : client[kBodyTimeout];
+          const bodyTimeout = request3.bodyTimeout != null ? request3.bodyTimeout : client[kBodyTimeout];
           this.setTimeout(bodyTimeout, TIMEOUT_BODY);
         } else if (this.timeout) {
           if (this.timeout.refresh) {
             this.timeout.refresh();
           }
         }
-        if (request2.method === "CONNECT") {
+        if (request3.method === "CONNECT") {
           assert(client[kRunning] === 1);
           this.upgrade = true;
           return 2;
@@ -8674,11 +8736,11 @@ var require_client_h1 = __commonJS({
         } else {
           socket[kReset] = true;
         }
-        const pause = request2.onResponseStart(statusCode, headers, this.resume, statusText) === false;
-        if (request2.aborted) {
+        const pause = request3.onResponseStart(statusCode, headers, this.resume, statusText) === false;
+        if (request3.aborted) {
           return -1;
         }
-        if (request2.method === "HEAD") {
+        if (request3.method === "HEAD") {
           return 1;
         }
         if (statusCode < 200) {
@@ -8699,8 +8761,8 @@ var require_client_h1 = __commonJS({
         if (socket.destroyed) {
           return -1;
         }
-        const request2 = client[kQueue][client[kRunningIdx]];
-        assert(request2);
+        const request3 = client[kQueue][client[kRunningIdx]];
+        assert(request3);
         assert(this.timeoutType === TIMEOUT_BODY);
         if (this.timeout) {
           if (this.timeout.refresh) {
@@ -8713,7 +8775,7 @@ var require_client_h1 = __commonJS({
           return -1;
         }
         this.bytesRead += buf.length;
-        if (request2.onResponseData(buf) === false) {
+        if (request3.onResponseData(buf) === false) {
           return constants.ERROR.PAUSED;
         }
         return 0;
@@ -8731,8 +8793,8 @@ var require_client_h1 = __commonJS({
         }
         assert(statusCode >= 100);
         assert((this.headers.length & 1) === 0);
-        const request2 = client[kQueue][client[kRunningIdx]];
-        assert(request2);
+        const request3 = client[kQueue][client[kRunningIdx]];
+        assert(request3);
         this.statusCode = 0;
         this.statusText = "";
         this.bytesRead = 0;
@@ -8744,11 +8806,11 @@ var require_client_h1 = __commonJS({
         if (statusCode < 200) {
           return 0;
         }
-        if (request2.method !== "HEAD" && contentLength !== -1 && bytesRead !== contentLength) {
+        if (request3.method !== "HEAD" && contentLength !== -1 && bytesRead !== contentLength) {
           util.destroy(socket, new ResponseContentLengthMismatchError());
           return -1;
         }
-        request2.onResponseEnd(headers);
+        request3.onResponseEnd(headers);
         client[kQueue][client[kRunningIdx]++] = null;
         socket[kSocketUsed] = client[kPending] === 0;
         if (socket[kWriting]) {
@@ -8817,8 +8879,8 @@ var require_client_h1 = __commonJS({
       return {
         version: "h1",
         defaultPipelining: 1,
-        write(request2) {
-          return writeH1(client, request2);
+        write(request3) {
+          return writeH1(client, request3);
         },
         resume() {
           resumeH1(client);
@@ -8845,18 +8907,18 @@ var require_client_h1 = __commonJS({
          * @param {import('../core/request.js')} request
          * @returns {boolean}
          */
-        busy(request2) {
+        busy(request3) {
           if (socket[kWriting] || socket[kReset] || socket[kBlocking] || socket[kIdleSocketValidation] === 1) {
             return true;
           }
-          if (request2) {
-            if (client[kRunning] > 0 && !request2.idempotent) {
+          if (request3) {
+            if (client[kRunning] > 0 && !request3.idempotent) {
               return true;
             }
-            if (client[kRunning] > 0 && (request2.upgrade || request2.method === "CONNECT")) {
+            if (client[kRunning] > 0 && (request3.upgrade || request3.method === "CONNECT")) {
               return true;
             }
-            if (client[kRunning] > 0 && util.bodyLength(request2.body) !== 0 && (util.isStream(request2.body) || util.isAsyncIterable(request2.body) || util.isFormDataLike(request2.body))) {
+            if (client[kRunning] > 0 && util.bodyLength(request3.body) !== 0 && (util.isStream(request3.body) || util.isAsyncIterable(request3.body) || util.isFormDataLike(request3.body))) {
               return true;
             }
           }
@@ -8910,13 +8972,13 @@ var require_client_h1 = __commonJS({
         assert(client[kPending] === 0);
         const requests = client[kQueue].splice(client[kRunningIdx]);
         for (let i = 0; i < requests.length; i++) {
-          const request2 = requests[i];
-          util.errorRequest(client, request2, err);
+          const request3 = requests[i];
+          util.errorRequest(client, request3, err);
         }
       } else if (client[kRunning] > 0 && err.code !== "UND_ERR_INFO") {
-        const request2 = client[kQueue][client[kRunningIdx]];
+        const request3 = client[kQueue][client[kRunningIdx]];
         client[kQueue][client[kRunningIdx]++] = null;
-        util.errorRequest(client, request2, err);
+        util.errorRequest(client, request3, err);
       }
       client[kPendingIdx] = client[kRunningIdx];
       assert(client[kRunning] === 0);
@@ -8984,8 +9046,8 @@ var require_client_h1 = __commonJS({
           }
         } else if (client[kRunning] > 0 && socket[kParser].statusCode < 200) {
           if (socket[kParser].timeoutType !== TIMEOUT_HEADERS) {
-            const request2 = client[kQueue][client[kRunningIdx]];
-            const headersTimeout = request2.headersTimeout != null ? request2.headersTimeout : client[kHeadersTimeout];
+            const request3 = client[kQueue][client[kRunningIdx]];
+            const headersTimeout = request3.headersTimeout != null ? request3.headersTimeout : client[kHeadersTimeout];
             socket[kParser].setTimeout(headersTimeout, TIMEOUT_HEADERS);
           }
         }
@@ -8994,11 +9056,11 @@ var require_client_h1 = __commonJS({
     function shouldSendContentLength(method) {
       return method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && method !== "TRACE" && method !== "CONNECT";
     }
-    function setTypeOfService(socket, request2) {
+    function setTypeOfService(socket, request3) {
       if (typeof socket.setTypeOfService !== "function") {
         return;
       }
-      const typeOfService = request2.typeOfService;
+      const typeOfService = request3.typeOfService;
       if (typeOfService === void 0) {
         return;
       }
@@ -9012,26 +9074,26 @@ var require_client_h1 = __commonJS({
       } catch {
       }
     }
-    function writeH1(client, request2) {
-      const { method, path: path2, host, upgrade, blocking, reset } = request2;
-      let { body, headers, contentLength } = request2;
+    function writeH1(client, request3) {
+      const { method, path: path3, host, upgrade, blocking, reset } = request3;
+      let { body, headers, contentLength } = request3;
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
       if (util.isFormDataLike(body)) {
         if (!extractBody) {
           extractBody = require_body().extractBody;
         }
         const [bodyStream, contentType] = extractBody(body);
-        if (request2.contentType == null) {
+        if (request3.contentType == null) {
           headers.push("content-type", contentType);
         }
         body = bodyStream.stream;
         contentLength = bodyStream.length;
-      } else if (util.isBlobLike(body) && request2.contentType == null) {
+      } else if (util.isBlobLike(body) && request3.contentType == null) {
         const contentType = body.type;
         if (contentType) {
           const contentTypeValue = `${contentType}`;
           if (!util.isValidHeaderValue(contentTypeValue)) {
-            util.errorRequest(client, request2, new InvalidArgumentError("invalid content-type header"));
+            util.errorRequest(client, request3, new InvalidArgumentError("invalid content-type header"));
             return false;
           }
           headers.push("content-type", contentTypeValue);
@@ -9043,14 +9105,14 @@ var require_client_h1 = __commonJS({
       const bodyLength = util.bodyLength(body);
       contentLength = bodyLength ?? contentLength;
       if (contentLength === null) {
-        contentLength = request2.contentLength;
+        contentLength = request3.contentLength;
       }
       if (contentLength === 0 && !expectsPayload) {
         contentLength = null;
       }
-      if (shouldSendContentLength(method) && contentLength > 0 && request2.contentLength !== null && request2.contentLength !== contentLength) {
+      if (shouldSendContentLength(method) && contentLength > 0 && request3.contentLength !== null && request3.contentLength !== contentLength) {
         if (client[kStrictContentLength]) {
-          util.errorRequest(client, request2, new RequestContentLengthMismatchError());
+          util.errorRequest(client, request3, new RequestContentLengthMismatchError());
           return false;
         }
         process.emitWarning(new RequestContentLengthMismatchError());
@@ -9058,19 +9120,19 @@ var require_client_h1 = __commonJS({
       const socket = client[kSocket];
       clearIdleSocketValidation(socket);
       const abort = (err) => {
-        if (request2.aborted || request2.completed) {
+        if (request3.aborted || request3.completed) {
           return;
         }
-        util.errorRequest(client, request2, err || new RequestAbortedError());
+        util.errorRequest(client, request3, err || new RequestAbortedError());
         util.destroy(body);
         util.destroy(socket, new InformationalError("aborted"));
       };
       try {
-        request2.onRequestStart(abort, null);
+        request3.onRequestStart(abort, null);
       } catch (err) {
-        util.errorRequest(client, request2, err);
+        util.errorRequest(client, request3, err);
       }
-      if (request2.aborted) {
+      if (request3.aborted) {
         return false;
       }
       if (method === "HEAD") {
@@ -9088,8 +9150,8 @@ var require_client_h1 = __commonJS({
       if (blocking) {
         socket[kBlocking] = true;
       }
-      setTypeOfService(socket, request2);
-      let header = `${method} ${path2} HTTP/1.1\r
+      setTypeOfService(socket, request3);
+      let header = `${method} ${path3} HTTP/1.1\r
 `;
       if (typeof host === "string") {
         header += `host: ${host}\r
@@ -9122,31 +9184,31 @@ upgrade: ${upgrade}\r
         }
       }
       if (channels.sendHeaders.hasSubscribers) {
-        channels.sendHeaders.publish({ request: request2, headers: header, socket });
+        channels.sendHeaders.publish({ request: request3, headers: header, socket });
       }
       if (!body || bodyLength === 0) {
-        writeBuffer(abort, null, client, request2, socket, contentLength, header, expectsPayload);
+        writeBuffer(abort, null, client, request3, socket, contentLength, header, expectsPayload);
       } else if (util.isBuffer(body)) {
-        writeBuffer(abort, body, client, request2, socket, contentLength, header, expectsPayload);
+        writeBuffer(abort, body, client, request3, socket, contentLength, header, expectsPayload);
       } else if (util.isBlobLike(body)) {
         if (typeof body.stream === "function") {
-          writeIterable(abort, body.stream(), client, request2, socket, contentLength, header, expectsPayload);
+          writeIterable(abort, body.stream(), client, request3, socket, contentLength, header, expectsPayload);
         } else {
-          writeBlob(abort, body, client, request2, socket, contentLength, header, expectsPayload);
+          writeBlob(abort, body, client, request3, socket, contentLength, header, expectsPayload);
         }
       } else if (util.isStream(body)) {
-        writeStream(abort, body, client, request2, socket, contentLength, header, expectsPayload);
+        writeStream(abort, body, client, request3, socket, contentLength, header, expectsPayload);
       } else if (util.isIterable(body)) {
-        writeIterable(abort, body, client, request2, socket, contentLength, header, expectsPayload);
+        writeIterable(abort, body, client, request3, socket, contentLength, header, expectsPayload);
       } else {
         assert(false);
       }
       return true;
     }
-    function writeStream(abort, body, client, request2, socket, contentLength, header, expectsPayload) {
+    function writeStream(abort, body, client, request3, socket, contentLength, header, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
       let finished = false;
-      const writer = new AsyncWriter({ abort, socket, request: request2, contentLength, client, expectsPayload, header });
+      const writer = new AsyncWriter({ abort, socket, request: request3, contentLength, client, expectsPayload, header });
       const onData = function(chunk) {
         if (finished) {
           return;
@@ -9212,7 +9274,7 @@ upgrade: ${upgrade}\r
         setImmediate(onClose);
       }
     }
-    function writeBuffer(abort, body, client, request2, socket, contentLength, header, expectsPayload) {
+    function writeBuffer(abort, body, client, request3, socket, contentLength, header, expectsPayload) {
       try {
         if (!body) {
           if (contentLength === 0) {
@@ -9232,18 +9294,18 @@ upgrade: ${upgrade}\r
 `, "latin1");
           socket.write(body);
           socket.uncork();
-          request2.onBodySent(body);
-          if (!expectsPayload && request2.reset !== false) {
+          request3.onBodySent(body);
+          if (!expectsPayload && request3.reset !== false) {
             socket[kReset] = true;
           }
         }
-        request2.onRequestSent();
+        request3.onRequestSent();
         client[kResume]();
       } catch (err) {
         abort(err);
       }
     }
-    async function writeBlob(abort, body, client, request2, socket, contentLength, header, expectsPayload) {
+    async function writeBlob(abort, body, client, request3, socket, contentLength, header, expectsPayload) {
       try {
         if (contentLength != null && contentLength !== body.size) {
           throw new RequestContentLengthMismatchError();
@@ -9255,9 +9317,9 @@ upgrade: ${upgrade}\r
 `, "latin1");
         socket.write(buffer);
         socket.uncork();
-        request2.onBodySent(buffer);
-        request2.onRequestSent();
-        if (!expectsPayload && request2.reset !== false) {
+        request3.onBodySent(buffer);
+        request3.onRequestSent();
+        if (!expectsPayload && request3.reset !== false) {
           socket[kReset] = true;
         }
         client[kResume]();
@@ -9265,7 +9327,7 @@ upgrade: ${upgrade}\r
         abort(err);
       }
     }
-    async function writeIterable(abort, body, client, request2, socket, contentLength, header, expectsPayload) {
+    async function writeIterable(abort, body, client, request3, socket, contentLength, header, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "iterator body cannot be pipelined");
       let callback = null;
       function onDrain() {
@@ -9284,7 +9346,7 @@ upgrade: ${upgrade}\r
         }
       });
       socket.on("close", onDrain).on("drain", onDrain);
-      const writer = new AsyncWriter({ abort, socket, request: request2, contentLength, client, expectsPayload, header });
+      const writer = new AsyncWriter({ abort, socket, request: request3, contentLength, client, expectsPayload, header });
       try {
         for await (const chunk of body) {
           if (socket[kError]) {
@@ -9313,9 +9375,9 @@ upgrade: ${upgrade}\r
        * @param {boolean} arg.expectsPayload
        * @param {string} arg.header
        */
-      constructor({ abort, socket, request: request2, contentLength, client, expectsPayload, header }) {
+      constructor({ abort, socket, request: request3, contentLength, client, expectsPayload, header }) {
         this.socket = socket;
-        this.request = request2;
+        this.request = request3;
         this.contentLength = contentLength;
         this.client = client;
         this.bytesWritten = 0;
@@ -9329,7 +9391,7 @@ upgrade: ${upgrade}\r
        * @returns
        */
       write(chunk) {
-        const { socket, request: request2, contentLength, client, bytesWritten, expectsPayload, header } = this;
+        const { socket, request: request3, contentLength, client, bytesWritten, expectsPayload, header } = this;
         if (socket[kError]) {
           throw socket[kError];
         }
@@ -9348,7 +9410,7 @@ upgrade: ${upgrade}\r
         }
         socket.cork();
         if (bytesWritten === 0) {
-          if (!expectsPayload && request2.reset !== false) {
+          if (!expectsPayload && request3.reset !== false) {
             socket[kReset] = true;
           }
           if (contentLength === null) {
@@ -9368,7 +9430,7 @@ ${len.toString(16)}\r
         this.bytesWritten += len;
         const ret = socket.write(chunk);
         socket.uncork();
-        request2.onBodySent(chunk);
+        request3.onBodySent(chunk);
         if (!ret) {
           if (socket[kParser].timeout && socket[kParser].timeoutType === TIMEOUT_HEADERS) {
             if (socket[kParser].timeout.refresh) {
@@ -9382,8 +9444,8 @@ ${len.toString(16)}\r
        * @returns {void}
        */
       end() {
-        const { socket, contentLength, client, bytesWritten, expectsPayload, header, request: request2 } = this;
-        request2.onRequestSent();
+        const { socket, contentLength, client, bytesWritten, expectsPayload, header, request: request3 } = this;
+        request3.onRequestSent();
         socket[kWriting] = false;
         if (socket[kError]) {
           throw socket[kError];
@@ -9538,48 +9600,48 @@ var require_client_h2 = __commonJS({
     function getGoAwayPendingIdx(client, lastStreamID) {
       const maxAcceptedStreamID = Number.isInteger(lastStreamID) ? lastStreamID : Number.MAX_SAFE_INTEGER;
       for (let i = client[kRunningIdx]; i < client[kPendingIdx]; i++) {
-        const request2 = client[kQueue][i];
-        if (request2 == null) {
+        const request3 = client[kQueue][i];
+        if (request3 == null) {
           continue;
         }
-        if (typeof request2[kRequestStreamId] !== "number" || request2[kRequestStreamId] > maxAcceptedStreamID) {
+        if (typeof request3[kRequestStreamId] !== "number" || request3[kRequestStreamId] > maxAcceptedStreamID) {
           return i;
         }
       }
       return client[kPendingIdx];
     }
-    function detachRequestFromStream(request2) {
-      request2[kRequestStreamId] = null;
-      request2[kRequestStream] = null;
-      request2[kRequestStreamCleanup] = null;
+    function detachRequestFromStream(request3) {
+      request3[kRequestStreamId] = null;
+      request3[kRequestStream] = null;
+      request3[kRequestStreamCleanup] = null;
     }
-    function bindRequestToStream(request2, stream, cleanup) {
-      const previousCleanup = request2[kRequestStreamCleanup];
-      const previousStream = request2[kRequestStream];
-      detachRequestFromStream(request2);
+    function bindRequestToStream(request3, stream, cleanup) {
+      const previousCleanup = request3[kRequestStreamCleanup];
+      const previousStream = request3[kRequestStream];
+      detachRequestFromStream(request3);
       previousCleanup?.(previousStream);
-      request2[kRequestStreamId] = stream.id;
-      request2[kRequestStream] = stream;
-      request2[kRequestStreamCleanup] = cleanup;
+      request3[kRequestStreamId] = stream.id;
+      request3[kRequestStream] = stream;
+      request3[kRequestStreamCleanup] = cleanup;
     }
-    function clearRequestStream(request2) {
-      const cleanup = request2[kRequestStreamCleanup];
-      const stream = request2[kRequestStream];
-      detachRequestFromStream(request2);
+    function clearRequestStream(request3) {
+      const cleanup = request3[kRequestStreamCleanup];
+      const stream = request3[kRequestStream];
+      detachRequestFromStream(request3);
       cleanup?.(stream);
     }
-    function requeueUnsentRequest(client, request2) {
-      client[kQueue].splice(client[kPendingIdx] + 1, 0, request2);
+    function requeueUnsentRequest(client, request3) {
+      client[kQueue].splice(client[kPendingIdx] + 1, 0, request3);
     }
-    function completeRequest(client, request2, resetPendingIdx = false) {
+    function completeRequest(client, request3, resetPendingIdx = false) {
       const queue = client[kQueue];
       const runningIdx = client[kRunningIdx];
-      if (runningIdx < client[kPendingIdx] && queue[runningIdx] === request2) {
+      if (runningIdx < client[kPendingIdx] && queue[runningIdx] === request3) {
         queue[runningIdx] = null;
         client[kRunningIdx] = runningIdx + 1;
         return;
       }
-      const index = queue.indexOf(request2, runningIdx);
+      const index = queue.indexOf(request3, runningIdx);
       if (index === -1 || index >= client[kPendingIdx]) {
         return;
       }
@@ -9589,17 +9651,17 @@ var require_client_h2 = __commonJS({
         client[kPendingIdx] = client[kRunningIdx];
       }
     }
-    function canReplayRequest(request2) {
-      const { body } = request2;
+    function canReplayRequest(request3) {
+      const { body } = request3;
       return body == null || util.isBuffer(body) || util.isBlobLike(body);
     }
-    function hasResponseStarted(request2) {
-      const state = request2[kRequestStream]?.[kRequestStreamState];
+    function hasResponseStarted(request3) {
+      const state = request3[kRequestStream]?.[kRequestStreamState];
       return state?.responseReceived === true;
     }
-    function registerGoAwayRefusal(request2) {
-      const attempts = (request2[kGoAwayReplayAttempts] ?? 0) + 1;
-      request2[kGoAwayReplayAttempts] = attempts;
+    function registerGoAwayRefusal(request3) {
+      const attempts = (request3[kGoAwayReplayAttempts] ?? 0) + 1;
+      request3[kGoAwayReplayAttempts] = attempts;
       return attempts <= MAX_GOAWAY_REPLAY_ATTEMPTS;
     }
     function closeStream(stream, code = NGHTTP2_REFUSED_STREAM) {
@@ -9610,9 +9672,9 @@ var require_client_h2 = __commonJS({
         }
       }
     }
-    function detachRequestStreamForClose(request2) {
-      const stream = request2[kRequestStream];
-      clearRequestStream(request2);
+    function detachRequestStreamForClose(request3) {
+      const stream = request3[kRequestStream];
+      clearRequestStream(request3);
       severRequestStream(stream);
       return stream;
     }
@@ -9687,8 +9749,8 @@ var require_client_h2 = __commonJS({
          * @param {import('../core/request.js')} request
          * @returns {boolean}
         */
-        write(request2) {
-          return writeH2(client, request2);
+        write(request3) {
+          return writeH2(client, request3);
         },
         /**
          * @returns {void}
@@ -9717,18 +9779,18 @@ var require_client_h2 = __commonJS({
          * @param {import('../core/request.js')} request
          * @returns {boolean}
         */
-        busy(request2) {
+        busy(request3) {
           if (session[kRemoteSettings] === false && client[kRunning] > 0) {
             return true;
           }
           if (client[kRunning] >= client[kMaxConcurrentStreams]) {
             return true;
           }
-          if (request2 != null) {
+          if (request3 != null) {
             if (client[kRunning] > 0) {
-              if ((request2.upgrade === "websocket" || request2.method === "CONNECT") && session[kRemoteSettings] === false) return true;
+              if ((request3.upgrade === "websocket" || request3.method === "CONNECT") && session[kRemoteSettings] === false) return true;
             } else {
-              return (request2.upgrade === "websocket" || request2.method === "CONNECT") && session[kRemoteSettings] === false;
+              return (request3.upgrade === "websocket" || request3.method === "CONNECT") && session[kRemoteSettings] === false;
             }
           }
           return false;
@@ -9908,14 +9970,14 @@ var require_client_h2 = __commonJS({
       const retriableRequests = [];
       const streamsToClose = [];
       for (let i = pendingIdx; i < previousPendingIdx; i++) {
-        const request2 = client[kQueue][i];
-        if (request2 != null) {
-          const responseStarted = hasResponseStarted(request2);
-          streamsToClose.push(detachRequestStreamForClose(request2));
-          if (!responseStarted && canReplayRequest(request2) && registerGoAwayRefusal(request2)) {
-            retriableRequests.push(request2);
+        const request3 = client[kQueue][i];
+        if (request3 != null) {
+          const responseStarted = hasResponseStarted(request3);
+          streamsToClose.push(detachRequestStreamForClose(request3));
+          if (!responseStarted && canReplayRequest(request3) && registerGoAwayRefusal(request3)) {
+            retriableRequests.push(request3);
           } else {
-            util.errorRequest(client, request2, err);
+            util.errorRequest(client, request3, err);
           }
         }
       }
@@ -9959,9 +10021,9 @@ var require_client_h2 = __commonJS({
         assert(client[kPending] === 0);
         const requests = client[kQueue].splice(client[kRunningIdx]);
         for (let i = 0; i < requests.length; i++) {
-          const request2 = requests[i];
-          if (request2 != null) {
-            util.errorRequest(client, request2, err);
+          const request3 = requests[i];
+          if (request3 != null) {
+            util.errorRequest(client, request3, err);
           }
         }
       }
@@ -10080,9 +10142,9 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
-      if (request2[kRequestStream] === stream) {
-        detachRequestFromStream(request2);
+      const { request: request3 } = state;
+      if (request3[kRequestStream] === stream) {
+        detachRequestFromStream(request3);
       }
       removeUpgradeStreamListeners(stream);
       if (!stream.destroyed && !stream.closed) {
@@ -10093,8 +10155,8 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
-      if (state.responseReceived || request2.aborted || request2.completed) {
+      const { request: request3 } = state;
+      if (state.responseReceived || request3.aborted || request3.completed) {
         return;
       }
       releaseUpgradeStream(state.stream);
@@ -10118,30 +10180,30 @@ var require_client_h2 = __commonJS({
     function onUpgradeResponse(headers, _flags) {
       const stream = this;
       const state = stream[kRequestStreamState];
-      const { request: request2 } = state;
+      const { request: request3 } = state;
       state.responseReceived = true;
       const statusCode = headers[HTTP2_HEADER_STATUS];
       delete headers[HTTP2_HEADER_STATUS];
       try {
-        request2.onRequestUpgrade(statusCode, headers, stream);
+        request3.onRequestUpgrade(statusCode, headers, stream);
       } catch (err) {
         state.abort(err);
         return;
       }
-      if (request2.aborted) {
+      if (request3.aborted) {
         return;
       }
       removeUpgradeStreamListeners(stream);
-      detachRequestFromStream(request2);
+      detachRequestFromStream(request3);
       finalizeRequest(state);
     }
     function setupUpgradeStream(stream, state) {
-      const { request: request2, headersTimeout, session } = state;
+      const { request: request3, headersTimeout, session } = state;
       stream[kHTTP2Stream] = true;
       stream[kHTTP2Session] = session;
       stream[kRequestStreamState] = state;
       state.stream = stream;
-      bindRequestToStream(request2, stream, releaseUpgradeStream);
+      bindRequestToStream(request3, stream, releaseUpgradeStream);
       stream.once("response", onUpgradeResponse);
       stream.on("error", onUpgradeStreamError);
       stream.once("end", onUpgradeStreamEnd);
@@ -10159,7 +10221,7 @@ var require_client_h2 = __commonJS({
       completeRequest(state.client, state.request, resetPendingIdx);
       state.client[kResume]();
     }
-    function openStream(client, request2, session, abort, headers, options) {
+    function openStream(client, request3, session, abort, headers, options) {
       try {
         return session.request(headers, options);
       } catch (err) {
@@ -10168,7 +10230,7 @@ var require_client_h2 = __commonJS({
           wrappedErr2.cause = err;
           session[kError] = wrappedErr2;
           resetHttp2Session(session, wrappedErr2);
-          requeueUnsentRequest(client, request2);
+          requeueUnsentRequest(client, request3);
           return null;
         }
         const wrappedErr = new InformationalError(err.message, { cause: err });
@@ -10180,13 +10242,13 @@ var require_client_h2 = __commonJS({
         return null;
       }
     }
-    function writeH2(client, request2) {
-      const headersTimeout = request2.headersTimeout ?? client[kHeadersTimeout];
-      const bodyTimeout = request2.bodyTimeout ?? client[kBodyTimeout];
+    function writeH2(client, request3) {
+      const headersTimeout = request3.headersTimeout ?? client[kHeadersTimeout];
+      const bodyTimeout = request3.bodyTimeout ?? client[kBodyTimeout];
       const session = client[kHTTP2Session];
-      const { method, path: path2, host, upgrade, expectContinue, signal, protocol, headers: reqHeaders } = request2;
+      const { method, path: path3, host, upgrade, expectContinue, signal, protocol, headers: reqHeaders } = request3;
       if (upgrade != null && upgrade !== "websocket") {
-        util.errorRequest(client, request2, new InvalidArgumentError(`Custom upgrade "${upgrade}" not supported over HTTP/2`));
+        util.errorRequest(client, request3, new InvalidArgumentError(`Custom upgrade "${upgrade}" not supported over HTTP/2`));
         return false;
       }
       const headers = buildRequestHeaders(reqHeaders);
@@ -10194,13 +10256,13 @@ var require_client_h2 = __commonJS({
       headers[HTTP2_HEADER_METHOD] = method;
       const state = {
         abort: null,
-        body: request2.body,
+        body: request3.body,
         bytesRead: 0,
         client,
         contentLength: null,
         expectsPayload: false,
         maxResponseSize: client[kMaxResponseSize],
-        request: request2,
+        request: request3,
         headersTimeout,
         bodyTimeout,
         requestFinalized: false,
@@ -10213,13 +10275,13 @@ var require_client_h2 = __commonJS({
         stream: null
       };
       const abort = (err, resetPendingIdx = false) => {
-        if (request2.aborted || request2.completed) {
+        if (request3.aborted || request3.completed) {
           return;
         }
         err = err || new RequestAbortedError();
-        util.errorRequest(client, request2, err);
+        util.errorRequest(client, request3, err);
         if (state.stream != null) {
-          clearRequestStream(request2);
+          clearRequestStream(request3);
           const stream2 = state.stream;
           stream2.close();
           if (!stream2.destroyed) {
@@ -10233,30 +10295,30 @@ var require_client_h2 = __commonJS({
       state.abort = abort;
       let stream = null;
       try {
-        request2.onRequestStart(abort, null);
+        request3.onRequestStart(abort, null);
       } catch (err) {
-        util.errorRequest(client, request2, err);
+        util.errorRequest(client, request3, err);
       }
-      if (request2.aborted) {
+      if (request3.aborted) {
         return false;
       }
       if (upgrade || method === "CONNECT") {
         refH2Session(session);
         if (upgrade === "websocket") {
           if (session[kEnableConnectProtocol] === false) {
-            util.errorRequest(client, request2, new InformationalError("HTTP/2: Extended CONNECT protocol not supported by server"));
+            util.errorRequest(client, request3, new InformationalError("HTTP/2: Extended CONNECT protocol not supported by server"));
             unrefH2Session(session);
             return false;
           }
           headers[HTTP2_HEADER_METHOD] = "CONNECT";
           headers[HTTP2_HEADER_PROTOCOL] = "websocket";
-          headers[HTTP2_HEADER_PATH] = path2;
+          headers[HTTP2_HEADER_PATH] = path3;
           if (protocol === "ws:" || protocol === "wss:") {
             headers[HTTP2_HEADER_SCHEME] = protocol === "ws:" ? "http" : "https";
           } else {
             headers[HTTP2_HEADER_SCHEME] = protocol === "http:" ? "http" : "https";
           }
-          stream = openStream(client, request2, session, abort, headers, { endStream: false, signal });
+          stream = openStream(client, request3, session, abort, headers, { endStream: false, signal });
           if (stream == null) {
             unrefH2Session(session);
             return false;
@@ -10264,7 +10326,7 @@ var require_client_h2 = __commonJS({
           setupUpgradeStream(stream, state);
           return true;
         }
-        stream = openStream(client, request2, session, abort, headers, { endStream: false, signal });
+        stream = openStream(client, request3, session, abort, headers, { endStream: false, signal });
         if (stream == null) {
           unrefH2Session(session);
           return false;
@@ -10272,7 +10334,7 @@ var require_client_h2 = __commonJS({
         setupUpgradeStream(stream, state);
         return true;
       }
-      headers[HTTP2_HEADER_PATH] = path2;
+      headers[HTTP2_HEADER_PATH] = path3;
       headers[HTTP2_HEADER_SCHEME] = protocol === "http:" ? "http" : "https";
       const expectsPayload = method === "PUT" || method === "POST" || method === "PATCH" || method === "QUERY" || method === "PROPFIND" || method === "PROPPATCH";
       let body = state.body;
@@ -10288,14 +10350,14 @@ var require_client_h2 = __commonJS({
         contentLength = bodyStream.length;
       }
       if (contentLength == null) {
-        contentLength = request2.contentLength;
+        contentLength = request3.contentLength;
       }
       if (contentLength === 0 && !expectsPayload) {
         contentLength = null;
       }
-      if (shouldSendContentLength(method) && contentLength > 0 && request2.contentLength != null && request2.contentLength !== contentLength) {
+      if (shouldSendContentLength(method) && contentLength > 0 && request3.contentLength != null && request3.contentLength !== contentLength) {
         if (client[kStrictContentLength]) {
-          util.errorRequest(client, request2, new RequestContentLengthMismatchError());
+          util.errorRequest(client, request3, new RequestContentLengthMismatchError());
           return false;
         }
         process.emitWarning(new RequestContentLengthMismatchError());
@@ -10311,7 +10373,7 @@ var require_client_h2 = __commonJS({
           header += `${key}: ${headers[key]}\r
 `;
         }
-        channels.sendHeaders.publish({ request: request2, headers: header, socket: session[kSocket] });
+        channels.sendHeaders.publish({ request: request3, headers: header, socket: session[kSocket] });
       }
       const shouldEndStream = body === null || contentLength === 0;
       state.body = body;
@@ -10320,7 +10382,7 @@ var require_client_h2 = __commonJS({
       if (expectContinue) {
         headers[HTTP2_HEADER_EXPECT] = "100-continue";
       }
-      stream = openStream(client, request2, session, abort, headers, { endStream: shouldEndStream, signal });
+      stream = openStream(client, request3, session, abort, headers, { endStream: shouldEndStream, signal });
       if (stream == null) {
         return false;
       }
@@ -10334,7 +10396,7 @@ var require_client_h2 = __commonJS({
       }
       stream[kHTTP2Session] = session;
       stream.on("close", completeRequestStream);
-      bindRequestToStream(request2, stream, releaseRequestStream);
+      bindRequestToStream(request3, stream, releaseRequestStream);
       if (expectContinue) {
         stream.once("continue", writeBodyH2);
       }
@@ -10374,9 +10436,9 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
-      if (request2[kRequestStream] === stream) {
-        detachRequestFromStream(request2);
+      const { request: request3 } = state;
+      if (request3[kRequestStream] === stream) {
+        detachRequestFromStream(request3);
       }
       if (!stream.destroyed && !stream.closed) {
         removeRequestStreamListeners(stream);
@@ -10389,8 +10451,8 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2, maxResponseSize, responseContentLength } = state;
-      if (request2.aborted || request2.completed) {
+      const { request: request3, maxResponseSize, responseContentLength } = state;
+      if (request3.aborted || request3.completed) {
         return;
       }
       if (responseContentLength != null && state.bytesRead + chunk.length > responseContentLength) {
@@ -10402,7 +10464,7 @@ var require_client_h2 = __commonJS({
         return;
       }
       state.bytesRead += chunk.length;
-      if (request2.onResponseData(chunk) === false) {
+      if (request3.onResponseData(chunk) === false) {
         stream.pause();
       }
     }
@@ -10412,13 +10474,13 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
-      if (request2.aborted || request2.completed) {
+      const { request: request3 } = state;
+      if (request3.aborted || request3.completed) {
         return;
       }
       const statusCode = headers[HTTP2_HEADER_STATUS];
       delete headers[HTTP2_HEADER_STATUS];
-      request2.onResponseStart(Number(statusCode), headers, noop, "");
+      request3.onResponseStart(Number(statusCode), headers, noop, "");
     }
     function onResponse(headers) {
       const stream = this;
@@ -10426,7 +10488,7 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
+      const { request: request3 } = state;
       stream.off("response", onResponse);
       if (state.body != null && !state.bodySent && !stream.writableEnded) {
         stream.removeListener("continue", writeBodyH2);
@@ -10434,20 +10496,20 @@ var require_client_h2 = __commonJS({
       }
       const statusCode = Number(headers[HTTP2_HEADER_STATUS]);
       delete headers[HTTP2_HEADER_STATUS];
-      request2.onResponseStarted();
+      request3.onResponseStarted();
       state.responseReceived = true;
-      if (request2.method !== "HEAD" && statusCode !== 304) {
+      if (request3.method !== "HEAD" && statusCode !== 304) {
         const contentLength = headers[HTTP2_HEADER_CONTENT_LENGTH];
         state.responseContentLength = contentLength == null ? null : Number(contentLength);
       }
       if (state.headersTimeout || state.bodyTimeout) {
         stream.setTimeout(state.bodyTimeout);
       }
-      if (request2.aborted || request2.completed) {
+      if (request3.aborted || request3.completed) {
         releaseRequestStream(stream);
         return;
       }
-      if (request2.onResponseStart(statusCode, headers, stream.resume.bind(stream), "") === false) {
+      if (request3.onResponseStart(statusCode, headers, stream.resume.bind(stream), "") === false) {
         stream.pause();
       }
       stream.on("data", onData);
@@ -10458,10 +10520,10 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
+      const { request: request3 } = state;
       stream.off("end", onEnd);
       if (state.responseReceived) {
-        if (!request2.aborted && !request2.completed) {
+        if (!request3.aborted && !request3.completed) {
           if (state.responseContentLength != null && state.bytesRead !== state.responseContentLength) {
             state.abort(new ResponseContentLengthMismatchError());
             return;
@@ -10474,16 +10536,16 @@ var require_client_h2 = __commonJS({
       }
     }
     function retryRefusedStream(stream, state) {
-      const { client, request: request2 } = state;
-      if (state.responseReceived || request2.aborted || request2.completed || request2[kRefusedStreamRetry] || !canReplayRequest(request2)) {
+      const { client, request: request3 } = state;
+      if (state.responseReceived || request3.aborted || request3.completed || request3[kRefusedStreamRetry] || !canReplayRequest(request3)) {
         return false;
       }
-      request2[kRefusedStreamRetry] = true;
-      detachRequestStreamForClose(request2);
+      request3[kRefusedStreamRetry] = true;
+      detachRequestStreamForClose(request3);
       state.stream = null;
       state.requestFinalized = true;
-      completeRequest(client, request2);
-      client[kQueue].splice(client[kPendingIdx], 0, request2);
+      completeRequest(client, request3);
+      client[kQueue].splice(client[kPendingIdx], 0, request3);
       client[kResume]();
       return true;
     }
@@ -10533,10 +10595,10 @@ var require_client_h2 = __commonJS({
       if (state == null) {
         return;
       }
-      const { request: request2 } = state;
+      const { request: request3 } = state;
       stream.off("trailers", onTrailers);
       stream.off("data", onData);
-      if (request2.aborted || request2.completed) {
+      if (request3.aborted || request3.completed) {
         return;
       }
       state.trailers = trailers;
@@ -10545,14 +10607,14 @@ var require_client_h2 = __commonJS({
       const stream = this;
       const state = stream[kRequestStreamState];
       state.bodySent = true;
-      const { abort, body, client, contentLength, expectsPayload, request: request2 } = state;
+      const { abort, body, client, contentLength, expectsPayload, request: request3 } = state;
       if (!body || contentLength === 0) {
         writeBuffer(
           abort,
           stream,
           null,
           client,
-          request2,
+          request3,
           client[kSocket],
           contentLength,
           expectsPayload
@@ -10563,7 +10625,7 @@ var require_client_h2 = __commonJS({
           stream,
           body,
           client,
-          request2,
+          request3,
           client[kSocket],
           contentLength,
           expectsPayload
@@ -10575,7 +10637,7 @@ var require_client_h2 = __commonJS({
             stream,
             body.stream(),
             client,
-            request2,
+            request3,
             client[kSocket],
             contentLength,
             expectsPayload
@@ -10586,7 +10648,7 @@ var require_client_h2 = __commonJS({
             stream,
             body,
             client,
-            request2,
+            request3,
             client[kSocket],
             contentLength,
             expectsPayload
@@ -10600,7 +10662,7 @@ var require_client_h2 = __commonJS({
           stream,
           body,
           client,
-          request2,
+          request3,
           contentLength
         );
       } else if (util.isIterable(body)) {
@@ -10609,7 +10671,7 @@ var require_client_h2 = __commonJS({
           stream,
           body,
           client,
-          request2,
+          request3,
           client[kSocket],
           contentLength,
           expectsPayload
@@ -10618,7 +10680,7 @@ var require_client_h2 = __commonJS({
         assert(false);
       }
     }
-    function writeBuffer(abort, h2stream, body, client, request2, socket, contentLength, expectsPayload) {
+    function writeBuffer(abort, h2stream, body, client, request3, socket, contentLength, expectsPayload) {
       try {
         if (body != null && util.isBuffer(body)) {
           assert(contentLength === body.byteLength, "buffer body must have content length");
@@ -10626,18 +10688,18 @@ var require_client_h2 = __commonJS({
           h2stream.write(body);
           h2stream.uncork();
           h2stream.end();
-          request2.onBodySent(body);
+          request3.onBodySent(body);
         }
         if (!expectsPayload) {
           socket[kReset] = true;
         }
-        request2.onRequestSent();
+        request3.onRequestSent();
         client[kResume]();
       } catch (error) {
         abort(error);
       }
     }
-    function writeStream(abort, socket, expectsPayload, h2stream, body, client, request2, contentLength) {
+    function writeStream(abort, socket, expectsPayload, h2stream, body, client, request3, contentLength) {
       assert(contentLength !== 0 || client[kRunning] === 0, "stream body cannot be pipelined");
       const pipe = pipeline(
         body,
@@ -10648,7 +10710,7 @@ var require_client_h2 = __commonJS({
             abort(err);
           } else {
             util.removeAllListeners(pipe);
-            request2.onRequestSent();
+            request3.onRequestSent();
             if (!expectsPayload) {
               socket[kReset] = true;
             }
@@ -10658,10 +10720,10 @@ var require_client_h2 = __commonJS({
       );
       util.addListener(pipe, "data", onPipeData);
       function onPipeData(chunk) {
-        request2.onBodySent(chunk);
+        request3.onBodySent(chunk);
       }
     }
-    async function writeBlob(abort, h2stream, body, client, request2, socket, contentLength, expectsPayload) {
+    async function writeBlob(abort, h2stream, body, client, request3, socket, contentLength, expectsPayload) {
       try {
         if (contentLength != null && contentLength !== body.size) {
           throw new RequestContentLengthMismatchError();
@@ -10671,8 +10733,8 @@ var require_client_h2 = __commonJS({
         h2stream.write(buffer);
         h2stream.uncork();
         h2stream.end();
-        request2.onBodySent(buffer);
-        request2.onRequestSent();
+        request3.onBodySent(buffer);
+        request3.onRequestSent();
         if (!expectsPayload) {
           socket[kReset] = true;
         }
@@ -10681,7 +10743,7 @@ var require_client_h2 = __commonJS({
         abort(err);
       }
     }
-    async function writeIterable(abort, h2stream, body, client, request2, socket, contentLength, expectsPayload) {
+    async function writeIterable(abort, h2stream, body, client, request3, socket, contentLength, expectsPayload) {
       assert(contentLength !== 0 || client[kRunning] === 0, "iterator body cannot be pipelined");
       let callback = null;
       function onDrain() {
@@ -10706,13 +10768,13 @@ var require_client_h2 = __commonJS({
             throw socket[kError];
           }
           const res = h2stream.write(chunk);
-          request2.onBodySent(chunk);
+          request3.onBodySent(chunk);
           if (!res) {
             await waitForDrain();
           }
         }
         h2stream.end();
-        request2.onRequestSent();
+        request3.onRequestSent();
         if (!expectsPayload) {
           socket[kReset] = true;
         }
@@ -10732,7 +10794,7 @@ var require_client = __commonJS({
   "vendor/channel-pack/node_modules/undici/lib/dispatcher/client.js"(exports, module) {
     "use strict";
     var assert = __require("node:assert");
-    var net = __require("node:net");
+    var net2 = __require("node:net");
     var http = __require("node:http");
     var util = require_util();
     var { ClientStats } = require_stats();
@@ -10836,7 +10898,7 @@ var require_client = __commonJS({
         tls,
         strictContentLength,
         maxCachedSessions,
-        connect: connect2,
+        connect: connect3,
         maxRequestsPerClient,
         localAddress,
         maxResponseSize,
@@ -10896,13 +10958,13 @@ var require_client = __commonJS({
         if (bodyTimeout != null && (!Number.isInteger(bodyTimeout) || bodyTimeout < 0)) {
           throw new InvalidArgumentError("bodyTimeout must be a positive integer or zero");
         }
-        if (connect2 != null && typeof connect2 !== "function" && typeof connect2 !== "object") {
+        if (connect3 != null && typeof connect3 !== "function" && typeof connect3 !== "object") {
           throw new InvalidArgumentError("connect must be a function or an object");
         }
         if (maxRequestsPerClient != null && (!Number.isInteger(maxRequestsPerClient) || maxRequestsPerClient < 0)) {
           throw new InvalidArgumentError("maxRequestsPerClient must be a positive number");
         }
-        if (localAddress != null && (typeof localAddress !== "string" || net.isIP(localAddress) === 0)) {
+        if (localAddress != null && (typeof localAddress !== "string" || net2.isIP(localAddress) === 0)) {
           throw new InvalidArgumentError("localAddress must be valid string IP address");
         }
         if (maxResponseSize != null && (!Number.isInteger(maxResponseSize) || maxResponseSize < -1)) {
@@ -10955,8 +11017,8 @@ var require_client = __commonJS({
           }
         }
         super({ webSocket, eventSource });
-        if (typeof connect2 !== "function") {
-          connect2 = buildConnector({
+        if (typeof connect3 !== "function") {
+          connect3 = buildConnector({
             ...tls,
             maxCachedSessions,
             allowH2,
@@ -10964,11 +11026,11 @@ var require_client = __commonJS({
             useH2c: h2Options?.useH2c ?? useH2c,
             timeout: connectTimeout,
             ...typeof autoSelectFamily === "boolean" ? { autoSelectFamily, autoSelectFamilyAttemptTimeout } : void 0,
-            ...connect2
+            ...connect3
           });
         } else {
-          const customConnect = connect2;
-          connect2 = (opts, callback) => customConnect({
+          const customConnect = connect3;
+          connect3 = (opts, callback) => customConnect({
             ...opts,
             ...socketPath != null ? { socketPath } : null,
             ...allowH2 != null ? { allowH2 } : null
@@ -10976,7 +11038,7 @@ var require_client = __commonJS({
         }
         this[kUrl] = util.parseOrigin(url);
         this[kHostAuthority] = `${this[kUrl].hostname}${this[kUrl].port ? `:${this[kUrl].port}` : ""}`;
-        this[kConnector] = connect2;
+        this[kConnector] = connect3;
         this[kPipelining] = pipelining != null ? pipelining : 1;
         this[kMaxHeadersSize] = maxHeaderSize;
         this[kKeepAliveDefaultTimeout] = keepAliveTimeout == null ? 4e3 : keepAliveTimeout;
@@ -11046,14 +11108,14 @@ var require_client = __commonJS({
         );
       }
       [kConnect](cb) {
-        connect(this);
+        connect2(this);
         this.once("connect", cb);
       }
       [kDispatch](opts, handler) {
-        const request2 = new Request2(this[kUrl].origin, opts, handler);
-        this[kQueue].push(request2);
+        const request3 = new Request2(this[kUrl].origin, opts, handler);
+        this[kQueue].push(request3);
         if (this[kResuming]) {
-        } else if (util.bodyLength(request2.body) == null && util.isIterable(request2.body)) {
+        } else if (util.bodyLength(request3.body) == null && util.isIterable(request3.body)) {
           this[kResuming] = 1;
           queueMicrotask(() => resume(this));
         } else {
@@ -11077,9 +11139,9 @@ var require_client = __commonJS({
         return new Promise((resolve2) => {
           const requests = this[kQueue].splice(this[kPendingIdx]);
           for (let i = 0; i < requests.length; i++) {
-            const request2 = requests[i];
-            if (request2 != null) {
-              util.errorRequest(this, request2, err);
+            const request3 = requests[i];
+            if (request3 != null) {
+              util.errorRequest(this, request3, err);
             }
           }
           const callback = () => {
@@ -11104,15 +11166,15 @@ var require_client = __commonJS({
         assert(client[kPendingIdx] === client[kRunningIdx]);
         const requests = client[kQueue].splice(client[kRunningIdx]);
         for (let i = 0; i < requests.length; i++) {
-          const request2 = requests[i];
-          if (request2 != null) {
-            util.errorRequest(client, request2, err);
+          const request3 = requests[i];
+          if (request3 != null) {
+            util.errorRequest(client, request3, err);
           }
         }
         assert(client[kSize] === 0);
       }
     }
-    function connect(client) {
+    function connect2(client) {
       assert(!client[kConnecting]);
       assert(!client[kHTTPContext]);
       let { host, hostname, protocol, port } = client[kUrl];
@@ -11120,7 +11182,7 @@ var require_client = __commonJS({
         const idx = hostname.indexOf("]");
         assert(idx !== -1);
         const ip = hostname.substring(1, idx);
-        assert(net.isIPv6(ip));
+        assert(net2.isIPv6(ip));
         hostname = ip;
       }
       client[kConnecting] = true;
@@ -11221,8 +11283,8 @@ var require_client = __commonJS({
           util.errorRequest(client, running2[i], err);
         }
         while (client[kPending] > 0 && client[kQueue][client[kPendingIdx]].servername === client[kServerName]) {
-          const request2 = client[kQueue].splice(client[kPendingIdx], 1)[0];
-          util.errorRequest(client, request2, err);
+          const request3 = client[kQueue].splice(client[kPendingIdx], 1)[0];
+          util.errorRequest(client, request3, err);
         }
       } else {
         onError(client, err);
@@ -11277,19 +11339,19 @@ var require_client = __commonJS({
         if (client[kRunning] >= (getMaxConcurrent(client) || 1)) {
           return;
         }
-        const request2 = client[kQueue][client[kPendingIdx]];
-        if (request2 === null) {
+        const request3 = client[kQueue][client[kPendingIdx]];
+        if (request3 === null) {
           return;
         }
-        if (request2.aborted) {
+        if (request3.aborted) {
           client[kQueue].splice(client[kPendingIdx], 1);
           continue;
         }
-        if (client[kUrl].protocol === "https:" && client[kServerName] !== request2.servername) {
+        if (client[kUrl].protocol === "https:" && client[kServerName] !== request3.servername) {
           if (client[kRunning] > 0) {
             return;
           }
-          client[kServerName] = request2.servername;
+          client[kServerName] = request3.servername;
           client[kHTTPContext]?.destroy(new InformationalError("servername changed"), () => {
             client[kHTTPContext] = null;
             resume(client);
@@ -11299,17 +11361,17 @@ var require_client = __commonJS({
           return;
         }
         if (!client[kHTTPContext]) {
-          client[kServerName] = request2.servername;
-          connect(client);
+          client[kServerName] = request3.servername;
+          connect2(client);
           return;
         }
         if (client[kHTTPContext].destroyed) {
           return;
         }
-        if (client[kHTTPContext].busy(request2)) {
+        if (client[kHTTPContext].busy(request3)) {
           return;
         }
-        if (!request2.aborted && client[kHTTPContext].write(request2)) {
+        if (!request3.aborted && client[kHTTPContext].write(request3)) {
           client[kPendingIdx]++;
         } else {
           client[kQueue].splice(client[kPendingIdx], 1);
@@ -11520,8 +11582,8 @@ var require_pool_base = __commonJS({
       }
       get [kPending]() {
         let ret = this[kQueued];
-        for (const { [kPending]: pending } of this[kClients]) {
-          ret += pending;
+        for (const { [kPending]: pending2 } of this[kClients]) {
+          ret += pending2;
         }
         return ret;
       }
@@ -11677,7 +11739,7 @@ var require_pool = __commonJS({
       constructor(origin, {
         connections,
         factory: factory2 = defaultFactory,
-        connect,
+        connect: connect2,
         connectTimeout,
         tls,
         maxCachedSessions,
@@ -11695,11 +11757,11 @@ var require_pool = __commonJS({
         if (typeof factory2 !== "function") {
           throw new InvalidArgumentError("factory must be a function.");
         }
-        if (connect != null && typeof connect !== "function" && typeof connect !== "object") {
+        if (connect2 != null && typeof connect2 !== "function" && typeof connect2 !== "object") {
           throw new InvalidArgumentError("connect must be a function or an object");
         }
-        if (typeof connect !== "function") {
-          connect = buildConnector({
+        if (typeof connect2 !== "function") {
+          connect2 = buildConnector({
             ...tls,
             maxCachedSessions,
             allowH2,
@@ -11707,13 +11769,13 @@ var require_pool = __commonJS({
             socketPath,
             timeout: connectTimeout,
             ...typeof autoSelectFamily === "boolean" ? { autoSelectFamily, autoSelectFamilyAttemptTimeout } : void 0,
-            ...connect
+            ...connect2
           });
         }
         super(options);
         this[kConnections] = connections || null;
         this[kUrl] = util.parseOrigin(origin);
-        this[kOptions] = { ...util.deepClone(options), connect, allowH2, useH2c, clientTtl, socketPath };
+        this[kOptions] = { ...util.deepClone(options), connect: connect2, allowH2, useH2c, clientTtl, socketPath };
         this[kFactory] = factory2;
         this[kProtocol] = null;
         this[kProtocolProbe] = null;
@@ -11850,15 +11912,15 @@ var require_balanced_pool = __commonJS({
       return new Pool2(origin, opts);
     }
     var BalancedPool = class extends PoolBase {
-      constructor(upstreams = [], { factory: factory2 = defaultFactory, connect, tls, ...opts } = {}) {
+      constructor(upstreams = [], { factory: factory2 = defaultFactory, connect: connect2, tls, ...opts } = {}) {
         if (typeof factory2 !== "function") {
           throw new InvalidArgumentError("factory must be a function.");
         }
         super(opts);
         this[kOriginless] = true;
-        if (connect && typeof connect !== "function") connect = { ...connect };
+        if (connect2 && typeof connect2 !== "function") connect2 = { ...connect2 };
         if (tls && typeof tls !== "function") tls = { ...tls };
-        this[kOptions] = { ...util.deepClone(opts), connect, tls };
+        this[kOptions] = { ...util.deepClone(opts), connect: connect2, tls };
         this[kIndex] = -1;
         this[kCurrentWeight] = 0;
         this[kMaxWeightPerServer] = this[kOptions].maxWeightPerServer || 100;
@@ -11989,7 +12051,7 @@ var require_round_robin_pool = __commonJS({
       constructor(origin, {
         connections,
         factory: factory2 = defaultFactory,
-        connect,
+        connect: connect2,
         connectTimeout,
         tls,
         maxCachedSessions,
@@ -12006,24 +12068,24 @@ var require_round_robin_pool = __commonJS({
         if (typeof factory2 !== "function") {
           throw new InvalidArgumentError("factory must be a function.");
         }
-        if (connect != null && typeof connect !== "function" && typeof connect !== "object") {
+        if (connect2 != null && typeof connect2 !== "function" && typeof connect2 !== "object") {
           throw new InvalidArgumentError("connect must be a function or an object");
         }
-        if (typeof connect !== "function") {
-          connect = buildConnector({
+        if (typeof connect2 !== "function") {
+          connect2 = buildConnector({
             ...tls,
             maxCachedSessions,
             allowH2,
             socketPath,
             timeout: connectTimeout,
             ...typeof autoSelectFamily === "boolean" ? { autoSelectFamily, autoSelectFamilyAttemptTimeout } : void 0,
-            ...connect
+            ...connect2
           });
         }
         super(options);
         this[kConnections] = connections || null;
         this[kUrl] = util.parseOrigin(origin);
-        this[kOptions] = { ...util.deepClone(options), connect, allowH2, clientTtl, socketPath };
+        this[kOptions] = { ...util.deepClone(options), connect: connect2, allowH2, clientTtl, socketPath };
         this[kFactory] = factory2;
         this[kIndex] = -1;
         this.on("connect", (origin2, targets) => {
@@ -12116,21 +12178,21 @@ var require_agent = __commonJS({
       return opts && opts.connections === 1 ? new Client(origin, opts) : new Pool2(origin, opts);
     }
     var Agent2 = class extends DispatcherBase {
-      constructor({ factory: factory2 = defaultFactory, maxOrigins = Infinity, connect, ...options } = {}) {
+      constructor({ factory: factory2 = defaultFactory, maxOrigins = Infinity, connect: connect2, ...options } = {}) {
         if (typeof factory2 !== "function") {
           throw new InvalidArgumentError("factory must be a function.");
         }
-        if (connect != null && typeof connect !== "function" && typeof connect !== "object") {
+        if (connect2 != null && typeof connect2 !== "function" && typeof connect2 !== "object") {
           throw new InvalidArgumentError("connect must be a function or an object");
         }
         if (typeof maxOrigins !== "number" || Number.isNaN(maxOrigins) || maxOrigins <= 0) {
           throw new InvalidArgumentError("maxOrigins must be a number greater than 0");
         }
         super(options);
-        if (connect && typeof connect !== "function") {
-          connect = { ...connect };
+        if (connect2 && typeof connect2 !== "function") {
+          connect2 = { ...connect2 };
         }
-        this[kOptions] = { ...util.deepClone(options), maxOrigins, connect };
+        this[kOptions] = { ...util.deepClone(options), maxOrigins, connect: connect2 };
         this[kFactory] = factory2;
         this[kClients] = /* @__PURE__ */ new Map();
         this[kOrigins] = /* @__PURE__ */ new Set();
@@ -12326,10 +12388,10 @@ var require_socks5_utils = __commonJS({
   "vendor/channel-pack/node_modules/undici/lib/core/socks5-utils.js"(exports, module) {
     "use strict";
     var { Buffer: Buffer2 } = __require("node:buffer");
-    var net = __require("node:net");
+    var net2 = __require("node:net");
     var { InvalidArgumentError } = require_errors();
     function parseAddress(address) {
-      if (net.isIPv4(address)) {
+      if (net2.isIPv4(address)) {
         const parts = address.split(".").map(Number);
         return {
           type: 1,
@@ -12337,7 +12399,7 @@ var require_socks5_utils = __commonJS({
           buffer: Buffer2.from(parts)
         };
       }
-      if (net.isIPv6(address)) {
+      if (net2.isIPv6(address)) {
         return {
           type: 4,
           // IPv6
@@ -12360,7 +12422,7 @@ var require_socks5_utils = __commonJS({
       if (address.includes(".")) {
         const lastColonIndex = address.lastIndexOf(":");
         const ipv4Part = address.slice(lastColonIndex + 1);
-        if (net.isIPv4(ipv4Part)) {
+        if (net2.isIPv4(ipv4Part)) {
           const octets = ipv4Part.split(".").map(Number);
           const high = (octets[0] << 8 | octets[1]).toString(16);
           const low = (octets[2] << 8 | octets[3]).toString(16);
@@ -12613,13 +12675,13 @@ var require_socks5_client = __commonJS({
         }
         debug("starting handshake with", this.authMethods.length, "auth methods");
         this.state = STATES.HANDSHAKING;
-        const request2 = Buffer2.alloc(2 + this.authMethods.length);
-        request2[0] = SOCKS_VERSION;
-        request2[1] = this.authMethods.length;
+        const request3 = Buffer2.alloc(2 + this.authMethods.length);
+        request3[0] = SOCKS_VERSION;
+        request3[1] = this.authMethods.length;
         this.authMethods.forEach((method, i) => {
-          request2[2 + i] = method;
+          request3[2 + i] = method;
         });
-        this.socket.write(request2);
+        this.socket.write(request3);
       }
       /**
        * Handle handshake response from server
@@ -12661,13 +12723,13 @@ var require_socks5_client = __commonJS({
         if (usernameBuffer.length > 255 || passwordBuffer.length > 255) {
           throw new InvalidArgumentError("Username or password too long");
         }
-        const request2 = Buffer2.alloc(3 + usernameBuffer.length + passwordBuffer.length);
-        request2[0] = 1;
-        request2[1] = usernameBuffer.length;
-        usernameBuffer.copy(request2, 2);
-        request2[2 + usernameBuffer.length] = passwordBuffer.length;
-        passwordBuffer.copy(request2, 3 + usernameBuffer.length);
-        this.socket.write(request2);
+        const request3 = Buffer2.alloc(3 + usernameBuffer.length + passwordBuffer.length);
+        request3[0] = 1;
+        request3[1] = usernameBuffer.length;
+        usernameBuffer.copy(request3, 2);
+        request3[2 + usernameBuffer.length] = passwordBuffer.length;
+        passwordBuffer.copy(request3, 3 + usernameBuffer.length);
+        this.socket.write(request3);
       }
       /**
        * Handle authentication response
@@ -12702,22 +12764,22 @@ var require_socks5_client = __commonJS({
         }
         debug("connecting to", address, port);
         this.state = STATES.CONNECTING;
-        const request2 = this.buildConnectRequest(COMMANDS.CONNECT, address, port);
-        this.socket.write(request2);
+        const request3 = this.buildConnectRequest(COMMANDS.CONNECT, address, port);
+        this.socket.write(request3);
       }
       /**
        * Build a SOCKS5 request
        */
       buildConnectRequest(command, address, port) {
         const { type: addressType, buffer: addressBuffer } = parseAddress(address);
-        const request2 = Buffer2.alloc(4 + addressBuffer.length + 2);
-        request2[0] = SOCKS_VERSION;
-        request2[1] = command;
-        request2[2] = 0;
-        request2[3] = addressType;
-        addressBuffer.copy(request2, 4);
-        request2.writeUInt16BE(port, 4 + addressBuffer.length);
-        return request2;
+        const request3 = Buffer2.alloc(4 + addressBuffer.length + 2);
+        request3[0] = SOCKS_VERSION;
+        request3[1] = command;
+        request3[2] = 0;
+        request3[3] = addressType;
+        addressBuffer.copy(request3, 4);
+        request3.writeUInt16BE(port, 4 + addressBuffer.length);
+        return request3;
       }
       /**
        * Handle CONNECT response
@@ -12749,8 +12811,8 @@ var require_socks5_client = __commonJS({
           return;
         }
         if (reply2 !== REPLY_CODES.SUCCEEDED) {
-          const errorMessage6 = this.getReplyErrorMessage(reply2);
-          throw new Socks5ProxyError(`SOCKS5 connection failed: ${errorMessage6}`, `UND_ERR_SOCKS5_REPLY_${reply2}`);
+          const errorMessage7 = this.getReplyErrorMessage(reply2);
+          throw new Socks5ProxyError(`SOCKS5 connection failed: ${errorMessage7}`, `UND_ERR_SOCKS5_REPLY_${reply2}`);
         }
         let boundAddress;
         let offset = 4;
@@ -13129,7 +13191,7 @@ var require_proxy_agent = __commonJS({
     var Http1ProxyWrapper = class extends DispatcherBase {
       #client;
       #proxyServername;
-      constructor(proxyUrl, { headers = {}, connect, factory: factory2, proxyServername }) {
+      constructor(proxyUrl, { headers = {}, connect: connect2, factory: factory2, proxyServername }) {
         if (!proxyUrl) {
           throw new InvalidArgumentError("Proxy URL is mandatory");
         }
@@ -13137,9 +13199,9 @@ var require_proxy_agent = __commonJS({
         this[kProxyHeaders] = headers;
         this.#proxyServername = proxyServername;
         if (factory2) {
-          this.#client = factory2(proxyUrl, { connect });
+          this.#client = factory2(proxyUrl, { connect: connect2 });
         } else {
-          this.#client = new Client(proxyUrl, { connect });
+          this.#client = new Client(proxyUrl, { connect: connect2 });
         }
       }
       [kDispatch](opts, handler) {
@@ -13155,10 +13217,10 @@ var require_proxy_agent = __commonJS({
         };
         const {
           origin,
-          path: path2 = "/",
+          path: path3 = "/",
           headers = {}
         } = opts;
-        opts.path = origin + path2;
+        opts.path = origin + path3;
         if (!("host" in headers) && !("Host" in headers)) {
           const { host } = new URL(origin);
           headers.host = host;
@@ -13205,7 +13267,7 @@ var require_proxy_agent = __commonJS({
         } else if (username) {
           this[kProxyHeaders]["proxy-authorization"] = `Basic ${Buffer.from(`${decodeURIComponent(username)}:`).toString("base64")}`;
         }
-        const connect = buildConnector({ timeout: connectTimeout, ...opts.proxyTls });
+        const connect2 = buildConnector({ timeout: connectTimeout, ...opts.proxyTls });
         const connectHTTP1 = buildConnector({ timeout: connectTimeout, ...opts.proxyTls, allowH2: false });
         this[kConnectEndpoint] = buildConnector({ timeout: connectTimeout, ...opts.requestTls });
         this[kConnectEndpointHTTP1] = buildConnector({ timeout: connectTimeout, ...opts.requestTls, allowH2: false });
@@ -13215,7 +13277,7 @@ var require_proxy_agent = __commonJS({
           if (this[kProxy].protocol === "socks5:" || this[kProxy].protocol === "socks:") {
             return new Socks5ProxyAgent(this[kProxy].uri, {
               headers: this[kProxyHeaders],
-              connect,
+              connect: connect2,
               factory: agentFactory,
               username: opts.username || username,
               password: opts.password || password,
@@ -13244,7 +13306,7 @@ var require_proxy_agent = __commonJS({
         if (protocol === "socks5:" || protocol === "socks:") {
           this[kClient] = null;
         } else {
-          this[kClient] = clientFactory(url, { connect });
+          this[kClient] = clientFactory(url, { connect: connect2 });
         }
         this[kAgent] = new Agent2({
           ...opts,
@@ -14706,10 +14768,10 @@ var require_api_request = __commonJS({
         }
       }
     };
-    function request2(opts, callback) {
+    function request3(opts, callback) {
       if (callback === void 0) {
         return new Promise((resolve2, reject) => {
-          request2.call(this, opts, (err, data) => {
+          request3.call(this, opts, (err, data) => {
             return err ? reject(err) : resolve2(data);
           });
         });
@@ -14725,7 +14787,7 @@ var require_api_request = __commonJS({
         queueMicrotask(() => callback(err, { opaque }));
       }
     }
-    module.exports = request2;
+    module.exports = request3;
     module.exports.RequestHandler = RequestHandler;
   }
 });
@@ -15367,10 +15429,10 @@ var require_api_connect = __commonJS({
         }
       }
     };
-    function connect(opts, callback) {
+    function connect2(opts, callback) {
       if (callback === void 0) {
         return new Promise((resolve2, reject) => {
-          connect.call(this, opts, (err, data) => {
+          connect2.call(this, opts, (err, data) => {
             return err ? reject(err) : resolve2(data);
           });
         });
@@ -15387,7 +15449,7 @@ var require_api_connect = __commonJS({
         queueMicrotask(() => callback(err, { opaque }));
       }
     }
-    module.exports = connect;
+    module.exports = connect2;
   }
 });
 
@@ -15574,20 +15636,20 @@ var require_mock_utils = __commonJS({
       }
       return normalizedQp;
     }
-    function safeUrl(path2) {
-      if (typeof path2 !== "string") {
-        return path2;
+    function safeUrl(path3) {
+      if (typeof path3 !== "string") {
+        return path3;
       }
-      const pathSegments = path2.split("?", 3);
+      const pathSegments = path3.split("?", 3);
       if (pathSegments.length !== 2) {
-        return path2;
+        return path3;
       }
       const qp = new URLSearchParams(pathSegments.pop());
       qp.sort();
       return [...pathSegments, qp.toString()].join("?");
     }
-    function matchKey(mockDispatch2, { path: path2, method, body, headers }) {
-      const pathMatch = matchValue(mockDispatch2.path, path2);
+    function matchKey(mockDispatch2, { path: path3, method, body, headers }) {
+      const pathMatch = matchValue(mockDispatch2.path, path3);
       const methodMatch = matchValue(mockDispatch2.method, method);
       const bodyMatch = typeof mockDispatch2.body !== "undefined" ? matchValue(mockDispatch2.body, body) : true;
       const headersMatch = matchHeaders(mockDispatch2, headers);
@@ -15614,8 +15676,8 @@ var require_mock_utils = __commonJS({
       const basePath = key.query ? serializePathWithQuery(key.path, key.query) : key.path;
       const resolvedPath = typeof basePath === "string" ? safeUrl(basePath) : basePath;
       const resolvedPathWithoutTrailingSlash = removeTrailingSlash(resolvedPath);
-      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path2, ignoreTrailingSlash }) => {
-        return ignoreTrailingSlash ? matchValue(removeTrailingSlash(safeUrl(path2)), resolvedPathWithoutTrailingSlash) : matchValue(safeUrl(path2), resolvedPath);
+      let matchedMockDispatches = mockDispatches.filter(({ consumed }) => !consumed).filter(({ path: path3, ignoreTrailingSlash }) => {
+        return ignoreTrailingSlash ? matchValue(removeTrailingSlash(safeUrl(path3)), resolvedPathWithoutTrailingSlash) : matchValue(safeUrl(path3), resolvedPath);
       });
       if (matchedMockDispatches.length === 0) {
         throw new MockNotMatchedError(`Mock dispatch not matched for path '${resolvedPath}'`);
@@ -15654,22 +15716,22 @@ var require_mock_utils = __commonJS({
         mockDispatches.splice(index, 1);
       }
     }
-    function removeTrailingSlash(path2) {
-      if (typeof path2 !== "string") {
-        return path2;
+    function removeTrailingSlash(path3) {
+      if (typeof path3 !== "string") {
+        return path3;
       }
-      while (path2.endsWith("/")) {
-        path2 = path2.slice(0, -1);
+      while (path3.endsWith("/")) {
+        path3 = path3.slice(0, -1);
       }
-      if (path2.length === 0) {
-        path2 = "/";
+      if (path3.length === 0) {
+        path3 = "/";
       }
-      return path2;
+      return path3;
     }
     function buildKey(opts) {
-      const { path: path2, method, body, headers, query } = opts;
+      const { path: path3, method, body, headers, query } = opts;
       return {
-        path: path2,
+        path: path3,
         method,
         body,
         headers,
@@ -16538,10 +16600,10 @@ var require_pending_interceptors_formatter = __commonJS({
       }
       format(pendingInterceptors) {
         const withPrettyHeaders = pendingInterceptors.map(
-          ({ method, path: path2, data: { statusCode }, persist: persist2, times, timesInvoked, origin }) => ({
+          ({ method, path: path3, data: { statusCode }, persist: persist2, times, timesInvoked, origin }) => ({
             Method: method,
             Origin: origin,
-            Path: path2,
+            Path: path3,
             "Status code": statusCode,
             Persistent: persist2 ? PERSISTENT : NOT_PERSISTENT,
             Invocations: timesInvoked,
@@ -16631,9 +16693,9 @@ var require_mock_agent = __commonJS({
           }
         }
         if (acceptNonStandardSearchParameters && dispatchOpts.path) {
-          const [path2, searchParams] = dispatchOpts.path.split("?");
+          const [path3, searchParams] = dispatchOpts.path.split("?");
           const normalizedSearchParams = normalizeSearchParams(searchParams, acceptNonStandardSearchParameters);
-          dispatchOpts.path = `${path2}?${normalizedSearchParams}`;
+          dispatchOpts.path = `${path3}?${normalizedSearchParams}`;
         }
         return this[kAgent].dispatch(dispatchOpts, handler);
       }
@@ -16727,19 +16789,19 @@ var require_mock_agent = __commonJS({
       }
       pendingInterceptors() {
         const mockAgentClients = this[kClients];
-        return Array.from(mockAgentClients.entries()).flatMap(([origin, dispatcher]) => dispatcher[kDispatches].map((dispatch) => ({ ...dispatch, origin }))).filter(({ pending }) => pending);
+        return Array.from(mockAgentClients.entries()).flatMap(([origin, dispatcher]) => dispatcher[kDispatches].map((dispatch) => ({ ...dispatch, origin }))).filter(({ pending: pending2 }) => pending2);
       }
       assertNoPendingInterceptors({ pendingInterceptorsFormatter = new PendingInterceptorsFormatter() } = {}) {
-        const pending = this.pendingInterceptors();
-        if (pending.length === 0) {
+        const pending2 = this.pendingInterceptors();
+        if (pending2.length === 0) {
           return;
         }
         throw new UndiciError(
-          pending.length === 1 ? `1 interceptor is pending:
+          pending2.length === 1 ? `1 interceptor is pending:
 
-${pendingInterceptorsFormatter.format(pending)}`.trim() : `${pending.length} interceptors are pending:
+${pendingInterceptorsFormatter.format(pending2)}`.trim() : `${pending2.length} interceptors are pending:
 
-${pendingInterceptorsFormatter.format(pending)}`.trim()
+${pendingInterceptorsFormatter.format(pending2)}`.trim()
         );
       }
     };
@@ -16978,8 +17040,8 @@ var require_snapshot_recorder = __commonJS({
         if (this.isUrlExcluded(requestOpts)) {
           return;
         }
-        const request2 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
-        const hash = createRequestHash(request2);
+        const request3 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
+        const hash = createRequestHash(request3);
         const normalizedHeaders = normalizeHeaders(response.headers);
         const responseData2 = {
           statusCode: response.statusCode,
@@ -16997,7 +17059,7 @@ var require_snapshot_recorder = __commonJS({
           existingSnapshot.timestamp = (/* @__PURE__ */ new Date()).toISOString();
         } else {
           this.#snapshots.set(hash, {
-            request: request2,
+            request: request3,
             responses: [responseData2],
             // Always store as array for consistency
             callCount: 0,
@@ -17031,8 +17093,8 @@ var require_snapshot_recorder = __commonJS({
         if (this.isUrlExcluded(requestOpts)) {
           return void 0;
         }
-        const request2 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
-        const hash = createRequestHash(request2);
+        const request3 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
+        const hash = createRequestHash(request3);
         const snapshot = this.#snapshots.get(hash);
         if (!snapshot) return void 0;
         const currentCallCount = snapshot.callCount || 0;
@@ -17049,12 +17111,12 @@ var require_snapshot_recorder = __commonJS({
        * @return {Promise<void>} - Resolves when snapshots are loaded
        */
       async loadSnapshots(filePath) {
-        const path2 = filePath || this.#snapshotPath;
-        if (!path2) {
+        const path3 = filePath || this.#snapshotPath;
+        if (!path3) {
           throw new InvalidArgumentError("Snapshot path is required");
         }
         try {
-          const data = await readFile2(resolve2(path2), "utf8");
+          const data = await readFile2(resolve2(path3), "utf8");
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
             this.#snapshots.clear();
@@ -17068,7 +17130,7 @@ var require_snapshot_recorder = __commonJS({
           if (error.code === "ENOENT") {
             this.#snapshots.clear();
           } else {
-            throw new UndiciError(`Failed to load snapshots from ${path2}`, { cause: error });
+            throw new UndiciError(`Failed to load snapshots from ${path3}`, { cause: error });
           }
         }
       }
@@ -17079,11 +17141,11 @@ var require_snapshot_recorder = __commonJS({
        * @returns {Promise<void>} - Resolves when snapshots are saved
        */
       async saveSnapshots(filePath) {
-        const path2 = filePath || this.#snapshotPath;
-        if (!path2) {
+        const path3 = filePath || this.#snapshotPath;
+        if (!path3) {
           throw new InvalidArgumentError("Snapshot path is required");
         }
-        const resolvedPath = resolve2(path2);
+        const resolvedPath = resolve2(path3);
         await mkdir2(dirname3(resolvedPath), { recursive: true });
         const data = Array.from(this.#snapshots.entries()).map(([hash, snapshot]) => ({
           hash,
@@ -17127,8 +17189,8 @@ var require_snapshot_recorder = __commonJS({
        * @returns {boolean} - True if snapshot was deleted, false if not found
        */
       deleteSnapshot(requestOpts) {
-        const request2 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
-        const hash = createRequestHash(request2);
+        const request3 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
+        const hash = createRequestHash(request3);
         return this.#snapshots.delete(hash);
       }
       /**
@@ -17137,8 +17199,8 @@ var require_snapshot_recorder = __commonJS({
        * @returns {SnapshotInfo|null} - Snapshot information or null if not found
        */
       getSnapshotInfo(requestOpts) {
-        const request2 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
-        const hash = createRequestHash(request2);
+        const request3 = formatRequestKey(requestOpts, this.#headerFilters, this.matchOptions);
+        const hash = createRequestHash(request3);
         const snapshot = this.#snapshots.get(hash);
         if (!snapshot) return null;
         return {
@@ -17437,16 +17499,16 @@ var require_snapshot_agent = __commonJS({
        */
       #setupMockInterceptors() {
         for (const snapshot of this[kSnapshotRecorder].getSnapshots()) {
-          const { request: request2, responses, response } = snapshot;
-          const url = new URL(request2.url);
+          const { request: request3, responses, response } = snapshot;
+          const url = new URL(request3.url);
           const mockPool = this.get(url.origin);
           const responseData2 = responses ? responses[0] : response;
           if (!responseData2) continue;
           mockPool.intercept({
             path: url.pathname + url.search,
-            method: request2.method,
-            headers: request2.headers,
-            body: request2.body
+            method: request3.method,
+            headers: request3.headers,
+            body: request3.body
           }).reply(responseData2.statusCode, responseData2.body, {
             headers: responseData2.headers,
             trailers: responseData2.trailers
@@ -17737,15 +17799,15 @@ var require_redirect_handler = __commonJS({
         }
         const baseUrl = requestOrigin ? new URL(this.opts.path, requestOrigin) : void 0;
         const { origin, pathname, search } = util.parseURL(new URL(this.location, baseUrl));
-        const path2 = search ? `${pathname}${search}` : pathname;
-        const redirectUrlString = `${origin}${path2}`;
+        const path3 = search ? `${pathname}${search}` : pathname;
+        const redirectUrlString = `${origin}${path3}`;
         for (const historyUrl of this.history) {
           if (historyUrl.toString() === redirectUrlString) {
             throw new InvalidArgumentError(`Redirect loop detected. Cannot redirect to ${origin}. This typically happens when using a Client or Pool with cross-origin redirects. Use an Agent for cross-origin redirects.`);
           }
         }
         this.opts.headers = cleanRequestHeaders(this.opts.headers, removeContentHeaders, requestOrigin !== origin, this.stripHeadersOnRedirect, this.stripHeadersOnCrossOriginRedirect);
-        this.opts.path = path2;
+        this.opts.path = path3;
         this.opts.origin = origin;
         this.opts[kRequestOrigin] = origin;
         this.opts.query = null;
@@ -19596,10 +19658,10 @@ var require_cache_handler = __commonJS({
       }
       return locationUrl.pathname + locationUrl.search;
     }
-    function deleteCachedUri(store2, cacheKey, path2) {
+    function deleteCachedUri(store2, cacheKey, path3) {
       deleteCachedValue(store2, {
         ...cacheKey,
-        path: path2
+        path: path3
       });
       for (let i = 0; i < util.safeHTTPMethods.length; i++) {
         const method = util.safeHTTPMethods[i];
@@ -19607,7 +19669,7 @@ var require_cache_handler = __commonJS({
           deleteCachedValue(store2, {
             ...cacheKey,
             method,
-            path: path2
+            path: path3
           });
         }
       }
@@ -19618,9 +19680,9 @@ var require_cache_handler = __commonJS({
       }
       const values = Array.isArray(headerValue) ? headerValue : [headerValue];
       for (let i = 0; i < values.length; i++) {
-        const path2 = getSameOriginPath(cacheKey, values[i]);
-        if (path2 !== void 0) {
-          deleteCachedUri(store2, cacheKey, path2);
+        const path3 = getSameOriginPath(cacheKey, values[i]);
+        if (path3 !== void 0) {
+          deleteCachedUri(store2, cacheKey, path3);
         }
       }
     }
@@ -23077,7 +23139,7 @@ var require_request2 = __commonJS({
         webidl.argumentLengthCheck(arguments, 1, prefix);
         input = webidl.converters.RequestInfo(input);
         init = webidl.converters.RequestInit(init);
-        let request2 = null;
+        let request3 = null;
         let fallbackMode = null;
         const baseUrl = environmentSettingsObject.settingsObject.baseUrl;
         let signal = null;
@@ -23094,18 +23156,18 @@ var require_request2 = __commonJS({
               "Request cannot be constructed from a URL that includes credentials: " + input
             );
           }
-          request2 = makeRequest({ urlList: [parsedURL] });
+          request3 = makeRequest({ urlList: [parsedURL] });
           fallbackMode = "cors";
         } else {
           assert(webidl.is.Request(input));
-          request2 = input.#state;
+          request3 = input.#state;
           signal = input.#signal;
           this.#dispatcher = init.dispatcher || input.#dispatcher;
         }
         const origin = environmentSettingsObject.settingsObject.origin;
         let window = "client";
-        if (request2.window?.constructor?.name === "EnvironmentSettingsObject" && sameOrigin(request2.window, origin)) {
-          window = request2.window;
+        if (request3.window?.constructor?.name === "EnvironmentSettingsObject" && sameOrigin(request3.window, origin)) {
+          window = request3.window;
         }
         if (init.window != null) {
           throw new TypeError(`'window' option '${window}' must be null`);
@@ -23113,66 +23175,66 @@ var require_request2 = __commonJS({
         if ("window" in init) {
           window = "no-window";
         }
-        request2 = makeRequest({
+        request3 = makeRequest({
           // URL request’s URL.
           // undici implementation note: this is set as the first item in request's urlList in makeRequest
           // method request’s method.
-          method: request2.method,
+          method: request3.method,
           // header list A copy of request’s header list.
           // undici implementation note: headersList is cloned in makeRequest
-          headersList: request2.headersList,
+          headersList: request3.headersList,
           // unsafe-request flag Set.
-          unsafeRequest: request2.unsafeRequest,
+          unsafeRequest: request3.unsafeRequest,
           // client This’s relevant settings object.
           client: environmentSettingsObject.settingsObject,
           // window window.
           window,
           // priority request’s priority.
-          priority: request2.priority,
+          priority: request3.priority,
           // origin request’s origin. The propagation of the origin is only significant for navigation requests
           // being handled by a service worker. In this scenario a request can have an origin that is different
           // from the current client.
-          origin: request2.origin,
+          origin: request3.origin,
           // referrer request’s referrer.
-          referrer: request2.referrer,
+          referrer: request3.referrer,
           // referrer policy request’s referrer policy.
-          referrerPolicy: request2.referrerPolicy,
+          referrerPolicy: request3.referrerPolicy,
           // mode request’s mode.
-          mode: request2.mode,
+          mode: request3.mode,
           // credentials mode request’s credentials mode.
-          credentials: request2.credentials,
+          credentials: request3.credentials,
           // cache mode request’s cache mode.
-          cache: request2.cache,
+          cache: request3.cache,
           // redirect mode request’s redirect mode.
-          redirect: request2.redirect,
+          redirect: request3.redirect,
           // integrity metadata request’s integrity metadata.
-          integrity: request2.integrity,
+          integrity: request3.integrity,
           // keepalive request’s keepalive.
-          keepalive: request2.keepalive,
+          keepalive: request3.keepalive,
           // reload-navigation flag request’s reload-navigation flag.
-          reloadNavigation: request2.reloadNavigation,
+          reloadNavigation: request3.reloadNavigation,
           // history-navigation flag request’s history-navigation flag.
-          historyNavigation: request2.historyNavigation,
+          historyNavigation: request3.historyNavigation,
           // URL list A clone of request’s URL list.
-          urlList: [...request2.urlList]
+          urlList: [...request3.urlList]
         });
         const initHasKey = Object.keys(init).length !== 0;
         if (initHasKey) {
-          if (request2.mode === "navigate") {
-            request2.mode = "same-origin";
+          if (request3.mode === "navigate") {
+            request3.mode = "same-origin";
           }
-          request2.reloadNavigation = false;
-          request2.historyNavigation = false;
-          request2.origin = "client";
-          request2.referrer = "client";
-          request2.referrerPolicy = "";
-          request2.url = request2.urlList[request2.urlList.length - 1];
-          request2.urlList = [request2.url];
+          request3.reloadNavigation = false;
+          request3.historyNavigation = false;
+          request3.origin = "client";
+          request3.referrer = "client";
+          request3.referrerPolicy = "";
+          request3.url = request3.urlList[request3.urlList.length - 1];
+          request3.urlList = [request3.url];
         }
         if (init.referrer !== void 0) {
           const referrer = init.referrer;
           if (referrer === "") {
-            request2.referrer = "no-referrer";
+            request3.referrer = "no-referrer";
           } else {
             let parsedReferrer;
             try {
@@ -23181,14 +23243,14 @@ var require_request2 = __commonJS({
               throw new TypeError(`Referrer "${referrer}" is not a valid URL.`, { cause: err });
             }
             if (parsedReferrer.protocol === "about:" && parsedReferrer.hostname === "client" || origin && !sameOrigin(parsedReferrer, environmentSettingsObject.settingsObject.baseUrl)) {
-              request2.referrer = "client";
+              request3.referrer = "client";
             } else {
-              request2.referrer = parsedReferrer;
+              request3.referrer = parsedReferrer;
             }
           }
         }
         if (init.referrerPolicy !== void 0) {
-          request2.referrerPolicy = init.referrerPolicy;
+          request3.referrerPolicy = init.referrerPolicy;
         }
         let mode;
         if (init.mode !== void 0) {
@@ -23203,33 +23265,33 @@ var require_request2 = __commonJS({
           });
         }
         if (mode != null) {
-          request2.mode = mode;
+          request3.mode = mode;
         }
         if (init.credentials !== void 0) {
-          request2.credentials = init.credentials;
+          request3.credentials = init.credentials;
         }
         if (init.cache !== void 0) {
-          request2.cache = init.cache;
+          request3.cache = init.cache;
         }
-        if (request2.cache === "only-if-cached" && request2.mode !== "same-origin") {
+        if (request3.cache === "only-if-cached" && request3.mode !== "same-origin") {
           throw new TypeError(
             "'only-if-cached' can be set only with 'same-origin' mode"
           );
         }
         if (init.redirect !== void 0) {
-          request2.redirect = init.redirect;
+          request3.redirect = init.redirect;
         }
         if (init.integrity != null) {
-          request2.integrity = String(init.integrity);
+          request3.integrity = String(init.integrity);
         }
         if (init.keepalive !== void 0) {
-          request2.keepalive = Boolean(init.keepalive);
+          request3.keepalive = Boolean(init.keepalive);
         }
         if (init.method !== void 0) {
           let method = init.method;
           const mayBeNormalized = normalizedMethodRecords[method];
           if (mayBeNormalized !== void 0) {
-            request2.method = mayBeNormalized;
+            request3.method = mayBeNormalized;
           } else {
             if (!isValidHTTPToken(method)) {
               throw new TypeError(`'${method}' is not a valid HTTP method.`);
@@ -23239,9 +23301,9 @@ var require_request2 = __commonJS({
               throw new TypeError(`'${method}' HTTP method is unsupported.`);
             }
             method = normalizedMethodRecordsBase[upperCase] ?? method;
-            request2.method = method;
+            request3.method = method;
           }
-          if (!patchMethodWarning && request2.method === "patch") {
+          if (!patchMethodWarning && request3.method === "patch") {
             process.emitWarning("Using `patch` is highly likely to result in a `405 Method Not Allowed`. `PATCH` is much more likely to succeed.", {
               code: "UNDICI-FETCH-patch"
             });
@@ -23251,7 +23313,7 @@ var require_request2 = __commonJS({
         if (init.signal !== void 0) {
           signal = init.signal;
         }
-        this.#state = request2;
+        this.#state = request3;
         const ac = new AbortController();
         this.#signal = ac.signal;
         if (signal != null) {
@@ -23274,12 +23336,12 @@ var require_request2 = __commonJS({
           }
         }
         this.#headers = new Headers2(kConstruct);
-        setHeadersList(this.#headers, request2.headersList);
+        setHeadersList(this.#headers, request3.headersList);
         setHeadersGuard(this.#headers, "request");
         if (mode === "no-cors") {
-          if (!corsSafeListedMethodsSet.has(request2.method)) {
+          if (!corsSafeListedMethodsSet.has(request3.method)) {
             throw new TypeError(
-              `'${request2.method} is unsupported in no-cors mode.`
+              `'${request3.method} is unsupported in no-cors mode.`
             );
           }
           setHeadersGuard(this.#headers, "request-no-cors");
@@ -23298,14 +23360,14 @@ var require_request2 = __commonJS({
           }
         }
         const inputBody = webidl.is.Request(input) ? input.#state.body : null;
-        if ((init.body != null || inputBody != null) && (request2.method === "GET" || request2.method === "HEAD")) {
+        if ((init.body != null || inputBody != null) && (request3.method === "GET" || request3.method === "HEAD")) {
           throw new TypeError("Request with GET/HEAD method cannot have body.");
         }
         let initBody = null;
         if (init.body != null) {
           const [extractedBody, contentType] = extractBody(
             init.body,
-            request2.keepalive
+            request3.keepalive
           );
           initBody = extractedBody;
           if (contentType && !getHeadersList(this.#headers).contains("content-type", true)) {
@@ -23317,12 +23379,12 @@ var require_request2 = __commonJS({
           if (initBody != null && init.duplex == null) {
             throw new TypeError("RequestInit: duplex option is required when sending a body.");
           }
-          if (request2.mode !== "same-origin" && request2.mode !== "cors") {
+          if (request3.mode !== "same-origin" && request3.mode !== "cors") {
             throw new TypeError(
               'If request is made from ReadableStream, mode should be "same-origin" or "cors"'
             );
           }
-          request2.useCORSPreflightFlag = true;
+          request3.useCORSPreflightFlag = true;
         }
         let finalBody = inputOrInitBody;
         if (initBody == null && inputBody != null) {
@@ -23509,26 +23571,26 @@ var require_request2 = __commonJS({
         return `Request ${nodeUtil.formatWithOptions(options, properties)}`;
       }
       static {
-        setRequestSignal = (request2, newSignal) => {
-          request2.#signal = newSignal;
+        setRequestSignal = (request3, newSignal) => {
+          request3.#signal = newSignal;
         };
-        getRequestDispatcher = (request2) => {
-          return request2.#dispatcher;
+        getRequestDispatcher = (request3) => {
+          return request3.#dispatcher;
         };
-        setRequestDispatcher = (request2, newDispatcher) => {
-          request2.#dispatcher = newDispatcher;
+        setRequestDispatcher = (request3, newDispatcher) => {
+          request3.#dispatcher = newDispatcher;
         };
-        setRequestHeaders = (request2, newHeaders) => {
-          request2.#headers = newHeaders;
+        setRequestHeaders = (request3, newHeaders) => {
+          request3.#headers = newHeaders;
         };
-        getRequestState = (request2) => {
-          return request2.#state;
+        getRequestState = (request3) => {
+          return request3.#state;
         };
-        setRequestState = (request2, newState) => {
-          request2.#state = newState;
+        setRequestState = (request3, newState) => {
+          request3.#state = newState;
         };
-        removeRequestAbortListener = (request2) => {
-          request2.#abortCleanup?.();
+        removeRequestAbortListener = (request3) => {
+          request3.#abortCleanup?.();
         };
         webidl.is.Request = (arg) => {
           return arg != null && typeof arg === "object" && #state in arg;
@@ -23581,23 +23643,23 @@ var require_request2 = __commonJS({
         headersList: init.headersList ? new HeadersList(init.headersList) : new HeadersList()
       };
     }
-    function cloneRequest(request2) {
-      const newRequest = makeRequest({ ...request2, body: null });
-      if (request2.body != null) {
-        newRequest.body = cloneBody(request2.body);
+    function cloneRequest(request3) {
+      const newRequest = makeRequest({ ...request3, body: null });
+      if (request3.body != null) {
+        newRequest.body = cloneBody(request3.body);
       }
       return newRequest;
     }
     function fromInnerRequest(innerRequest, dispatcher, signal, guard) {
-      const request2 = new Request2(kConstruct);
-      setRequestState(request2, innerRequest);
-      setRequestDispatcher(request2, dispatcher);
-      setRequestSignal(request2, signal);
+      const request3 = new Request2(kConstruct);
+      setRequestState(request3, innerRequest);
+      setRequestDispatcher(request3, dispatcher);
+      setRequestSignal(request3, signal);
       const headers = new Headers2(kConstruct);
-      setRequestHeaders(request2, headers);
+      setRequestHeaders(request3, headers);
       setHeadersList(headers, innerRequest.headersList);
       setHeadersGuard(headers, guard);
-      return request2;
+      return request3;
     }
     Object.defineProperties(Request2.prototype, {
       method: kEnumerableProperty,
@@ -24011,14 +24073,14 @@ var require_fetch = __commonJS({
         p.reject(e);
         return p.promise;
       }
-      const request2 = getRequestState(requestObject);
+      const request3 = getRequestState(requestObject);
       if (requestObject.signal.aborted) {
-        abortFetch(p, request2, null, requestObject.signal.reason, null);
+        abortFetch(p, request3, null, requestObject.signal.reason, null);
         return p.promise;
       }
-      const globalObject = request2.client.globalObject;
+      const globalObject = request3.client.globalObject;
       if (globalObject?.constructor?.name === "ServiceWorkerGlobalScope") {
-        request2.serviceWorkers = "none";
+        request3.serviceWorkers = "none";
       }
       let responseObject = null;
       let locallyAborted = false;
@@ -24030,7 +24092,7 @@ var require_fetch = __commonJS({
           assert(controller != null);
           controller.abort(requestObject.signal.reason);
           const realResponse = responseObject?.deref();
-          abortFetch(p, request2, realResponse, requestObject.signal.reason, controller.controller);
+          abortFetch(p, request3, realResponse, requestObject.signal.reason, controller.controller);
         }
       );
       const cleanupAbortListeners = () => {
@@ -24042,7 +24104,7 @@ var require_fetch = __commonJS({
           return;
         }
         if (response.aborted) {
-          abortFetch(p, request2, responseObject, controller.serializedAbortReason, controller.controller);
+          abortFetch(p, request3, responseObject, controller.serializedAbortReason, controller.controller);
           cleanupAbortListeners();
           return;
         }
@@ -24056,7 +24118,7 @@ var require_fetch = __commonJS({
         p = null;
       };
       controller = fetching({
-        request: request2,
+        request: request3,
         processResponseEndOfBody: (response) => {
           handleFetchDone(response);
           cleanupAbortListeners();
@@ -24106,12 +24168,12 @@ var require_fetch = __commonJS({
       );
     }
     var markResourceTiming = performance.markResourceTiming;
-    function abortFetch(p, request2, responseObject, error, controller) {
+    function abortFetch(p, request3, responseObject, error, controller) {
       if (p) {
         p.reject(error);
       }
-      if (request2.body?.stream != null && isReadable(request2.body.stream)) {
-        request2.body.stream.cancel(error).catch((err) => {
+      if (request3.body?.stream != null && isReadable(request3.body.stream)) {
+        request3.body.stream.cancel(error).catch((err) => {
           if (err.code === "ERR_INVALID_STATE") {
             return;
           }
@@ -24127,7 +24189,7 @@ var require_fetch = __commonJS({
       }
     }
     function fetching({
-      request: request2,
+      request: request3,
       processRequestBodyChunkLength,
       processRequestEndOfBody,
       processResponse,
@@ -24142,9 +24204,9 @@ var require_fetch = __commonJS({
       assert(dispatcher);
       let taskDestination = null;
       let crossOriginIsolatedCapability = false;
-      if (request2.client != null) {
-        taskDestination = request2.client.globalObject;
-        crossOriginIsolatedCapability = request2.client.crossOriginIsolatedCapability;
+      if (request3.client != null) {
+        taskDestination = request3.client.globalObject;
+        crossOriginIsolatedCapability = request3.client.crossOriginIsolatedCapability;
       }
       const currentTime = coarsenedSharedCurrentTime(crossOriginIsolatedCapability);
       const timingInfo = createOpaqueTimingInfo({
@@ -24152,7 +24214,7 @@ var require_fetch = __commonJS({
       });
       const fetchParams = {
         controller: new Fetch(dispatcher),
-        request: request2,
+        request: request3,
         timingInfo,
         processRequestBodyChunkLength,
         processRequestEndOfBody,
@@ -24164,79 +24226,79 @@ var require_fetch = __commonJS({
         // Keep requestObject alive to prevent its AbortController from being GC'd
         requestObject
       };
-      assert(!request2.body || request2.body.stream);
-      if (request2.window === "client") {
-        request2.window = request2.client?.globalObject?.constructor?.name === "Window" ? request2.client : "no-window";
+      assert(!request3.body || request3.body.stream);
+      if (request3.window === "client") {
+        request3.window = request3.client?.globalObject?.constructor?.name === "Window" ? request3.client : "no-window";
       }
-      if (request2.origin === "client") {
-        request2.origin = request2.client.origin;
+      if (request3.origin === "client") {
+        request3.origin = request3.client.origin;
       }
-      if (request2.policyContainer === "client") {
-        if (request2.client != null) {
-          request2.policyContainer = clonePolicyContainer(
-            request2.client.policyContainer
+      if (request3.policyContainer === "client") {
+        if (request3.client != null) {
+          request3.policyContainer = clonePolicyContainer(
+            request3.client.policyContainer
           );
         } else {
-          request2.policyContainer = makePolicyContainer();
+          request3.policyContainer = makePolicyContainer();
         }
       }
-      if (!request2.headersList.contains("accept", true)) {
+      if (!request3.headersList.contains("accept", true)) {
         const value = "*/*";
-        request2.headersList.append("accept", value, true);
+        request3.headersList.append("accept", value, true);
       }
-      if (!request2.headersList.contains("accept-language", true)) {
-        request2.headersList.append("accept-language", "*", true);
+      if (!request3.headersList.contains("accept-language", true)) {
+        request3.headersList.append("accept-language", "*", true);
       }
-      if (request2.priority === null) {
+      if (request3.priority === null) {
       }
-      if (subresourceSet.has(request2.destination)) {
+      if (subresourceSet.has(request3.destination)) {
       }
       mainFetch(fetchParams, false);
       return fetchParams.controller;
     }
     async function mainFetch(fetchParams, recursive) {
       try {
-        const request2 = fetchParams.request;
+        const request3 = fetchParams.request;
         let response = null;
-        if (request2.localURLsOnly && !urlIsLocal(requestCurrentURL(request2))) {
+        if (request3.localURLsOnly && !urlIsLocal(requestCurrentURL(request3))) {
           response = makeNetworkError("local URLs only");
         }
-        tryUpgradeRequestToAPotentiallyTrustworthyURL(request2);
-        if (requestBadPort(request2) === "blocked") {
+        tryUpgradeRequestToAPotentiallyTrustworthyURL(request3);
+        if (requestBadPort(request3) === "blocked") {
           response = makeNetworkError("bad port");
         }
-        if (request2.referrerPolicy === "") {
-          request2.referrerPolicy = request2.policyContainer.referrerPolicy;
+        if (request3.referrerPolicy === "") {
+          request3.referrerPolicy = request3.policyContainer.referrerPolicy;
         }
-        if (request2.referrer !== "no-referrer") {
-          request2.referrer = determineRequestsReferrer(request2);
+        if (request3.referrer !== "no-referrer") {
+          request3.referrer = determineRequestsReferrer(request3);
         }
         if (response === null) {
-          const currentURL = requestCurrentURL(request2);
+          const currentURL = requestCurrentURL(request3);
           if (
             // - request’s current URL’s origin is same origin with request’s origin,
             //   and request’s response tainting is "basic"
-            sameOrigin(currentURL, request2.url) && request2.responseTainting === "basic" || // request’s current URL’s scheme is "data"
+            sameOrigin(currentURL, request3.url) && request3.responseTainting === "basic" || // request’s current URL’s scheme is "data"
             currentURL.protocol === "data:" || // - request’s mode is "navigate" or "websocket"
-            (request2.mode === "navigate" || request2.mode === "websocket")
+            (request3.mode === "navigate" || request3.mode === "websocket")
           ) {
-            request2.responseTainting = "basic";
+            request3.responseTainting = "basic";
             response = await schemeFetch(fetchParams);
-          } else if (request2.mode === "same-origin") {
+          } else if (request3.mode === "same-origin") {
             response = makeNetworkError('request mode cannot be "same-origin"');
-          } else if (request2.mode === "no-cors") {
-            if (request2.redirect !== "follow") {
+          } else if (request3.mode === "no-cors") {
+            if (request3.redirect !== "follow") {
               response = makeNetworkError(
                 'redirect mode cannot be "follow" for "no-cors" request'
               );
             } else {
-              request2.responseTainting = "opaque";
+              request3.responseTainting = "opaque";
               response = await schemeFetch(fetchParams);
             }
-          } else if (!urlIsHttpHttpsScheme(requestCurrentURL(request2))) {
+          } else if (!urlIsHttpHttpsScheme(requestCurrentURL(request3))) {
             response = makeNetworkError("URL scheme must be a HTTP(S) scheme");
           } else {
-            request2.responseTainting = "cors";
+            request3.responseTainting = "cors";
             response = await httpFetch(fetchParams);
           }
         }
@@ -24244,13 +24306,13 @@ var require_fetch = __commonJS({
           return response;
         }
         if (response.status !== 0 && !response.internalResponse) {
-          if (request2.responseTainting === "cors") {
+          if (request3.responseTainting === "cors") {
           }
-          if (request2.responseTainting === "basic") {
+          if (request3.responseTainting === "basic") {
             response = filterResponse(response, "basic");
-          } else if (request2.responseTainting === "cors") {
+          } else if (request3.responseTainting === "cors") {
             response = filterResponse(response, "cors");
-          } else if (request2.responseTainting === "opaque") {
+          } else if (request3.responseTainting === "opaque") {
             response = filterResponse(response, "opaque");
           } else {
             assert(false);
@@ -24258,26 +24320,26 @@ var require_fetch = __commonJS({
         }
         let internalResponse = response.status === 0 ? response : response.internalResponse;
         if (internalResponse.urlList.length === 0) {
-          internalResponse.urlList.push(...request2.urlList);
+          internalResponse.urlList.push(...request3.urlList);
         }
-        if (!request2.timingAllowFailed) {
+        if (!request3.timingAllowFailed) {
           response.timingAllowPassed = true;
         }
-        if (response.type === "opaque" && internalResponse.status === 206 && internalResponse.rangeRequested && !request2.headers.contains("range", true)) {
+        if (response.type === "opaque" && internalResponse.status === 206 && internalResponse.rangeRequested && !request3.headers.contains("range", true)) {
           response = internalResponse = makeNetworkError();
         }
-        if (response.status !== 0 && (request2.method === "HEAD" || request2.method === "CONNECT" || nullBodyStatus.includes(internalResponse.status))) {
+        if (response.status !== 0 && (request3.method === "HEAD" || request3.method === "CONNECT" || nullBodyStatus.includes(internalResponse.status))) {
           internalResponse.body = null;
           fetchParams.controller.dump = true;
         }
-        if (request2.integrity) {
+        if (request3.integrity) {
           const processBodyError = (reason) => fetchFinale(fetchParams, makeNetworkError(reason));
-          if (request2.responseTainting === "opaque" || response.body == null) {
+          if (request3.responseTainting === "opaque" || response.body == null) {
             processBodyError(response.error);
             return;
           }
           const processBody = (bytes) => {
-            if (!bytesMatch(bytes, request2.integrity)) {
+            if (!bytesMatch(bytes, request3.integrity)) {
               processBodyError("integrity mismatch");
               return;
             }
@@ -24296,8 +24358,8 @@ var require_fetch = __commonJS({
       if (isCancelled(fetchParams)) {
         return Promise.resolve(makeAppropriateNetworkError(fetchParams));
       }
-      const { request: request2 } = fetchParams;
-      const { protocol: scheme } = requestCurrentURL(request2);
+      const { request: request3 } = fetchParams;
+      const { protocol: scheme } = requestCurrentURL(request3);
       switch (scheme) {
         case "about:": {
           return Promise.resolve(makeNetworkError("about scheme is not supported"));
@@ -24306,19 +24368,19 @@ var require_fetch = __commonJS({
           if (!resolveObjectURL) {
             resolveObjectURL = __require("node:buffer").resolveObjectURL;
           }
-          const blobURLEntry = requestCurrentURL(request2);
+          const blobURLEntry = requestCurrentURL(request3);
           if (blobURLEntry.search.length !== 0) {
             return Promise.resolve(makeNetworkError("NetworkError when attempting to fetch resource."));
           }
           const blob = resolveObjectURL(blobURLEntry.toString());
-          if (request2.method !== "GET" || !webidl.is.Blob(blob)) {
+          if (request3.method !== "GET" || !webidl.is.Blob(blob)) {
             return Promise.resolve(makeNetworkError("invalid method"));
           }
           const response = makeResponse();
           const fullLength = blob.size;
           const serializedFullLength = isomorphicEncode(`${fullLength}`);
           const type = blob.type;
-          if (!request2.headersList.contains("range", true)) {
+          if (!request3.headersList.contains("range", true)) {
             const bodyWithType = extractBody(blob);
             response.statusText = "OK";
             response.body = bodyWithType[0];
@@ -24326,7 +24388,7 @@ var require_fetch = __commonJS({
             response.headersList.set("content-type", type, true);
           } else {
             response.rangeRequested = true;
-            const rangeHeader = request2.headersList.get("range", true);
+            const rangeHeader = request3.headersList.get("range", true);
             const rangeValue = simpleRangeHeaderValue(rangeHeader, true);
             if (rangeValue === "failure") {
               return Promise.resolve(makeNetworkError("failed to fetch the data URL"));
@@ -24357,7 +24419,7 @@ var require_fetch = __commonJS({
           return Promise.resolve(response);
         }
         case "data:": {
-          const currentURL = requestCurrentURL(request2);
+          const currentURL = requestCurrentURL(request3);
           const dataURLStruct = dataURLProcessor(currentURL);
           if (dataURLStruct === "failure") {
             return Promise.resolve(makeNetworkError("failed to fetch the data URL"));
@@ -24455,41 +24517,41 @@ var require_fetch = __commonJS({
       }
     }
     async function httpFetch(fetchParams) {
-      const request2 = fetchParams.request;
+      const request3 = fetchParams.request;
       let response = null;
       let actualResponse = null;
       const timingInfo = fetchParams.timingInfo;
-      if (request2.serviceWorkers === "all") {
+      if (request3.serviceWorkers === "all") {
       }
       if (response === null) {
-        if (request2.redirect === "follow") {
-          request2.serviceWorkers = "none";
+        if (request3.redirect === "follow") {
+          request3.serviceWorkers = "none";
         }
         actualResponse = response = await httpNetworkOrCacheFetch(fetchParams);
-        if (request2.responseTainting === "cors" && corsCheck(request2, response) === "failure") {
+        if (request3.responseTainting === "cors" && corsCheck(request3, response) === "failure") {
           return makeNetworkError("cors failure");
         }
-        if (TAOCheck(request2, response) === "failure") {
-          request2.timingAllowFailed = true;
+        if (TAOCheck(request3, response) === "failure") {
+          request3.timingAllowFailed = true;
         }
       }
-      if ((request2.responseTainting === "opaque" || response.type === "opaque") && crossOriginResourcePolicyCheck(
-        request2.origin,
-        request2.client,
-        request2.destination,
+      if ((request3.responseTainting === "opaque" || response.type === "opaque") && crossOriginResourcePolicyCheck(
+        request3.origin,
+        request3.client,
+        request3.destination,
         actualResponse
       ) === "blocked") {
         return makeNetworkError("blocked");
       }
       if (redirectStatusSet.has(actualResponse.status)) {
-        if (request2.redirect !== "manual") {
+        if (request3.redirect !== "manual") {
           fetchParams.controller.connection.destroy();
         }
-        if (request2.redirect === "error") {
+        if (request3.redirect === "error") {
           response = makeNetworkError("unexpected redirect");
-        } else if (request2.redirect === "manual") {
+        } else if (request3.redirect === "manual") {
           response = actualResponse;
-        } else if (request2.redirect === "follow") {
+        } else if (request3.redirect === "follow") {
           response = await httpRedirectFetch(fetchParams, response);
         } else {
           assert(false);
@@ -24499,13 +24561,13 @@ var require_fetch = __commonJS({
       return response;
     }
     function httpRedirectFetch(fetchParams, response) {
-      const request2 = fetchParams.request;
+      const request3 = fetchParams.request;
       const actualResponse = response.internalResponse ? response.internalResponse : response;
       let locationURL;
       try {
         locationURL = responseLocationURL(
           actualResponse,
-          requestCurrentURL(request2).hash
+          requestCurrentURL(request3).hash
         );
         if (locationURL == null) {
           return response;
@@ -24516,68 +24578,68 @@ var require_fetch = __commonJS({
       if (!urlIsHttpHttpsScheme(locationURL)) {
         return Promise.resolve(makeNetworkError("URL scheme must be a HTTP(S) scheme"));
       }
-      if (request2.redirectCount === 20) {
+      if (request3.redirectCount === 20) {
         return Promise.resolve(makeNetworkError("redirect count exceeded"));
       }
-      request2.redirectCount += 1;
-      if (request2.mode === "cors" && (locationURL.username || locationURL.password) && !sameOrigin(request2, locationURL)) {
+      request3.redirectCount += 1;
+      if (request3.mode === "cors" && (locationURL.username || locationURL.password) && !sameOrigin(request3, locationURL)) {
         return Promise.resolve(makeNetworkError('cross origin not allowed for request mode "cors"'));
       }
-      if (request2.responseTainting === "cors" && (locationURL.username || locationURL.password)) {
+      if (request3.responseTainting === "cors" && (locationURL.username || locationURL.password)) {
         return Promise.resolve(makeNetworkError(
           'URL cannot contain credentials for request mode "cors"'
         ));
       }
-      if (actualResponse.status !== 303 && request2.body != null && request2.body.source == null) {
+      if (actualResponse.status !== 303 && request3.body != null && request3.body.source == null) {
         return Promise.resolve(makeNetworkError());
       }
-      if ([301, 302].includes(actualResponse.status) && request2.method === "POST" || actualResponse.status === 303 && !GET_OR_HEAD.includes(request2.method)) {
-        request2.method = "GET";
-        request2.body = null;
+      if ([301, 302].includes(actualResponse.status) && request3.method === "POST" || actualResponse.status === 303 && !GET_OR_HEAD.includes(request3.method)) {
+        request3.method = "GET";
+        request3.body = null;
         for (const headerName of requestBodyHeader) {
-          request2.headersList.delete(headerName);
+          request3.headersList.delete(headerName);
         }
       }
-      if (!sameOrigin(requestCurrentURL(request2), locationURL)) {
-        request2.headersList.delete("authorization", true);
-        request2.headersList.delete("proxy-authorization", true);
-        request2.headersList.delete("cookie", true);
-        request2.headersList.delete("host", true);
+      if (!sameOrigin(requestCurrentURL(request3), locationURL)) {
+        request3.headersList.delete("authorization", true);
+        request3.headersList.delete("proxy-authorization", true);
+        request3.headersList.delete("cookie", true);
+        request3.headersList.delete("host", true);
       }
-      if (request2.body != null) {
-        assert(request2.body.source != null);
-        request2.body = safelyExtractBody(request2.body.source)[0];
+      if (request3.body != null) {
+        assert(request3.body.source != null);
+        request3.body = safelyExtractBody(request3.body.source)[0];
       }
       const timingInfo = fetchParams.timingInfo;
       timingInfo.redirectEndTime = timingInfo.postRedirectStartTime = coarsenedSharedCurrentTime(fetchParams.crossOriginIsolatedCapability);
       if (timingInfo.redirectStartTime === 0) {
         timingInfo.redirectStartTime = timingInfo.startTime;
       }
-      request2.urlList.push(locationURL);
-      setRequestReferrerPolicyOnRedirect(request2, actualResponse);
+      request3.urlList.push(locationURL);
+      setRequestReferrerPolicyOnRedirect(request3, actualResponse);
       return mainFetch(fetchParams, true);
     }
     async function httpNetworkOrCacheFetch(fetchParams, isAuthenticationFetch = false, isNewConnectionFetch = false) {
-      const request2 = fetchParams.request;
+      const request3 = fetchParams.request;
       let httpFetchParams = null;
       let httpRequest = null;
       let response = null;
       const httpCache = null;
       const revalidatingFlag = false;
-      if (request2.window === "no-window" && request2.redirect === "error") {
+      if (request3.window === "no-window" && request3.redirect === "error") {
         httpFetchParams = fetchParams;
-        httpRequest = request2;
+        httpRequest = request3;
       } else {
-        if (request2.body?.source != null) {
-          httpRequest = cloneRequest(request2);
+        if (request3.body?.source != null) {
+          httpRequest = cloneRequest(request3);
         } else {
-          httpRequest = cloneRequest({ ...request2, body: null });
-          httpRequest.body = request2.body;
+          httpRequest = cloneRequest({ ...request3, body: null });
+          httpRequest.body = request3.body;
         }
         httpFetchParams = { ...fetchParams };
         httpFetchParams.request = httpRequest;
       }
-      const includeCredentials = request2.credentials === "include" || request2.credentials === "same-origin" && request2.responseTainting === "basic";
+      const includeCredentials = request3.credentials === "include" || request3.credentials === "same-origin" && request3.responseTainting === "basic";
       const contentLength = httpRequest.body ? httpRequest.body.length : null;
       let contentLengthHeaderValue = null;
       if (httpRequest.body == null && ["POST", "PUT"].includes(httpRequest.method)) {
@@ -24664,14 +24726,14 @@ var require_fetch = __commonJS({
         response.rangeRequested = true;
       }
       response.requestIncludesCredentials = includeCredentials;
-      if (response.status === 401 && httpRequest.responseTainting !== "cors" && includeCredentials && (request2.useURLCredentials !== void 0 || isTraversableNavigable(request2.traversableForUserPrompts))) {
-        if (request2.body != null) {
-          if (request2.body.source == null) {
+      if (response.status === 401 && httpRequest.responseTainting !== "cors" && includeCredentials && (request3.useURLCredentials !== void 0 || isTraversableNavigable(request3.traversableForUserPrompts))) {
+        if (request3.body != null) {
+          if (request3.body.source == null) {
             return response;
           }
-          request2.body = safelyExtractBody(request2.body.source)[0];
+          request3.body = safelyExtractBody(request3.body.source)[0];
         }
-        if (request2.useURLCredentials === void 0 || isAuthenticationFetch) {
+        if (request3.useURLCredentials === void 0 || isAuthenticationFetch) {
           if (isCancelled(fetchParams)) {
             return makeAppropriateNetworkError(fetchParams);
           }
@@ -24681,7 +24743,7 @@ var require_fetch = __commonJS({
         response = await httpNetworkOrCacheFetch(fetchParams, true);
       }
       if (response.status === 407) {
-        if (request2.window === "no-window") {
+        if (request3.window === "no-window") {
           return makeNetworkError();
         }
         if (isCancelled(fetchParams)) {
@@ -24693,7 +24755,7 @@ var require_fetch = __commonJS({
         // response’s status is 421
         response.status === 421 && // isNewConnectionFetch is false
         !isNewConnectionFetch && // request’s body is null, or request’s body is non-null and request’s body’s source is non-null
-        (request2.body == null || request2.body.source != null)
+        (request3.body == null || request3.body.source != null)
       ) {
         if (isCancelled(fetchParams)) {
           return makeAppropriateNetworkError(fetchParams);
@@ -24721,21 +24783,21 @@ var require_fetch = __commonJS({
           }
         }
       };
-      const request2 = fetchParams.request;
+      const request3 = fetchParams.request;
       let response = null;
       const timingInfo = fetchParams.timingInfo;
       const httpCache = null;
       if (httpCache == null) {
-        request2.cache = "no-store";
+        request3.cache = "no-store";
       }
       const newConnection = forceNewConnection ? "yes" : "no";
-      if (request2.mode === "websocket") {
+      if (request3.mode === "websocket") {
       } else {
       }
       let requestBody = null;
-      if (request2.body == null && fetchParams.processRequestEndOfBody) {
+      if (request3.body == null && fetchParams.processRequestEndOfBody) {
         queueMicrotask(() => fetchParams.processRequestEndOfBody());
-      } else if (request2.body != null) {
+      } else if (request3.body != null) {
         const processBodyChunk = async function* (bytes) {
           if (isCancelled(fetchParams)) {
             return;
@@ -24763,7 +24825,7 @@ var require_fetch = __commonJS({
         };
         requestBody = async function* () {
           try {
-            for await (const bytes of request2.body.stream) {
+            for await (const bytes of request3.body.stream) {
               yield* processBodyChunk(bytes);
             }
             processEndOfBody();
@@ -24870,23 +24932,23 @@ var require_fetch = __commonJS({
       }
       return response;
       function dispatch({ body }) {
-        const url = requestCurrentURL(request2);
+        const url = requestCurrentURL(request3);
         const agent = fetchParams.controller.dispatcher;
-        const path2 = url.pathname + url.search;
+        const path3 = url.pathname + url.search;
         const hasTrailingQuestionMark = url.search.length === 0 && url.href[url.href.length - url.hash.length - 1] === "?";
         return dispatchWithProtocolPreference(body);
         function dispatchWithProtocolPreference(body2, allowH2) {
           return new Promise((resolve2, reject) => agent.dispatch(
             {
-              path: hasTrailingQuestionMark ? `${path2}?` : path2,
+              path: hasTrailingQuestionMark ? `${path3}?` : path3,
               origin: url.origin,
-              method: request2.method,
-              body: agent.isMockActive ? request2.body && (request2.body.source || request2.body.stream) : body2,
+              method: request3.method,
+              body: agent.isMockActive ? request3.body && (request3.body.source || request3.body.stream) : body2,
               // Preserve the serialized fetch body for MockAgent net-connect fallthroughs.
               __mockAgentBodyForDispatch: body2,
-              headers: request2.headersList.entries,
+              headers: request3.headersList.entries,
               maxRedirections: 0,
-              upgrade: request2.mode === "websocket" ? "websocket" : void 0,
+              upgrade: request3.mode === "websocket" ? "websocket" : void 0,
               ...allowH2 === false ? { allowH2 } : null
             },
             {
@@ -24916,9 +24978,9 @@ var require_fetch = __commonJS({
                 appendHeadersListFromResponseHeaders(headersList, headers, rawHeaders);
                 const location = headersList.get("location", true);
                 this.body = new Readable({ read: () => controller.resume() });
-                const willFollow = location && request2.redirect === "follow" && redirectStatusSet.has(status);
+                const willFollow = location && request3.redirect === "follow" && redirectStatusSet.has(status);
                 const decoders = [];
-                if (request2.method !== "HEAD" && request2.method !== "CONNECT" && !nullBodyStatus.includes(status) && !willFollow) {
+                if (request3.method !== "HEAD" && request3.method !== "CONNECT" && !nullBodyStatus.includes(status) && !willFollow) {
                   const contentEncoding = headersList.get("content-encoding", true);
                   const codings = contentEncoding ? contentEncoding.toLowerCase().split(",") : [];
                   const maxContentEncodings = 5;
@@ -24991,7 +25053,7 @@ var require_fetch = __commonJS({
                 if (this.abort) {
                   fetchParams.controller.off("terminated", this.abort);
                 }
-                if (request2.mode === "websocket" && allowH2 !== false && error?.code === "UND_ERR_INFO" && error?.message === "HTTP/2: Extended CONNECT protocol not supported by server") {
+                if (request3.mode === "websocket" && allowH2 !== false && error?.code === "UND_ERR_INFO" && error?.message === "HTTP/2: Extended CONNECT protocol not supported by server") {
                   resolve2(dispatchWithProtocolPreference(body2, false));
                   return;
                 }
@@ -25089,31 +25151,31 @@ var require_cache3 = __commonJS({
         webidl.util.markAsUncloneable(this);
         this.#relevantRequestResponseList = arguments[1];
       }
-      async match(request2, options = {}) {
+      async match(request3, options = {}) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.match";
         webidl.argumentLengthCheck(arguments, 1, prefix);
-        request2 = webidl.converters.RequestInfo(request2);
+        request3 = webidl.converters.RequestInfo(request3);
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
-        const p = this.#internalMatchAll(request2, options, 1);
+        const p = this.#internalMatchAll(request3, options, 1);
         if (p.length === 0) {
           return;
         }
         return p[0];
       }
-      async matchAll(request2 = void 0, options = {}) {
+      async matchAll(request3 = void 0, options = {}) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.matchAll";
-        if (request2 !== void 0) request2 = webidl.converters.RequestInfo(request2);
+        if (request3 !== void 0) request3 = webidl.converters.RequestInfo(request3);
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
-        return this.#internalMatchAll(request2, options);
+        return this.#internalMatchAll(request3, options);
       }
-      async add(request2) {
+      async add(request3) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.add";
         webidl.argumentLengthCheck(arguments, 1, prefix);
-        request2 = webidl.converters.RequestInfo(request2);
-        const requests = [request2];
+        request3 = webidl.converters.RequestInfo(request3);
+        const requests = [request3];
         const responseArrayPromise = this.addAll(requests);
         return await responseArrayPromise;
       }
@@ -25123,19 +25185,19 @@ var require_cache3 = __commonJS({
         webidl.argumentLengthCheck(arguments, 1, prefix);
         const responsePromises = [];
         const requestList = [];
-        for (let request2 of requests) {
-          if (request2 === void 0) {
+        for (let request3 of requests) {
+          if (request3 === void 0) {
             throw webidl.errors.conversionFailed({
               prefix,
               argument: "Argument 1",
               types: ["undefined is not allowed"]
             });
           }
-          request2 = webidl.converters.RequestInfo(request2);
-          if (typeof request2 === "string") {
+          request3 = webidl.converters.RequestInfo(request3);
+          if (typeof request3 === "string") {
             continue;
           }
-          const r = getRequestState(request2);
+          const r = getRequestState(request3);
           if (!urlIsHttpHttpsScheme(r.url) || r.method !== "GET") {
             throw webidl.errors.exception({
               header: prefix,
@@ -25144,8 +25206,8 @@ var require_cache3 = __commonJS({
           }
         }
         const fetchControllers = [];
-        for (const request2 of requests) {
-          const r = getRequestState(new Request2(request2));
+        for (const request3 of requests) {
+          const r = getRequestState(new Request2(request3));
           if (!urlIsHttpHttpsScheme(r.url)) {
             throw webidl.errors.exception({
               header: prefix,
@@ -25225,17 +25287,17 @@ var require_cache3 = __commonJS({
         });
         return cacheJobPromise.promise;
       }
-      async put(request2, response) {
+      async put(request3, response) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.put";
         webidl.argumentLengthCheck(arguments, 2, prefix);
-        request2 = webidl.converters.RequestInfo(request2);
+        request3 = webidl.converters.RequestInfo(request3);
         response = webidl.converters.Response(response, prefix, "response");
         let innerRequest = null;
-        if (webidl.is.Request(request2)) {
-          innerRequest = getRequestState(request2);
+        if (webidl.is.Request(request3)) {
+          innerRequest = getRequestState(request3);
         } else {
-          innerRequest = getRequestState(new Request2(request2));
+          innerRequest = getRequestState(new Request2(request3));
         }
         if (!urlIsHttpHttpsScheme(innerRequest.url) || innerRequest.method !== "GET") {
           throw webidl.errors.exception({
@@ -25306,21 +25368,21 @@ var require_cache3 = __commonJS({
         });
         return cacheJobPromise.promise;
       }
-      async delete(request2, options = {}) {
+      async delete(request3, options = {}) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.delete";
         webidl.argumentLengthCheck(arguments, 1, prefix);
-        request2 = webidl.converters.RequestInfo(request2);
+        request3 = webidl.converters.RequestInfo(request3);
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
         let r = null;
-        if (webidl.is.Request(request2)) {
-          r = getRequestState(request2);
+        if (webidl.is.Request(request3)) {
+          r = getRequestState(request3);
           if (r.method !== "GET" && !options.ignoreMethod) {
             return false;
           }
         } else {
-          assert(typeof request2 === "string");
-          r = getRequestState(new Request2(request2));
+          assert(typeof request3 === "string");
+          r = getRequestState(new Request2(request3));
         }
         const operations = [];
         const operation = {
@@ -25352,25 +25414,25 @@ var require_cache3 = __commonJS({
        * @param {import('../../../types/cache').CacheQueryOptions} options
        * @returns {Promise<readonly Request[]>}
        */
-      async keys(request2 = void 0, options = {}) {
+      async keys(request3 = void 0, options = {}) {
         webidl.brandCheck(this, webidl.is.Cache);
         const prefix = "Cache.keys";
-        if (request2 !== void 0) request2 = webidl.converters.RequestInfo(request2);
+        if (request3 !== void 0) request3 = webidl.converters.RequestInfo(request3);
         options = webidl.converters.CacheQueryOptions(options, prefix, "options");
         let r = null;
-        if (request2 !== void 0) {
-          if (webidl.is.Request(request2)) {
-            r = getRequestState(request2);
+        if (request3 !== void 0) {
+          if (webidl.is.Request(request3)) {
+            r = getRequestState(request3);
             if (r.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
-          } else if (typeof request2 === "string") {
-            r = getRequestState(new Request2(request2));
+          } else if (typeof request3 === "string") {
+            r = getRequestState(new Request2(request3));
           }
         }
         const promise = Promise.withResolvers();
         const requests = [];
-        if (request2 === void 0) {
+        if (request3 === void 0) {
           for (const requestResponse of this.#relevantRequestResponseList) {
             requests.push(requestResponse[0]);
           }
@@ -25382,9 +25444,9 @@ var require_cache3 = __commonJS({
         }
         queueMicrotask(() => {
           const requestList = [];
-          for (const request3 of requests) {
+          for (const request4 of requests) {
             const requestObject = fromInnerRequest(
-              request3,
+              request4,
               void 0,
               new AbortController().signal,
               "immutable"
@@ -25503,9 +25565,9 @@ var require_cache3 = __commonJS({
        * @param {import('../../../types/cache').CacheQueryOptions | undefined} options
        * @returns {boolean}
        */
-      #requestMatchesCachedItem(requestQuery, request2, response = null, options) {
+      #requestMatchesCachedItem(requestQuery, request3, response = null, options) {
         const queryURL = new URL(requestQuery.url);
-        const cachedURL = new URL(request2.url);
+        const cachedURL = new URL(request3.url);
         if (options?.ignoreSearch) {
           cachedURL.search = "";
           queryURL.search = "";
@@ -25521,7 +25583,7 @@ var require_cache3 = __commonJS({
           if (fieldValue === "*") {
             return false;
           }
-          const requestValue = request2.headersList.get(fieldValue);
+          const requestValue = request3.headersList.get(fieldValue);
           const queryValue = requestQuery.headersList.get(fieldValue);
           if (requestValue !== queryValue) {
             return false;
@@ -25529,20 +25591,20 @@ var require_cache3 = __commonJS({
         }
         return true;
       }
-      #internalMatchAll(request2, options, maxResponses = Infinity) {
+      #internalMatchAll(request3, options, maxResponses = Infinity) {
         let r = null;
-        if (request2 !== void 0) {
-          if (webidl.is.Request(request2)) {
-            r = getRequestState(request2);
+        if (request3 !== void 0) {
+          if (webidl.is.Request(request3)) {
+            r = getRequestState(request3);
             if (r.method !== "GET" && !options.ignoreMethod) {
               return [];
             }
-          } else if (typeof request2 === "string") {
-            r = getRequestState(new Request2(request2));
+          } else if (typeof request3 === "string") {
+            r = getRequestState(new Request2(request3));
           }
         }
         const responses = [];
-        if (request2 === void 0) {
+        if (request3 === void 0) {
           for (const requestResponse of this.#relevantRequestResponseList) {
             responses.push(requestResponse[1]);
           }
@@ -25639,21 +25701,21 @@ var require_cachestorage = __commonJS({
         }
         webidl.util.markAsUncloneable(this);
       }
-      async match(request2, options = {}) {
+      async match(request3, options = {}) {
         webidl.brandCheck(this, webidl.is.CacheStorage);
         webidl.argumentLengthCheck(arguments, 1, "CacheStorage.match");
-        request2 = webidl.converters.RequestInfo(request2);
+        request3 = webidl.converters.RequestInfo(request3);
         options = webidl.converters.MultiCacheQueryOptions(options);
         if (options.cacheName != null) {
           if (this.#caches.has(options.cacheName)) {
             const cacheList = this.#caches.get(options.cacheName);
             const cache5 = new Cache(kConstruct, cacheList);
-            return await cache5.match(request2, options);
+            return await cache5.match(request3, options);
           }
         } else {
           for (const cacheList of this.#caches.values()) {
             const cache5 = new Cache(kConstruct, cacheList);
-            const response = await cache5.match(request2, options);
+            const response = await cache5.match(request3, options);
             if (response !== void 0) {
               return response;
             }
@@ -25808,9 +25870,9 @@ var require_util4 = __commonJS({
         }
       }
     }
-    function validateCookiePath(path2) {
-      for (let i = 0; i < path2.length; ++i) {
-        const code = path2.charCodeAt(i);
+    function validateCookiePath(path3) {
+      for (let i = 0; i < path3.length; ++i) {
+        const code = path3.charCodeAt(i);
         if (code < 32 || // exclude CTLs (0-31)
         code > 126 || // exclude non-ascii and DEL
         code === 59) {
@@ -26872,7 +26934,7 @@ var require_connection = __commonJS({
     function establishWebSocketConnection(url, protocols, client, handler, options) {
       const requestURL = url;
       requestURL.protocol = url.protocol === "ws:" ? "http:" : "https:";
-      const request2 = makeRequest({
+      const request3 = makeRequest({
         urlList: [requestURL],
         client,
         serviceWorkers: "none",
@@ -26885,18 +26947,18 @@ var require_connection = __commonJS({
       });
       if (options.headers) {
         const headersList = getHeadersList(new Headers2(options.headers));
-        request2.headersList = headersList;
+        request3.headersList = headersList;
       }
       const keyValue = crypto2.randomBytes(16).toString("base64");
-      request2.headersList.append("sec-websocket-key", keyValue, true);
-      request2.headersList.append("sec-websocket-version", "13", true);
+      request3.headersList.append("sec-websocket-key", keyValue, true);
+      request3.headersList.append("sec-websocket-version", "13", true);
       for (const protocol of protocols) {
-        request2.headersList.append("sec-websocket-protocol", protocol, true);
+        request3.headersList.append("sec-websocket-protocol", protocol, true);
       }
       const permessageDeflate = "permessage-deflate; client_max_window_bits";
-      request2.headersList.append("sec-websocket-extensions", permessageDeflate, true);
+      request3.headersList.append("sec-websocket-extensions", permessageDeflate, true);
       const controller = fetching({
-        request: request2,
+        request: request3,
         useParallelQueue: true,
         dispatcher: options.dispatcher,
         processResponse(response) {
@@ -26945,7 +27007,7 @@ var require_connection = __commonJS({
           }
           const secProtocol = response.headersList.get("Sec-WebSocket-Protocol");
           if (secProtocol !== null) {
-            const requestProtocols = getDecodeSplit("sec-websocket-protocol", request2.headersList);
+            const requestProtocols = getDecodeSplit("sec-websocket-protocol", request3.headersList);
             if (requestProtocols === null || !requestProtocols.includes(secProtocol)) {
               failHandshake(handler, response, 1002, "Protocol was not set in the opening handshake.");
               return;
@@ -28941,12 +29003,12 @@ var require_eventsource = __commonJS({
           corsAttributeState = USE_CREDENTIALS;
           this.#withCredentials = true;
         }
-        const request2 = createPotentialCORSRequest(urlRecord, "", corsAttributeState);
-        request2.client = environmentSettingsObject.settingsObject;
-        request2.headersList.set("Accept", "text/event-stream");
-        request2.cache = "no-store";
-        request2.initiator = "other";
-        this.#request = request2;
+        const request3 = createPotentialCORSRequest(urlRecord, "", corsAttributeState);
+        request3.client = environmentSettingsObject.settingsObject;
+        request3.headersList.set("Accept", "text/event-stream");
+        request3.cache = "no-store";
+        request3.initiator = "other";
+        this.#request = request3;
         this.#connect();
       }
       /**
@@ -29276,11 +29338,11 @@ var require_undici = __commonJS({
           if (typeof opts.path !== "string") {
             throw new InvalidArgumentError("invalid opts.path");
           }
-          let path2 = opts.path;
+          let path3 = opts.path;
           if (!opts.path.startsWith("/")) {
-            path2 = `/${path2}`;
+            path3 = `/${path3}`;
           }
-          url = new URL(util.parseOrigin(url).origin + path2);
+          url = new URL(util.parseOrigin(url).origin + path3);
         } else {
           if (!opts) {
             opts = typeof url === "object" ? url : {};
@@ -29390,9 +29452,1539 @@ ${captureLines}` : capture.stack;
 });
 
 // vendor/channel-pack/src/index.ts
-import { credentialRef as credentialRef16 } from "@deepseek-ai/dsh-credentials";
-import { LlmError as LlmError20 } from "@deepseek-ai/dsh-llm";
+import { credentialRef as credentialRef18 } from "@deepseek-ai/dsh-credentials";
+import { LlmError as LlmError22 } from "@deepseek-ai/dsh-llm";
 import Schema2 from "@deepseek-ai/schemastery";
+
+// vendor/channel-pack/src/catalog-broadcast.ts
+var pending = /* @__PURE__ */ new WeakSet();
+function broadcastCatalogChanged(ctx) {
+  if (pending.has(ctx)) return;
+  pending.add(ctx);
+  queueMicrotask(() => {
+    try {
+      ctx.emit("llm/adapters-updated");
+    } catch (error) {
+      ctx.logger?.warn?.(`[channel-pack] \u5E7F\u64AD\u6A21\u578B\u76EE\u5F55\u53D8\u66F4\u4E8B\u4EF6\u5931\u8D25\uFF1A${String(error)}`);
+    } finally {
+      pending.delete(ctx);
+    }
+  });
+}
+
+// vendor/channel-pack/src/remote-catalog-gate.ts
+var REMOTE_CATALOG_COOLDOWN_MS = 3e4;
+function normalizeLoadResult(result) {
+  if (typeof result === "boolean") return { got: result, complete: result };
+  return { got: result.got, complete: result.complete ?? result.got };
+}
+var RemoteCatalogGate = class {
+  inFlight;
+  retryAt;
+  cooldownMs;
+  now;
+  /** 目录落地后的通知回调（见 {@link RemoteCatalogGateOptions.onLoaded}）。 */
+  onLoaded;
+  constructor(options = {}) {
+    this.cooldownMs = options.cooldownMs ?? REMOTE_CATALOG_COOLDOWN_MS;
+    this.now = options.now ?? Date.now;
+    this.onLoaded = options.onLoaded;
+  }
+  /**
+   * 是否处于「上次没拿到目录」的冷却窗口内。
+   *
+   * ⚠ `retryAt` 是用**墙钟**算的，系统时间被回拨时 `now() < retryAt` 会
+   * 把冷却**拉长**（回拨一天就是事实上的永久卡死）。故这里只认「剩余量
+   * 不超过一个冷却周期」的窗口 —— 回拨造成的超长窗口一律按已到期处理。
+   */
+  cooling() {
+    if (this.retryAt === void 0) return false;
+    const now = this.now();
+    return now < this.retryAt && this.retryAt - now <= this.cooldownMs;
+  }
+  /**
+   * 至多发起一次加载。
+   *
+   * - 冷却中：**不调用** `run`，直接返回。
+   * - 已有在飞的加载：等它，不重复调用 `run`。
+   * - 否则调用 `run`；返回 `false`（或抛错）即进入冷却。
+   *
+   * @param run 执行实际拉取，并在成功时自行落缓存；返回是否拿到了非空目录。
+   */
+  async run(run) {
+    if (this.inFlight !== void 0) {
+      await this.inFlight;
+      return;
+    }
+    if (this.cooling()) return;
+    const task = (async () => {
+      try {
+        return normalizeLoadResult(await run());
+      } catch {
+        return { got: false, complete: false };
+      }
+    })();
+    this.inFlight = task;
+    try {
+      const { got, complete } = await task;
+      this.retryAt = complete ? void 0 : this.now() + this.cooldownMs;
+      if (got) {
+        try {
+          this.onLoaded?.();
+        } catch {
+        }
+      }
+    } finally {
+      if (this.inFlight === task) this.inFlight = void 0;
+    }
+  }
+  /** 清掉冷却窗口（例如用户显式触发刷新）。 */
+  reset() {
+    this.retryAt = void 0;
+  }
+};
+
+// vendor/channel-pack/src/catalog-prewarm.ts
+var CATALOG_PREWARM_DELAYS_MS = [0, 35e3, 75e3];
+function defaultSchedule(fn, ms) {
+  const timer = setTimeout(fn, ms);
+  timer.unref?.();
+  return () => clearTimeout(timer);
+}
+function startCatalogPrewarm(options) {
+  const delays = options.delaysMs ?? CATALOG_PREWARM_DELAYS_MS;
+  const schedule = options.schedule ?? defaultSchedule;
+  let stopped = false;
+  const cancels = [];
+  const runRound = async () => {
+    await Promise.allSettled(options.providers.map(async (provider) => {
+      try {
+        await options.warm(provider);
+      } catch (error) {
+        options.logger?.warn?.(
+          `[channel-pack] \u76EE\u5F55\u9884\u70ED\u5931\u8D25\uFF08${provider}\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }));
+  };
+  const runChain = async (index) => {
+    if (stopped) return;
+    if (index >= delays.length) return;
+    await runRound();
+    if (stopped) return;
+    const next = delays[index + 1];
+    if (next === void 0) return;
+    const gap = next > 0 ? next : REMOTE_CATALOG_COOLDOWN_MS + 1;
+    cancels.push(schedule(() => {
+      void runChain(index + 1);
+    }, gap));
+  };
+  queueMicrotask(() => {
+    if (stopped) return;
+    void runChain(0);
+  });
+  return () => {
+    stopped = true;
+    for (const cancel of cancels) cancel();
+    cancels.length = 0;
+  };
+}
+function isPrewarmSpacingValid(delays = CATALOG_PREWARM_DELAYS_MS) {
+  return delays.filter((delay2) => delay2 > 0).every((delay2) => delay2 > REMOTE_CATALOG_COOLDOWN_MS);
+}
+
+// vendor/channel-pack/src/models.ts
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+
+// vendor/channel-pack/src/sign.ts
+async function sha256Hex(data) {
+  const hash = await crypto.subtle.digest("SHA-256", data.slice().buffer);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function hmacSha256Hex(key, data) {
+  const cryptoKey = await crypto.subtle.importKey("raw", key.slice().buffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig2 = await crypto.subtle.sign("HMAC", cryptoKey, data.slice().buffer);
+  return Array.from(new Uint8Array(sig2)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+function buildCanonicalRequest(method, uri, query, headers, payloadHash) {
+  const signedHeaders = [];
+  headers.forEach((_, k) => signedHeaders.push(k));
+  signedHeaders.sort();
+  const headerLines = signedHeaders.map((k) => `${k}:${headers.get(k) ?? ""}`);
+  return [method, uri, query, headerLines.join("\n"), "", signedHeaders.join(";"), payloadHash].join("\n");
+}
+async function signRequestHuawei(ak, sk, securityToken, method, urlStr, body, extraHeaders) {
+  const url = new URL(urlStr);
+  let uri = url.pathname;
+  if (!uri.endsWith("/")) uri += "/";
+  const query = url.search.slice(1);
+  const dateStamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const payloadHash = await sha256Hex(body);
+  const headers = /* @__PURE__ */ new Map();
+  headers.set("host", url.host);
+  headers.set("x-sdk-date", dateStamp);
+  headers.set("x-sdk-content-sha256", payloadHash);
+  headers.set("x-security-token", securityToken);
+  if (extraHeaders !== void 0) {
+    for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value);
+  }
+  if (method.toUpperCase() !== "GET") headers.set("content-type", "application/json");
+  const signedHeaders = [];
+  headers.forEach((_, k) => signedHeaders.push(k));
+  signedHeaders.sort();
+  const canonicalRequest = buildCanonicalRequest(method, uri, query, headers, payloadHash);
+  const canonicalHash = await sha256Hex(new TextEncoder().encode(canonicalRequest));
+  const stringToSign = `SDK-HMAC-SHA256
+${dateStamp}
+${canonicalHash}`;
+  const signature = await hmacSha256Hex(new TextEncoder().encode(sk), new TextEncoder().encode(stringToSign));
+  headers.set("Authorization", `SDK-HMAC-SHA256 Access=${ak},SignedHeaders=${signedHeaders.join(";")},Signature=${signature}`);
+  return headers;
+}
+
+// vendor/channel-pack/src/models.ts
+var OPENGW_GATEWAY_CONFIG_URL = "https://opengw.developer.huaweicloud.com/api/v1/gateway/config";
+var SNAP_MODEL_BUILTIN_URL = "https://snap-access.cn-north-4.myhuaweicloud.com/v1/model/builtin";
+var CODEARTS_MODELS_CACHE_FILENAME = "codearts_models.json";
+var CODEARTS_BENEFIT_CACHE_FILENAME = "codearts_benefit_models.json";
+var CODEARTS_BENEFIT_FALLBACK = ["glm-5.3-flash", "deepseek-v4.1-flash"];
+var FETCH_TIMEOUT_MS = 1e4;
+var MODEL_REFRESH_INTERVAL_MS = 2 * 36e5;
+function isRemoteCatalogComplete(outcome) {
+  return outcome.gatewayOk && outcome.builtinOk;
+}
+var memoryCache;
+var benefitMemoryCache;
+function normalizeModelId(id) {
+  if (id.length > 5) {
+    const suffix = id.slice(-5);
+    if (suffix.startsWith("-") && /^\d{4}$/.test(suffix.slice(1))) {
+      return id.slice(0, -5);
+    }
+  }
+  return id;
+}
+function parseModelInfo(m, seen) {
+  const rawId = m["model_id"];
+  if (typeof rawId !== "string" || rawId.length === 0) return void 0;
+  const id = normalizeModelId(rawId);
+  if (id.includes("-VL-") || id.endsWith("-VL")) return void 0;
+  const rawName = m["model_name"];
+  const name2 = typeof rawName === "string" && rawName.length > 0 ? normalizeModelId(rawName) : id;
+  if (seen.has(id)) return void 0;
+  seen.add(id);
+  return { id, name: name2 };
+}
+function extractJsonArray(text, path3) {
+  try {
+    let value = JSON.parse(text);
+    for (const key of path3) {
+      if (typeof value !== "object" || value === null) return void 0;
+      value = value[key];
+    }
+    return Array.isArray(value) ? value : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function fetchSignedGet(fetcher, url, ak, sk, st, extraUnsignedHeaders) {
+  const signed = await signRequestHuawei(ak, sk, st, "GET", url, new Uint8Array());
+  const headers = new Headers();
+  signed.forEach((v, k) => {
+    if (k !== "host") headers.set(k, v);
+  });
+  if (extraUnsignedHeaders !== void 0) {
+    for (const [k, v] of Object.entries(extraUnsignedHeaders)) headers.set(k, v);
+  }
+  try {
+    const response = await fetcher(url, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    });
+    if (!response.ok) return void 0;
+    return await response.text();
+  } catch {
+    return void 0;
+  }
+}
+async function fetchCodeArtsRemoteModels(credential, fetcher = fetch, outcome) {
+  const { access_key_id: ak, secret_access_key: sk, security_token: st } = credential;
+  if (!ak || !sk) {
+    if (outcome !== void 0) {
+      outcome.gatewayOk = false;
+      outcome.builtinOk = false;
+    }
+    return [];
+  }
+  const models = [];
+  const seen = /* @__PURE__ */ new Set();
+  const benefitIds = [];
+  const gatewayText = await fetchSignedGet(fetcher, OPENGW_GATEWAY_CONFIG_URL, ak, sk, st);
+  const gatewayArr = gatewayText === void 0 ? void 0 : extractJsonArray(gatewayText, ["result", "models"]);
+  if (outcome !== void 0) outcome.gatewayOk = gatewayArr !== void 0;
+  if (gatewayArr !== void 0) {
+    for (const item of gatewayArr) {
+      if (typeof item === "object" && item !== null) {
+        const entry = item;
+        const rawId = typeof entry["model_id"] === "string" ? entry["model_id"] : "";
+        const mi = parseModelInfo(entry, seen);
+        if (mi) {
+          if (rawId.length > 0 && normalizeModelId(rawId) === rawId) benefitIds.push(mi.id);
+          models.push(mi);
+        }
+      }
+    }
+  }
+  const snapText = await fetchSignedGet(fetcher, SNAP_MODEL_BUILTIN_URL, ak, sk, st, {
+    "Content-Type": "application/json",
+    "Agent-Type": "PromptCenter",
+    "X-Language": "zh-cn"
+  });
+  const snapArr = snapText === void 0 ? void 0 : extractJsonArray(snapText, ["builtinModels"]);
+  if (outcome !== void 0) outcome.builtinOk = snapArr !== void 0;
+  if (snapArr !== void 0) {
+    for (const item of snapArr) {
+      if (typeof item === "object" && item !== null) {
+        const mi = parseModelInfo(item, seen);
+        if (mi) models.push(mi);
+      }
+    }
+  }
+  if (benefitIds.length > 0) {
+    setBenefitMemoryCache(benefitIds);
+    saveBenefitCache(benefitIds);
+  }
+  return models;
+}
+function cacheDir() {
+  const override = process.env.DSH_CODEARTS_CACHE_DIR;
+  if (override !== void 0 && override.length > 0) return override;
+  const home = process.env.USERPROFILE ?? process.env.HOME;
+  if (!home) return void 0;
+  return `${home}/.cache/deveco`;
+}
+function modelsCachePath() {
+  const dir = cacheDir();
+  return dir === void 0 ? void 0 : `${dir}/${CODEARTS_MODELS_CACHE_FILENAME}`;
+}
+function benefitCachePath() {
+  const dir = cacheDir();
+  return dir === void 0 ? void 0 : `${dir}/${CODEARTS_BENEFIT_CACHE_FILENAME}`;
+}
+function saveModelsCache(models) {
+  const path3 = modelsCachePath();
+  if (!path3) return;
+  const dir = path3.slice(0, path3.lastIndexOf("/"));
+  try {
+    mkdirSync(dir, { recursive: true });
+    const tmp = path3 + ".tmp";
+    writeFileSync(tmp, JSON.stringify(models), "utf-8");
+    renameSync(tmp, path3);
+  } catch {
+  }
+}
+function setMemoryCache(models) {
+  memoryCache = models;
+}
+function saveBenefitCache(ids) {
+  const path3 = benefitCachePath();
+  if (!path3) return;
+  const dir = path3.slice(0, path3.lastIndexOf("/"));
+  try {
+    mkdirSync(dir, { recursive: true });
+    const tmp = path3 + ".tmp";
+    writeFileSync(tmp, JSON.stringify(ids), "utf-8");
+    renameSync(tmp, path3);
+  } catch {
+  }
+}
+function loadBenefitCache() {
+  const path3 = benefitCachePath();
+  if (!path3) return void 0;
+  try {
+    if (!existsSync(path3)) return void 0;
+    const text = readFileSync(path3, "utf-8");
+    const ids = JSON.parse(text);
+    if (!Array.isArray(ids) || ids.length === 0) return void 0;
+    return ids.filter((id) => typeof id === "string");
+  } catch {
+    return void 0;
+  }
+}
+function setBenefitMemoryCache(ids) {
+  benefitMemoryCache = ids;
+}
+function isCodeArtsBenefitModel(model) {
+  if (benefitMemoryCache === void 0) benefitMemoryCache = loadBenefitCache();
+  if (benefitMemoryCache !== void 0 && benefitMemoryCache.includes(model)) return true;
+  return CODEARTS_BENEFIT_FALLBACK.includes(model);
+}
+
+// vendor/channel-pack/src/buddy.ts
+var AUTH_STATE_PATH = "/v2/plugin/auth/state";
+var AUTH_TOKEN_PATH = "/v2/plugin/auth/token";
+var LOGIN_ACCOUNT_PATH = "/v2/plugin/login/account";
+var AUTH_REFRESH_PATH = "/v2/plugin/auth/token/refresh";
+var CONFIG_PATH = "/v3/config";
+var LOGIN_TIMEOUT_MS = 5 * 60 * 1e3;
+var POLL_INTERVAL_MS = 1e3;
+var STATE_REQUEST_TIMEOUT_MS = 1e4;
+var REQUEST_TIMEOUT_MS = 6e4;
+var CODE_TOKEN_NOT_READY = 11217;
+var CODE_ACCOUNT_NOT_READY = 12151;
+var HTTP_HEADER_DOMAIN = "X-Domain";
+var HTTP_HEADER_ENTERPRISE_ID = "X-Enterprise-Id";
+var HTTP_HEADER_TENANT_ID = "X-Tenant-Id";
+var HTTP_HEADER_NO_AUTHORIZATION = "X-No-Authorization";
+var HTTP_HEADER_NO_USER_ID = "X-No-User-Id";
+var HTTP_HEADER_NO_ENTERPRISE_ID = "X-No-Enterprise-Id";
+var HTTP_HEADER_NO_DEPARTMENT_INFO = "X-No-Department-Info";
+var HTTP_HEADER_REFRESH_TOKEN = "X-Refresh-Token";
+var HTTP_HEADER_AUTH_REFRESH_SOURCE = "X-Auth-Refresh-Source";
+var HTTP_HEADER_PRODUCT = "X-Product";
+var HTTP_HEADER_PRODUCT_CODE = "X-Product-Code";
+var BUDDY_USER_AGENT = "CodeBuddyIDE/1.106.1";
+var BUDDY_DEPLOYMENT_TYPE = "SaaS";
+var AUTH_REFRESH_SOURCE = "ide-main";
+var API_DOMAIN = "copilot.tencent.com";
+function credentialExpiresAtMs(credential) {
+  const raw = credential.expires_at;
+  if (typeof raw === "string" && raw.length > 0) {
+    if (/^\d+$/.test(raw)) {
+      const value = Number(raw);
+      return value > 1e12 ? value : value * 1e3;
+    }
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return jwtExpiresAtMs(credential.access_token);
+}
+function jwtExpiresAtMs(token) {
+  if (typeof token !== "string" || token.length === 0) return void 0;
+  const parts = token.split(".");
+  if (parts.length < 2) return void 0;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return typeof payload.exp === "number" && Number.isFinite(payload.exp) ? payload.exp * 1e3 : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function jwtNickname(token) {
+  if (typeof token !== "string" || token.length === 0) return "";
+  const parts = token.split(".");
+  if (parts.length < 2) return "";
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    const nickname = payload.nickname ?? payload.preferred_username ?? payload.name;
+    return typeof nickname === "string" ? stripControlChars(nickname) : "";
+  } catch {
+    return "";
+  }
+}
+function isExpired(credential) {
+  const expiresAt = credentialExpiresAtMs(credential);
+  return expiresAt === void 0 ? false : Date.now() >= expiresAt;
+}
+function isRefreshable(credential) {
+  return credential.refresh_token.length > 0;
+}
+function credentialRequestHeaders(credential) {
+  const headers = {
+    [HTTP_HEADER_DOMAIN]: credential.domain || API_DOMAIN,
+    "User-Agent": BUDDY_USER_AGENT
+  };
+  if (credential.enterprise_id !== void 0 && credential.enterprise_id.length > 0) {
+    headers[HTTP_HEADER_ENTERPRISE_ID] = credential.enterprise_id;
+    headers[HTTP_HEADER_TENANT_ID] = credential.enterprise_id;
+  }
+  return headers;
+}
+function credentialAuthHeaders(credential) {
+  return {
+    ...credentialRequestHeaders(credential),
+    Authorization: `Bearer ${credential.access_token}`
+  };
+}
+function readStringField(data, key) {
+  const value = data[key];
+  if (typeof value === "string") return stripControlChars(value);
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+function stripControlChars(value) {
+  return value.replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+function readNumberField(data, key) {
+  const value = data[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
+  return void 0;
+}
+function absoluteExpiryMs(record, absoluteKey, relativeKey, accessToken) {
+  const absolute = readStringField(record, absoluteKey);
+  if (absolute.length > 0) {
+    const asNumber = /^\d+$/.test(absolute) ? Number(absolute) : Date.parse(absolute);
+    if (Number.isFinite(asNumber)) {
+      const ms = asNumber > 1e12 ? asNumber : asNumber * 1e3;
+      return String(ms);
+    }
+    return absolute;
+  }
+  const relativeSeconds = readNumberField(record, relativeKey);
+  if (relativeSeconds === void 0) {
+    return absoluteKey === "expiresAt" ? "" : "";
+  }
+  const baseMs = jwtIssuedAtMs(accessToken) ?? Date.now();
+  return String(baseMs + relativeSeconds * 1e3);
+}
+function jwtIssuedAtMs(token) {
+  if (typeof token !== "string" || token.length === 0) return void 0;
+  const parts = token.split(".");
+  if (parts.length < 2) return void 0;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return typeof payload.iat === "number" && Number.isFinite(payload.iat) ? payload.iat * 1e3 : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function parseTokenData(data) {
+  const record = typeof data === "object" && data !== null ? data : {};
+  const tokenType = readStringField(record, "tokenType");
+  const accessToken = readStringField(record, "accessToken");
+  return {
+    accessToken,
+    refreshToken: readStringField(record, "refreshToken"),
+    expiresAt: absoluteExpiryMs(record, "expiresAt", "expiresIn", accessToken),
+    refreshExpiresAt: absoluteExpiryMs(record, "refreshExpiresAt", "refreshExpiresIn", accessToken),
+    tokenType: tokenType.length > 0 ? tokenType : "Bearer",
+    scope: readStringField(record, "scope"),
+    domain: readStringField(record, "domain")
+  };
+}
+function parseAccountData(data) {
+  const record = typeof data === "object" && data !== null ? data : {};
+  const accountType = readStringField(record, "type");
+  return {
+    uid: readStringField(record, "uid"),
+    nickname: readStringField(record, "nickname"),
+    enterpriseId: readStringField(record, "enterpriseId"),
+    accountType: accountType.length > 0 ? accountType : "personal"
+  };
+}
+function buildCredential(token, account) {
+  const nickname = account.nickname.length > 0 ? account.nickname : jwtNickname(token.accessToken);
+  return {
+    access_token: token.accessToken,
+    refresh_token: token.refreshToken,
+    expires_at: token.expiresAt,
+    refresh_expires_at: token.refreshExpiresAt,
+    token_type: token.tokenType,
+    scope: token.scope,
+    domain: token.domain,
+    user_id: account.uid.length > 0 ? account.uid : jwtSubject(token.accessToken),
+    nickname,
+    enterprise_id: account.enterpriseId,
+    account_type: account.accountType
+  };
+}
+function jwtSubject(token) {
+  if (typeof token !== "string" || token.length === 0) return "";
+  const parts = token.split(".");
+  if (parts.length < 2) return "";
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return typeof payload.sub === "string" ? payload.sub : "";
+  } catch {
+    return "";
+  }
+}
+var MODEL_DISPLAY_NAMES = {
+  "deepseek-v4-flash": "DeepSeek V4 Flash",
+  "deepseek-v4-pro": "DeepSeek V4 Pro",
+  "hy4-preview": "Hy4 Preview",
+  "hy4-preview-x": "Hy4 Preview X",
+  "hy3": "Hy3",
+  "hy3-x": "Hy3 X",
+  "glm-5.3": "GLM-5.3",
+  "glm-5.3-flash": "GLM-5.3 Flash",
+  "glm-5.2": "GLM-5.2",
+  "glm-5.1": "GLM-5.1",
+  "glm-5v-turbo": "GLM-5V Turbo",
+  "kimi-k3-1": "Kimi K3-1",
+  "kimi-k2.7": "Kimi K2.7",
+  "kimi-k2.6": "Kimi K2.6",
+  "minimax-m3": "MiniMax M3"
+};
+function displayNameForModel(id) {
+  return MODEL_DISPLAY_NAMES[id] ?? id;
+}
+function normalizeCreditsRate(value) {
+  return normalizeRate(value, /^(?:x(\d+(?:\.\d+)?))\b/i, /^(\d+(?:\.\d+)?)x\b/i);
+}
+function normalizeDiscountedRate(value) {
+  return normalizeRate(value, /^(?:x(\d+(?:\.\d+)?))\b/i, /^(\d+(?:\.\d+)?)x\b/i);
+}
+function normalizeRate(value, prefixed, suffixed) {
+  if (typeof value !== "string") return void 0;
+  const text = value.trim();
+  const head = text.split(/\s+/)[0] ?? "";
+  const match = prefixed.exec(head) ?? suffixed.exec(head);
+  return match?.[1] !== void 0 ? `x${match[1]}` : void 0;
+}
+function parseHHMM(value) {
+  if (typeof value !== "string") return void 0;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (m === null) return void 0;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  return h < 24 && min < 60 ? h * 60 + min : void 0;
+}
+function zonedMinutes(now, timeZone) {
+  const zone = typeof timeZone === "string" && timeZone.length > 0 ? timeZone : "Asia/Shanghai";
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(now);
+    const h = Number(parts.find((p) => p.type === "hour")?.value);
+    const m = Number(parts.find((p) => p.type === "minute")?.value);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function hasTimeWindow(schedule) {
+  return Array.isArray(schedule.daily) && schedule.daily.length > 0 || schedule.validFrom !== void 0 || schedule.validUntil !== void 0;
+}
+function promotionActiveNow(item, now) {
+  const raw = item.schedule;
+  if (typeof raw !== "object" || raw === null) return true;
+  const schedule = raw;
+  const from = typeof schedule.validFrom === "string" ? Date.parse(schedule.validFrom) : Number.NaN;
+  const until = typeof schedule.validUntil === "string" ? Date.parse(schedule.validUntil) : Number.NaN;
+  if (Number.isFinite(from) && now.getTime() < from) return false;
+  if (Number.isFinite(until) && now.getTime() >= until) return false;
+  if (!Array.isArray(schedule.daily) || schedule.daily.length === 0) return true;
+  const minutes = zonedMinutes(now, schedule.timezone);
+  if (minutes === void 0) return true;
+  return schedule.daily.some((slot2) => {
+    if (typeof slot2 !== "object" || slot2 === null) return false;
+    const start = parseHHMM(slot2.start);
+    const end = parseHHMM(slot2.end);
+    if (start === void 0 || end === void 0) return false;
+    return start <= end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
+  });
+}
+function parsePromotions(record, now = /* @__PURE__ */ new Date()) {
+  const result = /* @__PURE__ */ new Map();
+  const chosen = /* @__PURE__ */ new Map();
+  const promotions = record.modelPromotions;
+  if (!Array.isArray(promotions)) return result;
+  const sorted = [...promotions].sort((a, b) => priorityOf(a) - priorityOf(b));
+  for (const item of sorted) {
+    if (typeof item !== "object" || item === null) continue;
+    const promotion = item;
+    if (promotion.enabled === false) continue;
+    if (!promotionActiveNow(promotion, now)) continue;
+    const discount = promotion.discount;
+    if (typeof discount !== "object" || discount === null) continue;
+    const detail = discount;
+    const factor = typeof detail.factor === "number" ? detail.factor : void 0;
+    const rawSchedule = promotion.schedule;
+    const windowed = typeof rawSchedule === "object" && rawSchedule !== null && hasTimeWindow(rawSchedule);
+    let rate;
+    if (factor === 0) {
+      if (!windowed) continue;
+      rate = "\u514D\u8D39";
+    } else {
+      rate = normalizeDiscountedRate(detail.discountedCredits);
+      if (rate === "x0") continue;
+    }
+    if (rate === void 0) continue;
+    const modelIds = promotion.modelIds;
+    if (!Array.isArray(modelIds)) continue;
+    const priority = priorityOf(promotion);
+    for (const id of modelIds) {
+      if (typeof id !== "string" || id.length === 0) continue;
+      const previous = chosen.get(id);
+      if (previous !== void 0 && previous > priority) continue;
+      chosen.set(id, priority);
+      result.set(id, rate);
+    }
+  }
+  return result;
+}
+function priorityOf(item) {
+  if (typeof item !== "object" || item === null) return 0;
+  const priority = item.priority;
+  return typeof priority === "number" && Number.isFinite(priority) ? priority : 0;
+}
+function formatCreditsRate(rate, discounted) {
+  if (rate === void 0) return discounted;
+  return discounted !== void 0 ? `${rate}\u2192${discounted}` : rate;
+}
+function parseModelsFromConfig(body) {
+  if (typeof body !== "object" || body === null) return [];
+  const data = body.data;
+  if (typeof data !== "object" || data === null) return [];
+  const record = data;
+  const metaById = /* @__PURE__ */ new Map();
+  if (Array.isArray(record.models)) {
+    for (const model of record.models) {
+      if (typeof model !== "object" || model === null) continue;
+      const entry = model;
+      if (typeof entry.id === "string") metaById.set(entry.id, entry);
+    }
+  }
+  const promotions = parsePromotions(record);
+  const agentReferencedIds = /* @__PURE__ */ new Set();
+  if (Array.isArray(record.agents)) {
+    for (const agent of record.agents) {
+      if (typeof agent !== "object" || agent === null) continue;
+      const models = agent.models;
+      if (!Array.isArray(models)) continue;
+      for (const model of models) if (typeof model === "string") agentReferencedIds.add(model);
+    }
+  }
+  const parsed = [];
+  const seen = /* @__PURE__ */ new Set();
+  const push = (id) => {
+    if (isAutoSelectAlias(id) || seen.has(id) || !isChatModel(id, metaById.get(id))) return;
+    seen.add(id);
+    const meta = metaById.get(id);
+    const remoteName = typeof meta?.name === "string" && meta.name.length > 0 ? meta.name : void 0;
+    const rate = normalizeCreditsRate(meta?.credits);
+    const discounted = promotions.get(id);
+    parsed.push({
+      id,
+      name: remoteName ?? displayNameForModel(id),
+      ...parseModelMeta(meta),
+      ...rate !== void 0 ? { creditsRate: rate } : {},
+      ...discounted !== void 0 ? { discountedCreditsRate: discounted } : {},
+      ...agentReferencedIds.has(id) ? { agentReferenced: true } : {}
+    });
+  };
+  for (const agentName of PREFERRED_AGENT_NAMES) {
+    let found = false;
+    const agents = record.agents;
+    if (!Array.isArray(agents)) break;
+    for (const agent of agents) {
+      if (typeof agent !== "object" || agent === null) continue;
+      const agentRecord = agent;
+      if (agentRecord.name !== agentName) continue;
+      if (Array.isArray(agentRecord.models)) {
+        for (const model of agentRecord.models) {
+          if (typeof model === "string") push(model);
+        }
+      }
+      found = true;
+      break;
+    }
+    if (found) break;
+  }
+  for (const id of metaById.keys()) push(id);
+  for (const id of trialModelIds(record)) {
+    if (isAutoSelectAlias(id) || seen.has(id)) continue;
+    seen.add(id);
+    const meta = metaById.get(id);
+    const rate = normalizeCreditsRate(meta?.credits);
+    const discounted = promotions.get(id);
+    parsed.push({
+      id,
+      name: displayNameForModel(id),
+      ...parseModelMeta(meta),
+      ...rate !== void 0 ? { creditsRate: rate } : {},
+      ...discounted !== void 0 ? { discountedCreditsRate: discounted } : {},
+      // 试用横幅本身就是「服务端推荐可用」的信号，与 agent 引用同义。
+      agentReferenced: true
+    });
+  }
+  return parsed;
+}
+var PREFERRED_AGENT_NAMES = ["cli", "craft"];
+function trialModelIds(data) {
+  const features = data.productFeaturesConfig;
+  if (typeof features !== "object" || features === null) return [];
+  const banner = features.ModelTrialBanner;
+  if (typeof banner !== "object" || banner === null) return [];
+  const banners = banner.banners;
+  if (!Array.isArray(banners)) return [];
+  const ids = [];
+  for (const item of banners) {
+    if (typeof item !== "object" || item === null) continue;
+    const target = item.targetModelId;
+    if (typeof target === "string" && target.length > 0) ids.push(target);
+  }
+  return ids;
+}
+function isAutoSelectAlias(id) {
+  return id === "auto" || id === "default";
+}
+function isChatModel(id, meta) {
+  if (id.startsWith("nes-") || id.startsWith("completion-") || id.startsWith("codewise-")) return false;
+  if (meta?.supportsExtra === true) return false;
+  const maxOutput = meta?.maxOutputTokens;
+  if (typeof maxOutput === "number" && maxOutput > 0 && maxOutput <= 256) return false;
+  const tags = meta?.tags;
+  if (Array.isArray(tags) && tags.some((tag2) => tag2 === "text-to-image")) return false;
+  return true;
+}
+function parseModelMeta(record) {
+  if (record === void 0) return {};
+  const meta = {};
+  const limit = record.maxInputTokens;
+  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) meta.contextWindow = limit;
+  const maxOutput = record.maxOutputTokens;
+  if (typeof maxOutput === "number" && Number.isFinite(maxOutput) && maxOutput > 0) {
+    meta.maxOutputTokens = maxOutput;
+  }
+  if (typeof record.supportsImages === "boolean") meta.supportsImages = record.supportsImages;
+  const reasoning = record.reasoning;
+  if (typeof reasoning === "object" && reasoning !== null) {
+    const fields = reasoning;
+    if (Array.isArray(fields.supportedEfforts)) {
+      const efforts = fields.supportedEfforts.filter((e) => typeof e === "string" && e.length > 0);
+      if (efforts.length > 0) meta.reasoningEfforts = efforts;
+    }
+    if (typeof fields.defaultEffort === "string" && fields.defaultEffort.length > 0) {
+      meta.defaultReasoningEffort = fields.defaultEffort;
+    }
+  }
+  return meta;
+}
+
+// vendor/channel-pack/src/product.ts
+var WORKBUDDY_UA_INTL = "WorkBuddy/5.5.2 WorkBuddy AI/5.5.2 CLI/5.5.2";
+var WORKBUDDY_UA_CN = "WorkBuddy/5.5.2 WorkBuddy/5.5.2 CLI/5.5.2";
+var CODEBUDDY_FALLBACK_MODELS = [
+  {
+    id: "hy4-preview",
+    name: "Hy4 preview",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "hy3",
+    name: "Hy3",
+    contextWindow: 192e3,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "hy3-x",
+    name: "Hy3",
+    contextWindow: 192e3,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    // maxOutputTokens 实测（2026-09-19）：scoped 端点 128000、/v3/config 131072。
+    // 取 **128000**（两个端点的较小者）：它是服务端真正接受的额度，131072 是
+    // /v3/config 的声明值。取小者避免因端点差异被上游拒绝；远端可用时仍以
+    // 远端下发值为准，本字段只在远端缺失时补位。
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek-V4.1-Flash",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "deepseek-v4-pro",
+    name: "Deepseek-V4-Pro",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "xhigh"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    // 2026-09 补录：远端 /v3/config 与 scoped 端点均返回该模型，且实测能看图
+    // （纯红图问答答出「红色」）。它不在 craft/cli agent 白名单里，但可正常调用，
+    // 也是适配器 DEFAULT_MODEL 的取值。
+    //
+    // 档位沿用适配器静态表 REASONING_EFFORTS 的既有取值 [low,high,max]（该表有
+    // 实测依据：三档会显著改变返回的 reasoning_content 长度）。注意上游
+    // /v3/config 声明的是 [low,high,xhigh]，与本表不一致；实测服务端对 low /
+    // medium / high / xhigh / max 一律返回 200（不报非法参数），无法据此判定
+    // 哪一组才真实生效，故不擅自改动既有行为，仅记录该分歧待后续验证。
+    id: "deepseek-v4-flash",
+    name: "Deepseek-V4-Flash",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 5e4
+  },
+  {
+    id: "glm-5.3",
+    name: "GLM-5.3",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "glm-5.3-flash",
+    name: "GLM-5.3-Flash",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 32e3
+  },
+  {
+    id: "glm-5.2",
+    name: "GLM-5.2",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["high", "xhigh"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    // supportsImages 为 true 有实测依据：纯红图问答答出「红色」。
+    // 注意 scoped 端点（/console/enterprises/personal/models）对它返回
+    // supportsImages=false，与 /v3/config、IDE 缓存、wb2api 清单三处矛盾；
+    // 实测以「能看到图」为准，故保留 true（远端若下发 true 则两者一致，
+    // 只有 scoped 端点先命中时才会被它的 false 覆盖，见 buddy-adapter 的
+    // supportsImagesFor 修正）。
+    id: "glm-5.1",
+    name: "GLM-5.1",
+    contextWindow: 2e5,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 48e3
+  },
+  {
+    id: "glm-5v-turbo",
+    name: "GLM-5V-Turbo",
+    contextWindow: 2e5,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "kimi-k3-1",
+    name: "Kimi-K3-1",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 32e3
+  },
+  {
+    // 2026-09 补录：旧注释曾把它列为「service info not found」而排除，但实测
+    // 可正常调用且能看图（纯红图问答答出「红色」），远端两端点也都在下发。
+    id: "kimi-k2.8-preview",
+    name: "Kimi-K2.8-Preview",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "kimi-k2.7",
+    name: "Kimi-K2.7",
+    contextWindow: 256e3,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 32e3
+  },
+  {
+    id: "kimi-k2.6",
+    name: "Kimi-K2.6",
+    contextWindow: 256e3,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 32e3
+  },
+  {
+    id: "minimax-m3",
+    name: "MiniMax-M3",
+    contextWindow: 512e3,
+    supportsImages: true,
+    reasoningEfforts: ["medium"],
+    maxOutputTokens: 64e3
+  }
+];
+var CODEBUDDY = {
+  id: "buddy",
+  platform: "ide",
+  endpoint: "https://copilot.tencent.com",
+  apiDomain: "copilot.tencent.com",
+  displayName: "CodeBuddy (\u817E\u8BAF)",
+  productCode: "codebuddy",
+  userAgent: "CodeBuddyIDE/1.106.1",
+  // 中国版只有一条产品线，无需按模型分档：全部模型沿用 IDE UA。
+  userAgentByModelFamily: [],
+  attributionName: "CodeBuddy",
+  clientVersion: "1.106.1",
+  cliVersion: "2.137.1",
+  defaultCredentialRef: "BUDDY_ACCESS_TOKEN",
+  appendSessionParams: false,
+  fallbackModels: CODEBUDDY_FALLBACK_MODELS
+};
+var WORKBUDDY_FALLBACK_MODELS = [
+  // 注：以下 maxOutputTokens 全部来自 2026-09-19 对国际版 `/v3/config` 的实测
+  // （`node scripts/dump-max-output.mjs`）。该值就是用户在 IDE 里实际拿到的
+  // 单次输出额度，远端不可用时由本表顶替。远端未下发的模型保持 undefined。
+  { id: "default-model", name: "Auto", contextWindow: 176e3, supportsImages: true, maxOutputTokens: 24e3 },
+  { id: "fast-model", name: "Fast", contextWindow: 2e5, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
+  { id: "balanced-model", name: "Balanced", contextWindow: 256e3, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
+  { id: "primary-model", name: "Primary", contextWindow: 272e3, supportsImages: true, reasoningEfforts: ["high"], maxOutputTokens: 72e3 },
+  { id: "deep-model", name: "Deep", contextWindow: 176e3, supportsImages: true, maxOutputTokens: 24e3 },
+  {
+    id: "hy4-preview-f",
+    name: "Hy4 preview",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    // 2026-09 补录：/v3/config 的 cli agent 白名单里有它，但兜底表原先漏了，
+    // 于是被 reconcileWithFallback 丢弃、模型选择器里看不到。实测能看图。
+    id: "hy4-preview",
+    name: "Hy4 preview",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    id: "hy3",
+    name: "Hy3",
+    contextWindow: 192e3,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 64e3
+  },
+  {
+    // ⚠️ 档位取 5 档（上游 issue IKJQSH，2026-10-06 实测）。本表是这两个模型的
+    // **唯一档位来源**：国际版 `/v3/config` 对它们**不下发 supportedEfforts**，
+    // 只给一个单值 `reasoning: {effort:"high", summary:"auto"}`（即「固定 high、
+    // 不提供选择」）。而 `parseModelMeta`（src/buddy.ts）只认 `supportedEfforts`
+    // 数组与 `defaultEffort`，**不认识 `effort`** —— 故远端这个表态会被静默忽略，
+    // 最终落到本表。写 `['high']` 意味着用户永远只有 high 可选，max 从未出现过。
+    //
+    // 实测（真实登录态直打 www.workbuddy.ai，同一条长前缀提示）：
+    //   low/medium/high/xhigh/max 五档**全部 HTTP 200 且都有真实 reasoning_content**
+    //   （4093 / 8670 / 9023 / 4105 / 10559 字符）；拼错的 `banana` 被拒：
+    //   HTTP 400 `code:11133` / `extError.code=model_param_invalid`。
+    // ⇒ 服务端**确实校验档位枚举**，故这 5 档是「实测可行」而非推测。
+    // ⚠️ 强度序**不可**从思考长度反推：xhigh(4105) 实测比 low(4093) 还短。
+    //
+    // ⚠️ 若将来 scoped 端点（/console/enterprises/personal/models）恢复并为这两个
+    // 模型下发列表，`mergeRemoteModels` 会以 scoped 为准（只比 id、不逐字段补齐），
+    // 本表才真正退居「远端缺失时补位」—— 但仍应保持这 5 档：它是「远端没表态时
+    // 我们对外的承诺」。
+    id: "deepseek-v4.1-flash",
+    name: "Deepseek-V4.1-Flash",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    // 2026-09 补录：新加坡区的同代模型（-sg 后缀），远端下发且实测能看图。
+    // 档位依据同上：国际版 `/v3/config` 对它同样只给 `reasoning.effort:"high"`、
+    // 不下发列表，故本表是唯一来源。实测五档同样全部 200 且有思考输出
+    // （3833 / 3761 / 5020 / 6345 / 16947 字符），`banana` 同样被 400 拒绝。
+    //
+    // ⚠️ 与 CodeBuddy 的 `-sg` 不是一回事：中国版端点上该模型不存在
+    // （实测 `code:11102 service info not found`），故 CODEBUDDY 兜底表未收录它。
+    // 这里是国际版专属条目，不要照抄到 CODEBUDDY 那张表。
+    id: "deepseek-v4.1-flash-sg",
+    name: "Deepseek-V4.1-Flash",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-6-astra",
+    name: "GPT-6-Astra",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6-Sol",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-5.6-terra",
+    name: "GPT-5.6-Terra",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6-Luna",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-5.5",
+    name: "GPT-5.5",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 128e3
+  },
+  {
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    contextWindow: 272e3,
+    supportsImages: true,
+    reasoningEfforts: ["low", "medium", "high", "xhigh"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 72e3
+  },
+  // gpt-5.3-codex：远端未下发 maxOutputTokens，故不填（保持 undefined，
+  // 交由网关默认），不臆造数值。
+  { id: "gpt-5.3-codex", name: "GPT-5.3-Codex", contextWindow: 272e3, supportsImages: true, reasoningEfforts: ["medium"] },
+  { id: "gemini-3.5-flash", name: "Gemini-3.5-Flash", contextWindow: 1e6, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 65536 },
+  {
+    id: "glm-5.3",
+    name: "GLM-5.3",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 48e3
+  },
+  {
+    id: "glm-5.2",
+    name: "GLM-5.2",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["high", "xhigh"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 48e3
+  },
+  { id: "kimi-k3", name: "Kimi-K3", contextWindow: 1e6, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
+  {
+    // 2026-09 补录：远端 /v3/config 的 cli agent 白名单里有它，兜底表原先漏了。
+    id: "kimi-k2.8-preview",
+    name: "Kimi-K2.8-Preview",
+    contextWindow: 1e6,
+    supportsImages: true,
+    reasoningEfforts: ["low", "high", "max"],
+    defaultReasoningEffort: "high",
+    maxOutputTokens: 32e3
+  },
+  { id: "kimi-k2.6", name: "Kimi-K2.6", contextWindow: 256e3, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 }
+];
+var WORKBUDDY = {
+  id: "workbuddy",
+  platform: "workbuddy-ai",
+  endpoint: "https://www.workbuddy.ai",
+  apiDomain: "www.workbuddy.ai",
+  displayName: "WorkBuddy (\u56FD\u9645\u7248)",
+  productCode: "workbuddy",
+  // 默认档：国际版产品形态（无按模型命中时使用）。
+  userAgent: WORKBUDDY_UA_INTL,
+  userAgentByModelFamily: [
+    // 国际版独有模型线（GPT / Gemini / Claude 系）→ 国际版形态。
+    { match: "gpt-", ua: WORKBUDDY_UA_INTL },
+    { match: "gemini-", ua: WORKBUDDY_UA_INTL },
+    { match: "claude-", ua: WORKBUDDY_UA_INTL },
+    // 国内系模型（glm / hy / kimi / minimax）→ 国内客户端形态。
+    { match: "glm-", ua: WORKBUDDY_UA_CN },
+    { match: "hy", ua: WORKBUDDY_UA_CN },
+    { match: "kimi-", ua: WORKBUDDY_UA_CN },
+    { match: "minimax-", ua: WORKBUDDY_UA_CN }
+  ],
+  attributionName: "WorkBuddy",
+  clientVersion: "5.5.2",
+  cliVersion: "5.5.2",
+  defaultCredentialRef: "WORKBUDDY_ACCESS_TOKEN",
+  appendSessionParams: true,
+  pluginVersion: "5.5.2",
+  fallbackModels: WORKBUDDY_FALLBACK_MODELS
+};
+var ALL_PRODUCTS = [CODEBUDDY, WORKBUDDY];
+function productById(id) {
+  return ALL_PRODUCTS.find((product) => product.id === id);
+}
+function resolveUserAgent(product, model) {
+  for (const rule of product.userAgentByModelFamily ?? []) {
+    if (model.startsWith(rule.match)) return rule.ua;
+  }
+  return product.userAgent;
+}
+
+// vendor/channel-pack/src/buddy-oauth.ts
+function responseCode(body) {
+  if (typeof body !== "object" || body === null) return 0;
+  const code = body.code;
+  return typeof code === "number" ? code : 0;
+}
+function responseMessage(body) {
+  if (typeof body !== "object" || body === null) return "";
+  const message2 = body.message;
+  return typeof message2 === "string" ? message2 : "";
+}
+function responseData(body) {
+  if (typeof body !== "object" || body === null) return void 0;
+  const data = body.data;
+  return data === null ? void 0 : data;
+}
+async function request(method, url, headers, options) {
+  const signal = options.signal === void 0 ? AbortSignal.timeout(options.timeoutMs) : AbortSignal.any([AbortSignal.timeout(options.timeoutMs), options.signal]);
+  let response;
+  try {
+    response = await options.fetcher(url, { method, headers, signal });
+  } catch (error) {
+    throw new Error(`CodeBuddy ${method} ${url} network error: ${String(error)}`);
+  }
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+  return { status: response.status, body };
+}
+async function fetchAuthState(fetcher = fetch, signal, product = CODEBUDDY) {
+  const url = `${product.endpoint}${AUTH_STATE_PATH}?platform=${product.platform}`;
+  const headers = {
+    [HTTP_HEADER_DOMAIN]: product.apiDomain,
+    [HTTP_HEADER_NO_AUTHORIZATION]: "true",
+    [HTTP_HEADER_NO_USER_ID]: "true",
+    [HTTP_HEADER_NO_ENTERPRISE_ID]: "true",
+    [HTTP_HEADER_NO_DEPARTMENT_INFO]: "true",
+    "User-Agent": product.userAgent
+  };
+  const { status, body } = await request("POST", url, headers, {
+    fetcher,
+    timeoutMs: STATE_REQUEST_TIMEOUT_MS,
+    ...signal !== void 0 ? { signal } : {}
+  });
+  if (status !== 200) {
+    throw new Error(`auth/state HTTP ${status}: ${responseMessage(body)}`);
+  }
+  const data = responseData(body);
+  if (typeof data !== "object" || data === null) {
+    throw new Error(`auth/state \u54CD\u5E94\u7F3A\u5C11 data \u5B57\u6BB5: ${JSON.stringify(body)}`);
+  }
+  const record = data;
+  const state = typeof record.state === "string" ? record.state : "";
+  const authUrl = typeof record.authUrl === "string" ? record.authUrl : "";
+  if (state.length === 0) throw new Error("auth/state \u54CD\u5E94\u7F3A\u5C11 state \u5B57\u6BB5");
+  if (authUrl.length === 0) throw new Error("auth/state \u54CD\u5E94\u7F3A\u5C11 authUrl \u5B57\u6BB5");
+  return { state, authUrl };
+}
+async function loopGetToken(state, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  const product = options.product ?? CODEBUDDY;
+  const url = `${product.endpoint}${AUTH_TOKEN_PATH}?state=${encodeURIComponent(state)}`;
+  const headers = {
+    [HTTP_HEADER_NO_AUTHORIZATION]: "true",
+    "User-Agent": product.userAgent
+  };
+  const deadline = Date.now() + (options.timeoutMs ?? LOGIN_TIMEOUT_MS);
+  const interval = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+  for (; ; ) {
+    if (Date.now() >= deadline) throw new Error("\u83B7\u53D6 token \u8D85\u65F6\uFF085 \u5206\u949F\uFF09");
+    if (options.signal?.aborted) throw new Error("\u767B\u5F55\u5DF2\u53D6\u6D88");
+    await sleep(interval);
+    let result;
+    try {
+      result = await request("GET", url, headers, {
+        fetcher,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        ...options.signal !== void 0 ? { signal: options.signal } : {}
+      });
+    } catch {
+      continue;
+    }
+    const { status, body } = result;
+    if (status === 200) {
+      const data = responseData(body);
+      if (data !== void 0) return parseTokenData(data);
+      continue;
+    }
+    const code = responseCode(body);
+    if (code === CODE_TOKEN_NOT_READY) continue;
+    throw new Error(`auth/token HTTP ${status} code=${code}: ${responseMessage(body)}`);
+  }
+}
+async function getAccount(state, token, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  const product = options.product ?? CODEBUDDY;
+  const url = `${product.endpoint}${LOGIN_ACCOUNT_PATH}?state=${encodeURIComponent(state)}`;
+  const headers = {
+    // ⚠️ `||` 而非裸 `token.domain`：token 由 `parseTokenData` → `readStringField`
+    // 产出，该函数在字段缺失/类型不符时返回**空串**（不是 `undefined`），裸用会
+    // 让 X-Domain 以空值发出。这与 `buddy-adapter.ts` 的 chat 头、`buddy.ts` 的
+    // `credentialRequestHeaders` 是同一形态（PR!19 修了那两处，这是第三处）。
+    //
+    // 兜底取 `product.apiDomain` 而非常量 `API_DOMAIN`：本请求的 URL 是
+    // `` `${product.endpoint}${LOGIN_ACCOUNT_PATH}` ``，X-Domain 必须与产品端点一致。
+    //
+    // ⚠️ **非空时仍以服务端下发的 `token.domain` 为准**（故不写成产品优先）：
+    // 这里是登录流程，该值是服务端**本次刚下发**的权威值，不是跨产品迁移后
+    // 会过期的历史快照 —— 与 adapter 那处的方向差异是有意的，差异只在「兜底值
+    // 取谁」，判据一致（空串必回退）。回归用例见 `tests/unit/buddy-oauth.spec.ts`
+    // 的「token.domain 为空串时…」与「token.domain 非空时…」两条。
+    [HTTP_HEADER_DOMAIN]: token.domain || product.apiDomain,
+    Authorization: `Bearer ${token.accessToken}`,
+    [HTTP_HEADER_NO_USER_ID]: "true",
+    [HTTP_HEADER_NO_ENTERPRISE_ID]: "true",
+    "User-Agent": (options.product ?? CODEBUDDY).userAgent
+  };
+  const deadline = Date.now() + (options.timeoutMs ?? LOGIN_TIMEOUT_MS);
+  const interval = options.pollIntervalMs ?? POLL_INTERVAL_MS;
+  for (; ; ) {
+    if (Date.now() >= deadline) throw new Error("\u83B7\u53D6\u8D26\u6237\u4FE1\u606F\u8D85\u65F6\uFF085 \u5206\u949F\uFF09");
+    if (options.signal?.aborted) throw new Error("\u767B\u5F55\u5DF2\u53D6\u6D88");
+    await sleep(interval);
+    let result;
+    try {
+      result = await request("GET", url, headers, {
+        fetcher,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        ...options.signal !== void 0 ? { signal: options.signal } : {}
+      });
+    } catch {
+      continue;
+    }
+    const { status, body } = result;
+    if (status === 200) {
+      const data = responseData(body);
+      if (data !== void 0) return parseAccountData(data);
+      continue;
+    }
+    const code = responseCode(body);
+    if (code === CODE_ACCOUNT_NOT_READY) continue;
+    throw new Error(`login/account HTTP ${status} code=${code}: ${responseMessage(body)}`);
+  }
+}
+async function refreshToken(credential, fetcher = fetch, signal, product = CODEBUDDY) {
+  if (!isRefreshable(credential)) {
+    throw new RefreshTokenExpiredError2("\u65E0 refresh_token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+  }
+  const url = `${product.endpoint}${AUTH_REFRESH_PATH}`;
+  const headers = {
+    ...credentialRequestHeaders(credential),
+    // credentialRequestHeaders 走的是 CodeBuddy 的 UA/域名常量，这里按产品覆盖，
+    // 否则 WorkBuddy 续期时会以 CodeBuddy 的身份标识发请求。
+    [HTTP_HEADER_DOMAIN]: product.apiDomain,
+    "User-Agent": product.userAgent,
+    Authorization: `Bearer ${credential.access_token}`,
+    [HTTP_HEADER_REFRESH_TOKEN]: credential.refresh_token,
+    [HTTP_HEADER_AUTH_REFRESH_SOURCE]: AUTH_REFRESH_SOURCE
+  };
+  const { status, body } = await request("POST", url, headers, {
+    fetcher,
+    timeoutMs: REQUEST_TIMEOUT_MS,
+    ...signal !== void 0 ? { signal } : {}
+  });
+  if (status !== 200) {
+    const code = responseCode(body);
+    const message2 = responseMessage(body);
+    const expired = status === 401 || status === 403 || code === 401 || code === 403 || message2.includes("expired") || message2.includes("invalid");
+    if (expired) {
+      throw new RefreshTokenExpiredError2(message2.length > 0 ? message2 : `HTTP ${status}`);
+    }
+    throw new Error(`\u5237\u65B0 token HTTP ${status} code=${code}: ${message2}`);
+  }
+  const data = responseData(body);
+  if (data === void 0) throw new Error("\u5237\u65B0 token \u54CD\u5E94\u7F3A\u5C11 data \u5B57\u6BB5");
+  return parseTokenData(data);
+}
+var RefreshTokenExpiredError2 = class extends Error {
+  constructor(message2) {
+    super(message2);
+    this.name = "RefreshTokenExpiredError";
+  }
+};
+async function fetchModels(credential, fetcher = fetch, signal, product = CODEBUDDY, outcome) {
+  if (credential.access_token.length === 0) {
+    if (outcome !== void 0) {
+      outcome.scopedOk = false;
+      outcome.configOk = false;
+    }
+    return [];
+  }
+  const headers = {
+    ...credentialAuthHeaders(credential),
+    // credentialAuthHeaders 内置 CodeBuddy 的 UA/域名，这里按产品覆盖。
+    [HTTP_HEADER_DOMAIN]: product.apiDomain,
+    "User-Agent": product.userAgent,
+    // X-Product 是**部署类型**（SaaS），CodeBuddy 与 WorkBuddy 共用同一取值，
+    // 故保持常量；随产品变化的是 X-Product-Code。
+    [HTTP_HEADER_PRODUCT]: BUDDY_DEPLOYMENT_TYPE,
+    [HTTP_HEADER_PRODUCT_CODE]: product.productCode
+  };
+  const scoped = await requestScopedModels(credential, headers, fetcher, signal, product);
+  if (outcome !== void 0) outcome.scopedOk = scoped !== void 0;
+  if (scoped !== void 0) {
+    const config = await requestConfig(headers, fetcher, signal, product);
+    if (outcome !== void 0) outcome.configOk = config.ok;
+    const merged = mergeRemoteModels(scoped, config.models);
+    return config.promotions.size === 0 ? merged : applyPromotions(merged, config.promotions);
+  }
+  const url = `${product.endpoint}${CONFIG_PATH}`;
+  try {
+    const { status, body } = await request("GET", url, headers, {
+      fetcher,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...signal !== void 0 ? { signal } : {}
+    });
+    if (status !== 200) {
+      return [];
+    }
+    const models = parseModelsFromConfig(body);
+    if (outcome !== void 0) outcome.configOk = true;
+    return models;
+  } catch {
+    return [];
+  }
+}
+function mergeRemoteModels(primary, extra) {
+  const known = new Set(primary.map((model) => model.id));
+  return [...primary, ...extra.filter((model) => !known.has(model.id))];
+}
+function isBuddyCatalogComplete(outcome) {
+  return outcome.scopedOk && outcome.configOk;
+}
+async function requestConfig(headers, fetcher, signal, product) {
+  const empty = { models: [], promotions: /* @__PURE__ */ new Map(), ok: false };
+  try {
+    const { status, body } = await request("GET", `${product.endpoint}${CONFIG_PATH}`, headers, {
+      fetcher,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...signal !== void 0 ? { signal } : {}
+    });
+    if (status !== 200 || typeof body !== "object" || body === null) return empty;
+    const data = body.data;
+    if (typeof data !== "object" || data === null) return empty;
+    return {
+      models: parseModelsFromConfig(body),
+      promotions: parsePromotions(data),
+      ok: true
+    };
+  } catch {
+    return empty;
+  }
+}
+function applyPromotions(models, promotions) {
+  return models.map((model) => {
+    const discounted = promotions.get(model.id);
+    return discounted === void 0 ? model : { ...model, discountedCreditsRate: discounted };
+  });
+}
+var ENTERPRISE_MODELS_SCOPE = "personal";
+async function requestScopedModels(credential, headers, fetcher, signal, product) {
+  const url = `${product.endpoint}/console/enterprises/${ENTERPRISE_MODELS_SCOPE}/models`;
+  try {
+    const { status, body } = await request("GET", url, headers, {
+      fetcher,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...signal !== void 0 ? { signal } : {}
+    });
+    if (status !== 200) return void 0;
+    const models = parseModelsFromConfig(body);
+    return models.length > 0 ? models : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function sleep(ms) {
+  return new Promise((resolve2) => {
+    setTimeout(resolve2, ms).unref?.();
+  });
+}
+async function defaultOpenBrowser(url) {
+  const { openBrowser: openBrowser3 } = await Promise.resolve().then(() => (init_login(), login_exports));
+  openBrowser3(url);
+}
+function decorateLoginUrl(authUrl, product) {
+  if (!product.appendSessionParams) return authUrl;
+  try {
+    const url = new URL(authUrl);
+    if (product.pluginVersion !== void 0 && product.pluginVersion.length > 0) {
+      url.searchParams.set("version", product.pluginVersion);
+    }
+    url.searchParams.set("loginSessionId", crypto.randomUUID());
+    return url.toString();
+  } catch {
+    return authUrl;
+  }
+}
+async function runBuddyLoginFlow(options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  const open = options.openBrowser ?? defaultOpenBrowser;
+  const product = options.product ?? CODEBUDDY;
+  let state;
+  let authUrl;
+  if (options.state) {
+    state = options.state;
+    authUrl = "";
+  } else {
+    const result = await fetchAuthState(fetcher, void 0, product);
+    state = result.state;
+    authUrl = result.authUrl;
+    const decorated = decorateLoginUrl(authUrl, product);
+    await open(decorated);
+    authUrl = decorated;
+  }
+  const pollOptions = {
+    fetcher,
+    ...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
+    ...options.pollIntervalMs !== void 0 ? { pollIntervalMs: options.pollIntervalMs } : {},
+    // 轮询 token / 账户两步同样带产品身份标识，否则 WorkBuddy 登录会以
+    // CodeBuddy 的 UA 发请求。
+    product
+  };
+  const token = await loopGetToken(state, pollOptions);
+  const account = await getAccount(state, token, pollOptions);
+  const credential = buildCredential(token, account);
+  return {
+    access: JSON.stringify(credential),
+    // 对齐 Rust 的 expires_at_ms(...).unwrap_or(0)：无法解析时报告 0。
+    expires: credentialExpiresAtMs(credential) ?? 0,
+    loginUrl: authUrl,
+    refreshable: isRefreshable(credential)
+  };
+}
 
 // vendor/channel-pack/src/llm-adapter.ts
 import {
@@ -29410,7 +31002,7 @@ import { ReasoningEffortId, ToolCallId } from "@deepseek-ai/dsh-llm";
 import { credentialRef } from "@deepseek-ai/dsh-credentials";
 
 // vendor/channel-pack/src/channel-pack-store.ts
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import Schema from "@deepseek-ai/schemastery";
@@ -29619,16 +31211,16 @@ function accountFromCredentialRef(ref) {
   };
 }
 var FileStore = class {
-  constructor(home, path2, logger2) {
+  constructor(home, path3, logger2) {
     this.home = home;
-    this.path = path2;
+    this.path = path3;
     this.logger = logger2;
   }
   kind = "file";
   load() {
     try {
-      if (!existsSync(this.path)) return this.bootstrapFromCredentialRefs();
-      const parsed = JSON.parse(readFileSync(this.path, "utf-8"));
+      if (!existsSync3(this.path)) return this.bootstrapFromCredentialRefs();
+      const parsed = JSON.parse(readFileSync2(this.path, "utf-8"));
       if (typeof parsed !== "object" || parsed === null) return void 0;
       const value = parsed;
       return {
@@ -29650,10 +31242,10 @@ var FileStore = class {
     this.write(state);
   }
   write(state) {
-    mkdirSync(join(this.home, "channel-pack"), { recursive: true });
+    mkdirSync2(join(this.home, "channel-pack"), { recursive: true });
     const tmp = `${this.path}.tmp`;
-    writeFileSync(tmp, JSON.stringify(state, null, 2), "utf-8");
-    renameSync(tmp, this.path);
+    writeFileSync2(tmp, JSON.stringify(state, null, 2), "utf-8");
+    renameSync2(tmp, this.path);
   }
   /**
    * 首次启动的数据恢复（**仅在状态文档不存在时**执行一次）。
@@ -29671,8 +31263,8 @@ var FileStore = class {
   bootstrapFromCredentialRefs() {
     const credentialsPath = join(this.home, ".credentials.yaml");
     try {
-      if (!existsSync(credentialsPath)) return void 0;
-      const accounts = extractCredentialRefNames(readFileSync(credentialsPath, "utf-8")).flatMap((ref) => accountFromCredentialRef(ref) ?? []);
+      if (!existsSync3(credentialsPath)) return void 0;
+      const accounts = extractCredentialRefNames(readFileSync2(credentialsPath, "utf-8")).flatMap((ref) => accountFromCredentialRef(ref) ?? []);
       if (accounts.length === 0) return void 0;
       const state = {
         accounts,
@@ -29727,7 +31319,7 @@ function createChannelPackStore(ctx) {
 }
 
 // vendor/channel-pack/src/permanent-lock-store.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync3, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join2 } from "node:path";
 var PERMANENT_LOCKS_FILE = "permanent-locks.json";
 var MemoryLockStore = class {
@@ -29743,15 +31335,15 @@ var MemoryLockStore = class {
   }
 };
 var FileLockStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
   }
   kind = "file";
   load() {
     try {
-      if (!existsSync2(this.path)) return { exists: false, locks: {} };
-      const parsed = JSON.parse(readFileSync2(this.path, "utf-8"));
+      if (!existsSync4(this.path)) return { exists: false, locks: {} };
+      const parsed = JSON.parse(readFileSync3(this.path, "utf-8"));
       return { exists: true, locks: sanitizePermanentLocks(locksFieldOf(parsed)) };
     } catch (error) {
       this.logger?.warn(`[channel-pack] \u8BFB\u53D6 ${this.path} \u5931\u8D25\uFF0C\u6309\u672A\u9501\u5B9A\u5904\u7406: ${String(error)}`);
@@ -29759,10 +31351,10 @@ var FileLockStore = class {
     }
   }
   async save(locks) {
-    mkdirSync2(join2(this.path, ".."), { recursive: true });
+    mkdirSync3(join2(this.path, ".."), { recursive: true });
     const tmp = `${this.path}.tmp`;
-    writeFileSync2(tmp, JSON.stringify({ schema: SCHEMA, locks }, null, 2), "utf-8");
-    renameSync2(tmp, this.path);
+    writeFileSync3(tmp, JSON.stringify({ schema: SCHEMA, locks }, null, 2), "utf-8");
+    renameSync3(tmp, this.path);
   }
 };
 var SCHEMA = "dsh-codearts-auth/permanent-locks/v1";
@@ -30854,65 +32446,6 @@ function resolveHideWithoutAccountFlag(raw) {
   return !(value === "0" || value === "false" || value === "no" || value === "off");
 }
 
-// vendor/channel-pack/src/remote-catalog-gate.ts
-var REMOTE_CATALOG_COOLDOWN_MS = 3e4;
-var RemoteCatalogGate = class {
-  inFlight;
-  retryAt;
-  cooldownMs;
-  now;
-  constructor(options = {}) {
-    this.cooldownMs = options.cooldownMs ?? REMOTE_CATALOG_COOLDOWN_MS;
-    this.now = options.now ?? Date.now;
-  }
-  /**
-   * 是否处于「上次没拿到目录」的冷却窗口内。
-   *
-   * ⚠ `retryAt` 是用**墙钟**算的，系统时间被回拨时 `now() < retryAt` 会
-   * 把冷却**拉长**（回拨一天就是事实上的永久卡死）。故这里只认「剩余量
-   * 不超过一个冷却周期」的窗口 —— 回拨造成的超长窗口一律按已到期处理。
-   */
-  cooling() {
-    if (this.retryAt === void 0) return false;
-    const now = this.now();
-    return now < this.retryAt && this.retryAt - now <= this.cooldownMs;
-  }
-  /**
-   * 至多发起一次加载。
-   *
-   * - 冷却中：**不调用** `run`，直接返回。
-   * - 已有在飞的加载：等它，不重复调用 `run`。
-   * - 否则调用 `run`；返回 `false`（或抛错）即进入冷却。
-   *
-   * @param run 执行实际拉取，并在成功时自行落缓存；返回是否拿到了非空目录。
-   */
-  async run(run) {
-    if (this.inFlight !== void 0) {
-      await this.inFlight;
-      return;
-    }
-    if (this.cooling()) return;
-    const task = (async () => {
-      try {
-        return await run();
-      } catch {
-        return false;
-      }
-    })();
-    this.inFlight = task;
-    try {
-      const got = await task;
-      this.retryAt = got ? void 0 : this.now() + this.cooldownMs;
-    } finally {
-      if (this.inFlight === task) this.inFlight = void 0;
-    }
-  }
-  /** 清掉冷却窗口（例如用户显式触发刷新）。 */
-  reset() {
-    this.retryAt = void 0;
-  }
-};
-
 // vendor/channel-pack/src/model-queue.ts
 var QUEUE_BUSINESS_CODE = "10605";
 var BILLING_BUSINESS_CODE = "110";
@@ -30988,227 +32521,6 @@ function queueDelayMs(info) {
   const raw = ms ?? (fromSeconds === void 0 ? void 0 : fromSeconds * 1e3);
   if (raw === void 0 || raw < 0) return void 0;
   return Math.min(Math.trunc(raw), QUEUE_MAX_DELAY_MS);
-}
-
-// vendor/channel-pack/src/models.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync3, readFileSync as readFileSync3, renameSync as renameSync3, writeFileSync as writeFileSync3 } from "node:fs";
-
-// vendor/channel-pack/src/sign.ts
-async function sha256Hex(data) {
-  const hash = await crypto.subtle.digest("SHA-256", data.slice().buffer);
-  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-async function hmacSha256Hex(key, data) {
-  const cryptoKey = await crypto.subtle.importKey("raw", key.slice().buffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig2 = await crypto.subtle.sign("HMAC", cryptoKey, data.slice().buffer);
-  return Array.from(new Uint8Array(sig2)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-function buildCanonicalRequest(method, uri, query, headers, payloadHash) {
-  const signedHeaders = [];
-  headers.forEach((_, k) => signedHeaders.push(k));
-  signedHeaders.sort();
-  const headerLines = signedHeaders.map((k) => `${k}:${headers.get(k) ?? ""}`);
-  return [method, uri, query, headerLines.join("\n"), "", signedHeaders.join(";"), payloadHash].join("\n");
-}
-async function signRequestHuawei(ak, sk, securityToken, method, urlStr, body, extraHeaders) {
-  const url = new URL(urlStr);
-  let uri = url.pathname;
-  if (!uri.endsWith("/")) uri += "/";
-  const query = url.search.slice(1);
-  const dateStamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
-  const payloadHash = await sha256Hex(body);
-  const headers = /* @__PURE__ */ new Map();
-  headers.set("host", url.host);
-  headers.set("x-sdk-date", dateStamp);
-  headers.set("x-sdk-content-sha256", payloadHash);
-  headers.set("x-security-token", securityToken);
-  if (extraHeaders !== void 0) {
-    for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value);
-  }
-  if (method.toUpperCase() !== "GET") headers.set("content-type", "application/json");
-  const signedHeaders = [];
-  headers.forEach((_, k) => signedHeaders.push(k));
-  signedHeaders.sort();
-  const canonicalRequest = buildCanonicalRequest(method, uri, query, headers, payloadHash);
-  const canonicalHash = await sha256Hex(new TextEncoder().encode(canonicalRequest));
-  const stringToSign = `SDK-HMAC-SHA256
-${dateStamp}
-${canonicalHash}`;
-  const signature = await hmacSha256Hex(new TextEncoder().encode(sk), new TextEncoder().encode(stringToSign));
-  headers.set("Authorization", `SDK-HMAC-SHA256 Access=${ak},SignedHeaders=${signedHeaders.join(";")},Signature=${signature}`);
-  return headers;
-}
-
-// vendor/channel-pack/src/models.ts
-var OPENGW_GATEWAY_CONFIG_URL = "https://opengw.developer.huaweicloud.com/api/v1/gateway/config";
-var SNAP_MODEL_BUILTIN_URL = "https://snap-access.cn-north-4.myhuaweicloud.com/v1/model/builtin";
-var CODEARTS_MODELS_CACHE_FILENAME = "codearts_models.json";
-var CODEARTS_BENEFIT_CACHE_FILENAME = "codearts_benefit_models.json";
-var CODEARTS_BENEFIT_FALLBACK = ["glm-5.3-flash", "deepseek-v4.1-flash"];
-var FETCH_TIMEOUT_MS = 1e4;
-var MODEL_REFRESH_INTERVAL_MS = 2 * 36e5;
-var memoryCache;
-var benefitMemoryCache;
-function normalizeModelId(id) {
-  if (id.length > 5) {
-    const suffix = id.slice(-5);
-    if (suffix.startsWith("-") && /^\d{4}$/.test(suffix.slice(1))) {
-      return id.slice(0, -5);
-    }
-  }
-  return id;
-}
-function parseModelInfo(m, seen) {
-  const rawId = m["model_id"];
-  if (typeof rawId !== "string" || rawId.length === 0) return void 0;
-  const id = normalizeModelId(rawId);
-  if (id.includes("-VL-") || id.endsWith("-VL")) return void 0;
-  const rawName = m["model_name"];
-  const name2 = typeof rawName === "string" && rawName.length > 0 ? normalizeModelId(rawName) : id;
-  if (seen.has(id)) return void 0;
-  seen.add(id);
-  return { id, name: name2 };
-}
-function extractJsonArray(text, path2) {
-  try {
-    let value = JSON.parse(text);
-    for (const key of path2) {
-      if (typeof value !== "object" || value === null) return void 0;
-      value = value[key];
-    }
-    return Array.isArray(value) ? value : void 0;
-  } catch {
-    return void 0;
-  }
-}
-async function fetchSignedGet(fetcher, url, ak, sk, st, extraUnsignedHeaders) {
-  const signed = await signRequestHuawei(ak, sk, st, "GET", url, new Uint8Array());
-  const headers = new Headers();
-  signed.forEach((v, k) => {
-    if (k !== "host") headers.set(k, v);
-  });
-  if (extraUnsignedHeaders !== void 0) {
-    for (const [k, v] of Object.entries(extraUnsignedHeaders)) headers.set(k, v);
-  }
-  try {
-    const response = await fetcher(url, {
-      method: "GET",
-      headers,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-    });
-    if (!response.ok) return void 0;
-    return await response.text();
-  } catch {
-    return void 0;
-  }
-}
-async function fetchCodeArtsRemoteModels(credential, fetcher = fetch) {
-  const { access_key_id: ak, secret_access_key: sk, security_token: st } = credential;
-  if (!ak || !sk) return [];
-  const models = [];
-  const seen = /* @__PURE__ */ new Set();
-  const benefitIds = [];
-  const gatewayText = await fetchSignedGet(fetcher, OPENGW_GATEWAY_CONFIG_URL, ak, sk, st);
-  if (gatewayText !== void 0) {
-    const arr = extractJsonArray(gatewayText, ["result", "models"]);
-    if (arr !== void 0) {
-      for (const item of arr) {
-        if (typeof item === "object" && item !== null) {
-          const entry = item;
-          const rawId = typeof entry["model_id"] === "string" ? entry["model_id"] : "";
-          const mi = parseModelInfo(entry, seen);
-          if (mi) {
-            if (rawId.length > 0 && normalizeModelId(rawId) === rawId) benefitIds.push(mi.id);
-            models.push(mi);
-          }
-        }
-      }
-    }
-  }
-  const snapText = await fetchSignedGet(fetcher, SNAP_MODEL_BUILTIN_URL, ak, sk, st, {
-    "Content-Type": "application/json",
-    "Agent-Type": "PromptCenter",
-    "X-Language": "zh-cn"
-  });
-  if (snapText !== void 0) {
-    const arr = extractJsonArray(snapText, ["builtinModels"]);
-    if (arr !== void 0) {
-      for (const item of arr) {
-        if (typeof item === "object" && item !== null) {
-          const mi = parseModelInfo(item, seen);
-          if (mi) models.push(mi);
-        }
-      }
-    }
-  }
-  if (benefitIds.length > 0) {
-    setBenefitMemoryCache(benefitIds);
-    saveBenefitCache(benefitIds);
-  }
-  return models;
-}
-function cacheDir() {
-  const override = process.env.DSH_CODEARTS_CACHE_DIR;
-  if (override !== void 0 && override.length > 0) return override;
-  const home = process.env.USERPROFILE ?? process.env.HOME;
-  if (!home) return void 0;
-  return `${home}/.cache/deveco`;
-}
-function modelsCachePath() {
-  const dir = cacheDir();
-  return dir === void 0 ? void 0 : `${dir}/${CODEARTS_MODELS_CACHE_FILENAME}`;
-}
-function benefitCachePath() {
-  const dir = cacheDir();
-  return dir === void 0 ? void 0 : `${dir}/${CODEARTS_BENEFIT_CACHE_FILENAME}`;
-}
-function saveModelsCache(models) {
-  const path2 = modelsCachePath();
-  if (!path2) return;
-  const dir = path2.slice(0, path2.lastIndexOf("/"));
-  try {
-    mkdirSync3(dir, { recursive: true });
-    const tmp = path2 + ".tmp";
-    writeFileSync3(tmp, JSON.stringify(models), "utf-8");
-    renameSync3(tmp, path2);
-  } catch {
-  }
-}
-function setMemoryCache(models) {
-  memoryCache = models;
-}
-function saveBenefitCache(ids) {
-  const path2 = benefitCachePath();
-  if (!path2) return;
-  const dir = path2.slice(0, path2.lastIndexOf("/"));
-  try {
-    mkdirSync3(dir, { recursive: true });
-    const tmp = path2 + ".tmp";
-    writeFileSync3(tmp, JSON.stringify(ids), "utf-8");
-    renameSync3(tmp, path2);
-  } catch {
-  }
-}
-function loadBenefitCache() {
-  const path2 = benefitCachePath();
-  if (!path2) return void 0;
-  try {
-    if (!existsSync3(path2)) return void 0;
-    const text = readFileSync3(path2, "utf-8");
-    const ids = JSON.parse(text);
-    if (!Array.isArray(ids) || ids.length === 0) return void 0;
-    return ids.filter((id) => typeof id === "string");
-  } catch {
-    return void 0;
-  }
-}
-function setBenefitMemoryCache(ids) {
-  benefitMemoryCache = ids;
-}
-function isCodeArtsBenefitModel(model) {
-  if (benefitMemoryCache === void 0) benefitMemoryCache = loadBenefitCache();
-  if (benefitMemoryCache !== void 0 && benefitMemoryCache.includes(model)) return true;
-  return CODEARTS_BENEFIT_FALLBACK.includes(model);
 }
 
 // vendor/channel-pack/src/message-shape.ts
@@ -31570,7 +32882,7 @@ function isProseTruncatedByStopString(text) {
 }
 
 // vendor/channel-pack/src/dead-model-store.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync4, readFileSync as readFileSync4, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readFileSync as readFileSync4, renameSync as renameSync4, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join3 } from "node:path";
 var DEAD_MODELS_FILE = "dead-models.json";
 var SCHEMA2 = "dsh-codearts-auth/dead-models/v1";
@@ -31676,14 +32988,14 @@ var MemoryDeadModelStore = class {
   }
 };
 var FileDeadModelStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
   }
   kind = "file";
   load() {
     try {
-      if (!existsSync4(this.path)) return {};
+      if (!existsSync5(this.path)) return {};
       return sanitize(JSON.parse(readFileSync4(this.path, "utf-8")));
     } catch (error) {
       this.logger?.warn(`[channel-pack] \u8BFB\u53D6 ${this.path} \u5931\u8D25\uFF0C\u6309\u65E0\u5931\u6548\u8BB0\u5F55\u5904\u7406: ${String(error)}`);
@@ -31698,7 +33010,7 @@ var FileDeadModelStore = class {
   }
 };
 var store;
-var cache;
+var cache2;
 var logger;
 var injectedCtx;
 function ensureStore() {
@@ -31715,16 +33027,16 @@ function ensureStore() {
 function configureDeadModelStore(ctx) {
   logger = ctx.logger;
   injectedCtx = ctx;
-  if (cache !== void 0 && Object.keys(cache).length > 0 && tryPersist()) {
+  if (cache2 !== void 0 && Object.keys(cache2).length > 0 && tryPersist()) {
     store = void 0;
-    cache = void 0;
+    cache2 = void 0;
     return;
   }
   store = void 0;
 }
 function tryPersist(prunedCount = 0) {
   try {
-    ensureStore().save(cache ?? {});
+    ensureStore().save(cache2 ?? {});
     if (prunedCount > 0) {
       logger?.warn(`[channel-pack] \u5DF2\u5931\u6548\u6A21\u578B\u8BB0\u5F55\u6E05\u7406 ${prunedCount} \u6761\uFF08\u8D85\u8FC7 TTL\uFF09`);
     }
@@ -31738,7 +33050,7 @@ function persist(prunedCount = 0) {
   tryPersist(prunedCount);
 }
 function loadRecords() {
-  if (cache !== void 0) return cache;
+  if (cache2 !== void 0) return cache2;
   const raw = ensureStore().load();
   const ttl = ttlMs();
   const now = Date.now();
@@ -31758,7 +33070,7 @@ function loadRecords() {
     }
     if (Object.keys(keep).length > 0) out[provider] = keep;
   }
-  cache = out;
+  cache2 = out;
   if (pruned > 0) persist(pruned);
   return out;
 }
@@ -31879,7 +33191,7 @@ function withDeadModelPruning(providers, adapter) {
   });
 }
 
-// src/image-pricing.js
+// vendor/channel-pack/src/image-pricing.ts
 var FALLBACK_IMAGE_PRICING = Object.freeze({
   /** @param {readonly { offloaded?: boolean }[]} images */
   priceImages(images) {
@@ -32362,6 +33674,11 @@ var CHAT_API_BASE = "https://snap-access.cn-north-4.myhuaweicloud.com/api/v2";
 var PROVIDER = "codearts";
 var BENEFIT_NOT_FOUND_CODE = "BENEFIT_NOT_FOUND";
 var CODEARTS_BENEFIT_NOT_FOUND_ERROR_CODE = "InferHub.4004.200";
+var CODEARTS_REASONING_EFFORTS = Object.freeze([
+  { id: ReasoningEffortId("off"), name: "\u5173\u95ED" },
+  { id: ReasoningEffortId("on"), name: "\u5F00\u542F" }
+]);
+var CODEARTS_DEFAULT_EFFORT = "on";
 var DEFAULT_MODELS = [
   "GLM-5.2",
   "GLM-5.1",
@@ -32768,6 +34085,9 @@ var CodeArtsAdapter = class extends LlmAdapter {
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.chatId = options.chatId ?? crypto.randomUUID().replace(/-/g, "");
     this.sessionId = options.sessionId ?? crypto.randomUUID().replace(/-/g, "");
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
   }
   fetchImpl;
   chatId;
@@ -32787,26 +34107,37 @@ var CodeArtsAdapter = class extends LlmAdapter {
   /** 动态模型缓存（首次 listModels 成功后填充）。 */
   remoteModels;
   /**
+   * 远端目录是否**已完整**（两来源都拿全）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**
+   * （此后连预热重试都在短路处直接返回），只能重启 DSH 才能恢复。
+   */
+  remoteComplete = false;
+  /**
    * 目录加载闸门：并发去重 + 失败冷却。
    *
    * ⚠ **不能省**：DSH 的 `buildModelCatalog` 对每个 provider `await listModels()`
    * 后再对每个模型 `await resolveModelInfo()`，两处都会走到这里。原实现失败
    * 直接返回（不落缓存）⇒ 一次网络故障被放大成「每模型重试一次」，每次顶着
    * 10s 超时（`src/models.ts:55 FETCH_TIMEOUT_MS`），首屏因此长时间空转。
+   *
+   * ⚠️ 通知挂在**闸门**上（各适配器的单点收口），理由见 `catalog-broadcast.ts`。
    */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /**
    * 懒加载远端模型目录。resolveModel 可能先于 listModels 被调用
    * （如直接进入会话），此时同样触发远端拉取。
    */
   async ensureRemoteModels() {
     const fetchRemote = this.options.fetchRemoteModels;
-    if (this.remoteModels !== void 0 || fetchRemote === void 0) return;
+    if (this.remoteComplete || fetchRemote === void 0) return;
     await this.catalogGate.run(async () => {
       const models = await fetchRemote();
       if (models.length === 0) return false;
       this.remoteModels = models;
-      return true;
+      this.remoteComplete = this.options.catalogComplete?.() ?? true;
+      return { got: true, complete: this.remoteComplete };
     });
   }
   /**
@@ -32837,11 +34168,8 @@ var CodeArtsAdapter = class extends LlmAdapter {
     const resolved = { provider, id: model, name: name2 };
     if (contextWindow !== void 0) resolved.context = { contextWindow };
     resolved.reasoning = {
-      efforts: [
-        { id: ReasoningEffortId("on"), name: "\u5F00\u542F" },
-        { id: ReasoningEffortId("off"), name: "\u5173\u95ED" }
-      ],
-      defaultEffort: ReasoningEffortId("on")
+      efforts: [...CODEARTS_REASONING_EFFORTS],
+      defaultEffort: ReasoningEffortId(CODEARTS_DEFAULT_EFFORT)
     };
     return resolved;
   }
@@ -33500,801 +34828,6 @@ import {
 } from "@deepseek-ai/dsh-llm";
 import { ToolCallId as ToolCallId2 } from "@deepseek-ai/dsh-llm";
 
-// vendor/channel-pack/src/buddy.ts
-var AUTH_STATE_PATH = "/v2/plugin/auth/state";
-var AUTH_TOKEN_PATH = "/v2/plugin/auth/token";
-var LOGIN_ACCOUNT_PATH = "/v2/plugin/login/account";
-var AUTH_REFRESH_PATH = "/v2/plugin/auth/token/refresh";
-var CONFIG_PATH = "/v3/config";
-var LOGIN_TIMEOUT_MS = 5 * 60 * 1e3;
-var POLL_INTERVAL_MS = 1e3;
-var STATE_REQUEST_TIMEOUT_MS = 1e4;
-var REQUEST_TIMEOUT_MS = 6e4;
-var CODE_TOKEN_NOT_READY = 11217;
-var CODE_ACCOUNT_NOT_READY = 12151;
-var HTTP_HEADER_DOMAIN = "X-Domain";
-var HTTP_HEADER_ENTERPRISE_ID = "X-Enterprise-Id";
-var HTTP_HEADER_TENANT_ID = "X-Tenant-Id";
-var HTTP_HEADER_NO_AUTHORIZATION = "X-No-Authorization";
-var HTTP_HEADER_NO_USER_ID = "X-No-User-Id";
-var HTTP_HEADER_NO_ENTERPRISE_ID = "X-No-Enterprise-Id";
-var HTTP_HEADER_NO_DEPARTMENT_INFO = "X-No-Department-Info";
-var HTTP_HEADER_REFRESH_TOKEN = "X-Refresh-Token";
-var HTTP_HEADER_AUTH_REFRESH_SOURCE = "X-Auth-Refresh-Source";
-var HTTP_HEADER_PRODUCT = "X-Product";
-var HTTP_HEADER_PRODUCT_CODE = "X-Product-Code";
-var BUDDY_USER_AGENT = "CodeBuddyIDE/1.106.1";
-var BUDDY_DEPLOYMENT_TYPE = "SaaS";
-var AUTH_REFRESH_SOURCE = "ide-main";
-var API_DOMAIN = "copilot.tencent.com";
-function credentialExpiresAtMs(credential) {
-  const raw = credential.expires_at;
-  if (typeof raw === "string" && raw.length > 0) {
-    if (/^\d+$/.test(raw)) {
-      const value = Number(raw);
-      return value > 1e12 ? value : value * 1e3;
-    }
-    const parsed = Date.parse(raw);
-    if (!Number.isNaN(parsed)) return parsed;
-  }
-  return jwtExpiresAtMs(credential.access_token);
-}
-function jwtExpiresAtMs(token) {
-  if (typeof token !== "string" || token.length === 0) return void 0;
-  const parts = token.split(".");
-  if (parts.length < 2) return void 0;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    return typeof payload.exp === "number" && Number.isFinite(payload.exp) ? payload.exp * 1e3 : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function jwtNickname(token) {
-  if (typeof token !== "string" || token.length === 0) return "";
-  const parts = token.split(".");
-  if (parts.length < 2) return "";
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    const nickname = payload.nickname ?? payload.preferred_username ?? payload.name;
-    return typeof nickname === "string" ? stripControlChars(nickname) : "";
-  } catch {
-    return "";
-  }
-}
-function isExpired(credential) {
-  const expiresAt = credentialExpiresAtMs(credential);
-  return expiresAt === void 0 ? false : Date.now() >= expiresAt;
-}
-function isRefreshable(credential) {
-  return credential.refresh_token.length > 0;
-}
-function credentialRequestHeaders(credential) {
-  const headers = {
-    [HTTP_HEADER_DOMAIN]: credential.domain || API_DOMAIN,
-    "User-Agent": BUDDY_USER_AGENT
-  };
-  if (credential.enterprise_id !== void 0 && credential.enterprise_id.length > 0) {
-    headers[HTTP_HEADER_ENTERPRISE_ID] = credential.enterprise_id;
-    headers[HTTP_HEADER_TENANT_ID] = credential.enterprise_id;
-  }
-  return headers;
-}
-function credentialAuthHeaders(credential) {
-  return {
-    ...credentialRequestHeaders(credential),
-    Authorization: `Bearer ${credential.access_token}`
-  };
-}
-function readStringField(data, key) {
-  const value = data[key];
-  if (typeof value === "string") return stripControlChars(value);
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return "";
-}
-function stripControlChars(value) {
-  return value.replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s{2,}/g, " ").trim();
-}
-function readNumberField(data, key) {
-  const value = data[key];
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
-  return void 0;
-}
-function absoluteExpiryMs(record, absoluteKey, relativeKey, accessToken) {
-  const absolute = readStringField(record, absoluteKey);
-  if (absolute.length > 0) {
-    const asNumber = /^\d+$/.test(absolute) ? Number(absolute) : Date.parse(absolute);
-    if (Number.isFinite(asNumber)) {
-      const ms = asNumber > 1e12 ? asNumber : asNumber * 1e3;
-      return String(ms);
-    }
-    return absolute;
-  }
-  const relativeSeconds = readNumberField(record, relativeKey);
-  if (relativeSeconds === void 0) {
-    return absoluteKey === "expiresAt" ? "" : "";
-  }
-  const baseMs = jwtIssuedAtMs(accessToken) ?? Date.now();
-  return String(baseMs + relativeSeconds * 1e3);
-}
-function jwtIssuedAtMs(token) {
-  if (typeof token !== "string" || token.length === 0) return void 0;
-  const parts = token.split(".");
-  if (parts.length < 2) return void 0;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    return typeof payload.iat === "number" && Number.isFinite(payload.iat) ? payload.iat * 1e3 : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function parseTokenData(data) {
-  const record = typeof data === "object" && data !== null ? data : {};
-  const tokenType = readStringField(record, "tokenType");
-  const accessToken = readStringField(record, "accessToken");
-  return {
-    accessToken,
-    refreshToken: readStringField(record, "refreshToken"),
-    expiresAt: absoluteExpiryMs(record, "expiresAt", "expiresIn", accessToken),
-    refreshExpiresAt: absoluteExpiryMs(record, "refreshExpiresAt", "refreshExpiresIn", accessToken),
-    tokenType: tokenType.length > 0 ? tokenType : "Bearer",
-    scope: readStringField(record, "scope"),
-    domain: readStringField(record, "domain")
-  };
-}
-function parseAccountData(data) {
-  const record = typeof data === "object" && data !== null ? data : {};
-  const accountType = readStringField(record, "type");
-  return {
-    uid: readStringField(record, "uid"),
-    nickname: readStringField(record, "nickname"),
-    enterpriseId: readStringField(record, "enterpriseId"),
-    accountType: accountType.length > 0 ? accountType : "personal"
-  };
-}
-function buildCredential(token, account) {
-  const nickname = account.nickname.length > 0 ? account.nickname : jwtNickname(token.accessToken);
-  return {
-    access_token: token.accessToken,
-    refresh_token: token.refreshToken,
-    expires_at: token.expiresAt,
-    refresh_expires_at: token.refreshExpiresAt,
-    token_type: token.tokenType,
-    scope: token.scope,
-    domain: token.domain,
-    user_id: account.uid.length > 0 ? account.uid : jwtSubject(token.accessToken),
-    nickname,
-    enterprise_id: account.enterpriseId,
-    account_type: account.accountType
-  };
-}
-function jwtSubject(token) {
-  if (typeof token !== "string" || token.length === 0) return "";
-  const parts = token.split(".");
-  if (parts.length < 2) return "";
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    return typeof payload.sub === "string" ? payload.sub : "";
-  } catch {
-    return "";
-  }
-}
-var MODEL_DISPLAY_NAMES = {
-  "deepseek-v4-flash": "DeepSeek V4 Flash",
-  "deepseek-v4-pro": "DeepSeek V4 Pro",
-  "hy4-preview": "Hy4 Preview",
-  "hy4-preview-x": "Hy4 Preview X",
-  "hy3": "Hy3",
-  "hy3-x": "Hy3 X",
-  "glm-5.3": "GLM-5.3",
-  "glm-5.3-flash": "GLM-5.3 Flash",
-  "glm-5.2": "GLM-5.2",
-  "glm-5.1": "GLM-5.1",
-  "glm-5v-turbo": "GLM-5V Turbo",
-  "kimi-k3-1": "Kimi K3-1",
-  "kimi-k2.7": "Kimi K2.7",
-  "kimi-k2.6": "Kimi K2.6",
-  "minimax-m3": "MiniMax M3"
-};
-function displayNameForModel(id) {
-  return MODEL_DISPLAY_NAMES[id] ?? id;
-}
-function normalizeCreditsRate(value) {
-  return normalizeRate(value, /^(?:x(\d+(?:\.\d+)?))\b/i, /^(\d+(?:\.\d+)?)x\b/i);
-}
-function normalizeDiscountedRate(value) {
-  return normalizeRate(value, /^(?:x(\d+(?:\.\d+)?))\b/i, /^(\d+(?:\.\d+)?)x\b/i);
-}
-function normalizeRate(value, prefixed, suffixed) {
-  if (typeof value !== "string") return void 0;
-  const text = value.trim();
-  const head = text.split(/\s+/)[0] ?? "";
-  const match = prefixed.exec(head) ?? suffixed.exec(head);
-  return match?.[1] !== void 0 ? `x${match[1]}` : void 0;
-}
-function parseHHMM(value) {
-  if (typeof value !== "string") return void 0;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-  if (m === null) return void 0;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  return h < 24 && min < 60 ? h * 60 + min : void 0;
-}
-function zonedMinutes(now, timeZone) {
-  const zone = typeof timeZone === "string" && timeZone.length > 0 ? timeZone : "Asia/Shanghai";
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: zone,
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23"
-    }).formatToParts(now);
-    const h = Number(parts.find((p) => p.type === "hour")?.value);
-    const m = Number(parts.find((p) => p.type === "minute")?.value);
-    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function hasTimeWindow(schedule) {
-  return Array.isArray(schedule.daily) && schedule.daily.length > 0 || schedule.validFrom !== void 0 || schedule.validUntil !== void 0;
-}
-function promotionActiveNow(item, now) {
-  const raw = item.schedule;
-  if (typeof raw !== "object" || raw === null) return true;
-  const schedule = raw;
-  const from = typeof schedule.validFrom === "string" ? Date.parse(schedule.validFrom) : Number.NaN;
-  const until = typeof schedule.validUntil === "string" ? Date.parse(schedule.validUntil) : Number.NaN;
-  if (Number.isFinite(from) && now.getTime() < from) return false;
-  if (Number.isFinite(until) && now.getTime() >= until) return false;
-  if (!Array.isArray(schedule.daily) || schedule.daily.length === 0) return true;
-  const minutes = zonedMinutes(now, schedule.timezone);
-  if (minutes === void 0) return true;
-  return schedule.daily.some((slot2) => {
-    if (typeof slot2 !== "object" || slot2 === null) return false;
-    const start = parseHHMM(slot2.start);
-    const end = parseHHMM(slot2.end);
-    if (start === void 0 || end === void 0) return false;
-    return start <= end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
-  });
-}
-function parsePromotions(record, now = /* @__PURE__ */ new Date()) {
-  const result = /* @__PURE__ */ new Map();
-  const chosen = /* @__PURE__ */ new Map();
-  const promotions = record.modelPromotions;
-  if (!Array.isArray(promotions)) return result;
-  const sorted = [...promotions].sort((a, b) => priorityOf(a) - priorityOf(b));
-  for (const item of sorted) {
-    if (typeof item !== "object" || item === null) continue;
-    const promotion = item;
-    if (promotion.enabled === false) continue;
-    if (!promotionActiveNow(promotion, now)) continue;
-    const discount = promotion.discount;
-    if (typeof discount !== "object" || discount === null) continue;
-    const detail = discount;
-    const factor = typeof detail.factor === "number" ? detail.factor : void 0;
-    const rawSchedule = promotion.schedule;
-    const windowed = typeof rawSchedule === "object" && rawSchedule !== null && hasTimeWindow(rawSchedule);
-    let rate;
-    if (factor === 0) {
-      if (!windowed) continue;
-      rate = "\u514D\u8D39";
-    } else {
-      rate = normalizeDiscountedRate(detail.discountedCredits);
-      if (rate === "x0") continue;
-    }
-    if (rate === void 0) continue;
-    const modelIds = promotion.modelIds;
-    if (!Array.isArray(modelIds)) continue;
-    const priority = priorityOf(promotion);
-    for (const id of modelIds) {
-      if (typeof id !== "string" || id.length === 0) continue;
-      const previous = chosen.get(id);
-      if (previous !== void 0 && previous > priority) continue;
-      chosen.set(id, priority);
-      result.set(id, rate);
-    }
-  }
-  return result;
-}
-function priorityOf(item) {
-  if (typeof item !== "object" || item === null) return 0;
-  const priority = item.priority;
-  return typeof priority === "number" && Number.isFinite(priority) ? priority : 0;
-}
-function formatCreditsRate(rate, discounted) {
-  if (rate === void 0) return discounted;
-  return discounted !== void 0 ? `${rate}\u2192${discounted}` : rate;
-}
-function parseModelsFromConfig(body) {
-  if (typeof body !== "object" || body === null) return [];
-  const data = body.data;
-  if (typeof data !== "object" || data === null) return [];
-  const record = data;
-  const metaById = /* @__PURE__ */ new Map();
-  if (Array.isArray(record.models)) {
-    for (const model of record.models) {
-      if (typeof model !== "object" || model === null) continue;
-      const entry = model;
-      if (typeof entry.id === "string") metaById.set(entry.id, entry);
-    }
-  }
-  const promotions = parsePromotions(record);
-  const agentReferencedIds = /* @__PURE__ */ new Set();
-  if (Array.isArray(record.agents)) {
-    for (const agent of record.agents) {
-      if (typeof agent !== "object" || agent === null) continue;
-      const models = agent.models;
-      if (!Array.isArray(models)) continue;
-      for (const model of models) if (typeof model === "string") agentReferencedIds.add(model);
-    }
-  }
-  const parsed = [];
-  const seen = /* @__PURE__ */ new Set();
-  const push = (id) => {
-    if (isAutoSelectAlias(id) || seen.has(id) || !isChatModel(id, metaById.get(id))) return;
-    seen.add(id);
-    const meta = metaById.get(id);
-    const remoteName = typeof meta?.name === "string" && meta.name.length > 0 ? meta.name : void 0;
-    const rate = normalizeCreditsRate(meta?.credits);
-    const discounted = promotions.get(id);
-    parsed.push({
-      id,
-      name: remoteName ?? displayNameForModel(id),
-      ...parseModelMeta(meta),
-      ...rate !== void 0 ? { creditsRate: rate } : {},
-      ...discounted !== void 0 ? { discountedCreditsRate: discounted } : {},
-      ...agentReferencedIds.has(id) ? { agentReferenced: true } : {}
-    });
-  };
-  for (const agentName of PREFERRED_AGENT_NAMES) {
-    let found = false;
-    const agents = record.agents;
-    if (!Array.isArray(agents)) break;
-    for (const agent of agents) {
-      if (typeof agent !== "object" || agent === null) continue;
-      const agentRecord = agent;
-      if (agentRecord.name !== agentName) continue;
-      if (Array.isArray(agentRecord.models)) {
-        for (const model of agentRecord.models) {
-          if (typeof model === "string") push(model);
-        }
-      }
-      found = true;
-      break;
-    }
-    if (found) break;
-  }
-  for (const id of metaById.keys()) push(id);
-  for (const id of trialModelIds(record)) {
-    if (isAutoSelectAlias(id) || seen.has(id)) continue;
-    seen.add(id);
-    const meta = metaById.get(id);
-    const rate = normalizeCreditsRate(meta?.credits);
-    const discounted = promotions.get(id);
-    parsed.push({
-      id,
-      name: displayNameForModel(id),
-      ...parseModelMeta(meta),
-      ...rate !== void 0 ? { creditsRate: rate } : {},
-      ...discounted !== void 0 ? { discountedCreditsRate: discounted } : {},
-      // 试用横幅本身就是「服务端推荐可用」的信号，与 agent 引用同义。
-      agentReferenced: true
-    });
-  }
-  return parsed;
-}
-var PREFERRED_AGENT_NAMES = ["cli", "craft"];
-function trialModelIds(data) {
-  const features = data.productFeaturesConfig;
-  if (typeof features !== "object" || features === null) return [];
-  const banner = features.ModelTrialBanner;
-  if (typeof banner !== "object" || banner === null) return [];
-  const banners = banner.banners;
-  if (!Array.isArray(banners)) return [];
-  const ids = [];
-  for (const item of banners) {
-    if (typeof item !== "object" || item === null) continue;
-    const target = item.targetModelId;
-    if (typeof target === "string" && target.length > 0) ids.push(target);
-  }
-  return ids;
-}
-function isAutoSelectAlias(id) {
-  return id === "auto" || id === "default";
-}
-function isChatModel(id, meta) {
-  if (id.startsWith("nes-") || id.startsWith("completion-") || id.startsWith("codewise-")) return false;
-  if (meta?.supportsExtra === true) return false;
-  const maxOutput = meta?.maxOutputTokens;
-  if (typeof maxOutput === "number" && maxOutput > 0 && maxOutput <= 256) return false;
-  const tags = meta?.tags;
-  if (Array.isArray(tags) && tags.some((tag2) => tag2 === "text-to-image")) return false;
-  return true;
-}
-function parseModelMeta(record) {
-  if (record === void 0) return {};
-  const meta = {};
-  const limit = record.maxInputTokens;
-  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) meta.contextWindow = limit;
-  const maxOutput = record.maxOutputTokens;
-  if (typeof maxOutput === "number" && Number.isFinite(maxOutput) && maxOutput > 0) {
-    meta.maxOutputTokens = maxOutput;
-  }
-  if (typeof record.supportsImages === "boolean") meta.supportsImages = record.supportsImages;
-  const reasoning = record.reasoning;
-  if (typeof reasoning === "object" && reasoning !== null) {
-    const fields = reasoning;
-    if (Array.isArray(fields.supportedEfforts)) {
-      const efforts = fields.supportedEfforts.filter((e) => typeof e === "string" && e.length > 0);
-      if (efforts.length > 0) meta.reasoningEfforts = efforts;
-    }
-    if (typeof fields.defaultEffort === "string" && fields.defaultEffort.length > 0) {
-      meta.defaultReasoningEffort = fields.defaultEffort;
-    }
-  }
-  return meta;
-}
-
-// vendor/channel-pack/src/product.ts
-var WORKBUDDY_UA_INTL = "WorkBuddy/5.5.2 WorkBuddy AI/5.5.2 CLI/5.5.2";
-var WORKBUDDY_UA_CN = "WorkBuddy/5.5.2 WorkBuddy/5.5.2 CLI/5.5.2";
-var CODEBUDDY_FALLBACK_MODELS = [
-  {
-    id: "hy4-preview",
-    name: "Hy4 preview",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "hy3",
-    name: "Hy3",
-    contextWindow: 192e3,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "hy3-x",
-    name: "Hy3",
-    contextWindow: 192e3,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    // maxOutputTokens 实测（2026-09-19）：scoped 端点 128000、/v3/config 131072。
-    // 取 **128000**（两个端点的较小者）：它是服务端真正接受的额度，131072 是
-    // /v3/config 的声明值。取小者避免因端点差异被上游拒绝；远端可用时仍以
-    // 远端下发值为准，本字段只在远端缺失时补位。
-    id: "deepseek-v4.1-flash",
-    name: "Deepseek-V4.1-Flash",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "deepseek-v4-pro",
-    name: "Deepseek-V4-Pro",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "xhigh"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    // 2026-09 补录：远端 /v3/config 与 scoped 端点均返回该模型，且实测能看图
-    // （纯红图问答答出「红色」）。它不在 craft/cli agent 白名单里，但可正常调用，
-    // 也是适配器 DEFAULT_MODEL 的取值。
-    //
-    // 档位沿用适配器静态表 REASONING_EFFORTS 的既有取值 [low,high,max]（该表有
-    // 实测依据：三档会显著改变返回的 reasoning_content 长度）。注意上游
-    // /v3/config 声明的是 [low,high,xhigh]，与本表不一致；实测服务端对 low /
-    // medium / high / xhigh / max 一律返回 200（不报非法参数），无法据此判定
-    // 哪一组才真实生效，故不擅自改动既有行为，仅记录该分歧待后续验证。
-    id: "deepseek-v4-flash",
-    name: "Deepseek-V4-Flash",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 5e4
-  },
-  {
-    id: "glm-5.3",
-    name: "GLM-5.3",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "glm-5.3-flash",
-    name: "GLM-5.3-Flash",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 32e3
-  },
-  {
-    id: "glm-5.2",
-    name: "GLM-5.2",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high", "xhigh"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    // supportsImages 为 true 有实测依据：纯红图问答答出「红色」。
-    // 注意 scoped 端点（/console/enterprises/personal/models）对它返回
-    // supportsImages=false，与 /v3/config、IDE 缓存、wb2api 清单三处矛盾；
-    // 实测以「能看到图」为准，故保留 true（远端若下发 true 则两者一致，
-    // 只有 scoped 端点先命中时才会被它的 false 覆盖，见 buddy-adapter 的
-    // supportsImagesFor 修正）。
-    id: "glm-5.1",
-    name: "GLM-5.1",
-    contextWindow: 2e5,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 48e3
-  },
-  {
-    id: "glm-5v-turbo",
-    name: "GLM-5V-Turbo",
-    contextWindow: 2e5,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "kimi-k3-1",
-    name: "Kimi-K3-1",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 32e3
-  },
-  {
-    // 2026-09 补录：旧注释曾把它列为「service info not found」而排除，但实测
-    // 可正常调用且能看图（纯红图问答答出「红色」），远端两端点也都在下发。
-    id: "kimi-k2.8-preview",
-    name: "Kimi-K2.8-Preview",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "kimi-k2.7",
-    name: "Kimi-K2.7",
-    contextWindow: 256e3,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 32e3
-  },
-  {
-    id: "kimi-k2.6",
-    name: "Kimi-K2.6",
-    contextWindow: 256e3,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 32e3
-  },
-  {
-    id: "minimax-m3",
-    name: "MiniMax-M3",
-    contextWindow: 512e3,
-    supportsImages: true,
-    reasoningEfforts: ["medium"],
-    maxOutputTokens: 64e3
-  }
-];
-var CODEBUDDY = {
-  id: "buddy",
-  platform: "ide",
-  endpoint: "https://copilot.tencent.com",
-  apiDomain: "copilot.tencent.com",
-  displayName: "CodeBuddy (\u817E\u8BAF)",
-  productCode: "codebuddy",
-  userAgent: "CodeBuddyIDE/1.106.1",
-  // 中国版只有一条产品线，无需按模型分档：全部模型沿用 IDE UA。
-  userAgentByModelFamily: [],
-  attributionName: "CodeBuddy",
-  clientVersion: "1.106.1",
-  cliVersion: "2.137.1",
-  defaultCredentialRef: "BUDDY_ACCESS_TOKEN",
-  appendSessionParams: false,
-  fallbackModels: CODEBUDDY_FALLBACK_MODELS
-};
-var WORKBUDDY_FALLBACK_MODELS = [
-  // 注：以下 maxOutputTokens 全部来自 2026-09-19 对国际版 `/v3/config` 的实测
-  // （`node scripts/dump-max-output.mjs`）。该值就是用户在 IDE 里实际拿到的
-  // 单次输出额度，远端不可用时由本表顶替。远端未下发的模型保持 undefined。
-  { id: "default-model", name: "Auto", contextWindow: 176e3, supportsImages: true, maxOutputTokens: 24e3 },
-  { id: "fast-model", name: "Fast", contextWindow: 2e5, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
-  { id: "balanced-model", name: "Balanced", contextWindow: 256e3, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
-  { id: "primary-model", name: "Primary", contextWindow: 272e3, supportsImages: true, reasoningEfforts: ["high"], maxOutputTokens: 72e3 },
-  { id: "deep-model", name: "Deep", contextWindow: 176e3, supportsImages: true, maxOutputTokens: 24e3 },
-  {
-    id: "hy4-preview-f",
-    name: "Hy4 preview",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    // 2026-09 补录：/v3/config 的 cli agent 白名单里有它，但兜底表原先漏了，
-    // 于是被 reconcileWithFallback 丢弃、模型选择器里看不到。实测能看图。
-    id: "hy4-preview",
-    name: "Hy4 preview",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  {
-    id: "hy3",
-    name: "Hy3",
-    contextWindow: 192e3,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 64e3
-  },
-  { id: "deepseek-v4.1-flash", name: "Deepseek-V4.1-Flash", contextWindow: 1e6, supportsImages: true, reasoningEfforts: ["high"], defaultReasoningEffort: "high", maxOutputTokens: 128e3 },
-  {
-    // 2026-09 补录：新加坡区的同代模型（-sg 后缀），远端下发且实测能看图。
-    id: "deepseek-v4.1-flash-sg",
-    name: "Deepseek-V4.1-Flash",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-6-astra",
-    name: "GPT-6-Astra",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-5.6-sol",
-    name: "GPT-5.6-Sol",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-5.6-terra",
-    name: "GPT-5.6-Terra",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-5.6-luna",
-    name: "GPT-5.6-Luna",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-5.5",
-    name: "GPT-5.5",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 128e3
-  },
-  {
-    id: "gpt-5.4",
-    name: "GPT-5.4",
-    contextWindow: 272e3,
-    supportsImages: true,
-    reasoningEfforts: ["low", "medium", "high", "xhigh"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 72e3
-  },
-  // gpt-5.3-codex：远端未下发 maxOutputTokens，故不填（保持 undefined，
-  // 交由网关默认），不臆造数值。
-  { id: "gpt-5.3-codex", name: "GPT-5.3-Codex", contextWindow: 272e3, supportsImages: true, reasoningEfforts: ["medium"] },
-  { id: "gemini-3.5-flash", name: "Gemini-3.5-Flash", contextWindow: 1e6, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 65536 },
-  {
-    id: "glm-5.3",
-    name: "GLM-5.3",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 48e3
-  },
-  {
-    id: "glm-5.2",
-    name: "GLM-5.2",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["high", "xhigh"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 48e3
-  },
-  { id: "kimi-k3", name: "Kimi-K3", contextWindow: 1e6, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 },
-  {
-    // 2026-09 补录：远端 /v3/config 的 cli agent 白名单里有它，兜底表原先漏了。
-    id: "kimi-k2.8-preview",
-    name: "Kimi-K2.8-Preview",
-    contextWindow: 1e6,
-    supportsImages: true,
-    reasoningEfforts: ["low", "high", "max"],
-    defaultReasoningEffort: "high",
-    maxOutputTokens: 32e3
-  },
-  { id: "kimi-k2.6", name: "Kimi-K2.6", contextWindow: 256e3, supportsImages: true, reasoningEfforts: ["medium"], maxOutputTokens: 32e3 }
-];
-var WORKBUDDY = {
-  id: "workbuddy",
-  platform: "workbuddy-ai",
-  endpoint: "https://www.workbuddy.ai",
-  apiDomain: "www.workbuddy.ai",
-  displayName: "WorkBuddy (\u56FD\u9645\u7248)",
-  productCode: "workbuddy",
-  // 默认档：国际版产品形态（无按模型命中时使用）。
-  userAgent: WORKBUDDY_UA_INTL,
-  userAgentByModelFamily: [
-    // 国际版独有模型线（GPT / Gemini / Claude 系）→ 国际版形态。
-    { match: "gpt-", ua: WORKBUDDY_UA_INTL },
-    { match: "gemini-", ua: WORKBUDDY_UA_INTL },
-    { match: "claude-", ua: WORKBUDDY_UA_INTL },
-    // 国内系模型（glm / hy / kimi / minimax）→ 国内客户端形态。
-    { match: "glm-", ua: WORKBUDDY_UA_CN },
-    { match: "hy", ua: WORKBUDDY_UA_CN },
-    { match: "kimi-", ua: WORKBUDDY_UA_CN },
-    { match: "minimax-", ua: WORKBUDDY_UA_CN }
-  ],
-  attributionName: "WorkBuddy",
-  clientVersion: "5.5.2",
-  cliVersion: "5.5.2",
-  defaultCredentialRef: "WORKBUDDY_ACCESS_TOKEN",
-  appendSessionParams: true,
-  pluginVersion: "5.5.2",
-  fallbackModels: WORKBUDDY_FALLBACK_MODELS
-};
-var ALL_PRODUCTS = [CODEBUDDY, WORKBUDDY];
-function productById(id) {
-  return ALL_PRODUCTS.find((product) => product.id === id);
-}
-function resolveUserAgent(product, model) {
-  for (const rule of product.userAgentByModelFamily ?? []) {
-    if (model.startsWith(rule.match)) return rule.ua;
-  }
-  return product.userAgent;
-}
-
 // vendor/channel-pack/src/image-budget.ts
 var REQUEST_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 var RACCOON_REQUEST_IMAGE_MAX_BYTES = 512 * 1024;
@@ -34639,6 +35172,11 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
     this.product = options.product ?? CODEBUDDY;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.sessionId = options.sessionId ?? crypto.randomUUID().replace(/-/g, "");
+    this.catalogGate = new RemoteCatalogGate({
+      ...options.now === void 0 ? {} : { now: options.now },
+      ...options.catalogCooldownMs === void 0 ? {} : { cooldownMs: options.catalogCooldownMs },
+      ...options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    });
     const fallback = this.product.fallbackModels ?? [];
     this.productFallbackIndex = new Map(fallback.map((model) => [model.id, model]));
     this.productFallbackContextWindows = new Map(
@@ -34659,7 +35197,16 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
    * 目录加载闸门：并发去重 + 失败/空结果冷却。
    * 依据见 `src/remote-catalog-gate.ts`（首屏「加载模型巨长」的实测归因）。
    */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
+  /**
+   * 远端目录是否**已完整**（scoped 与 `/v3/config` 都取到了）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**，
+   * 只能重启 DSH 才能恢复。用户可见症状正是报障原话「hy4 preview 现在 ide 是
+   * 免费我们还是 0.29」—— 促销倍率只由**失败的那个端点**下发。
+   */
+  remoteComplete = false;
   /** 远端下发的模型元数据（id → 能力），listModels/resolveModel/stream 共用。 */
   remoteMeta = /* @__PURE__ */ new Map();
   /** 远端下发的模型上下文窗口（/v3/config data.models[].maxInputTokens）。 */
@@ -34756,7 +35303,7 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
   }
   async ensureRemoteModels() {
     const fetchRemote = this.options.fetchRemoteModels;
-    if (this.remoteModels !== void 0 || fetchRemote === void 0) return;
+    if (this.remoteComplete || fetchRemote === void 0) return;
     await this.catalogGate.run(async () => {
       const models = await fetchRemote();
       if (models.length === 0) return false;
@@ -34766,7 +35313,8 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
       this.remoteContextWindows = new Map(
         reconciled.filter((model) => model.contextWindow !== void 0).map((model) => [model.id, model.contextWindow])
       );
-      return true;
+      this.remoteComplete = this.options.catalogComplete?.() ?? true;
+      return { got: true, complete: this.remoteComplete };
     });
   }
   /**
@@ -35588,7 +36136,7 @@ import {
 import { ToolCallId as ToolCallId3 } from "@deepseek-ai/dsh-llm";
 
 // vendor/channel-pack/src/lobsterai.ts
-import { createHash } from "node:crypto";
+import { createHash as createHash2 } from "node:crypto";
 var LOBSTERAI_EXCHANGE_PATH = "/api/auth/exchange";
 var LOBSTERAI_REFRESH_PATH = "/api/auth/refresh";
 var LOBSTERAI_MODELS_PATH = "/api/models/available";
@@ -35708,7 +36256,7 @@ function resolveLobsteraiUid(payload) {
   for (const candidate of [payload.userId, payload.accountUserId, payload.yid]) {
     if (candidate !== void 0 && candidate.length > 0) return candidate;
   }
-  return createHash("sha256").update(payload.accessToken).digest("hex").slice(0, 16);
+  return createHash2("sha256").update(payload.accessToken).digest("hex").slice(0, 16);
 }
 function buildLobsteraiCredential(payload, session) {
   const expiresAt = payload.expiresIn !== void 0 && payload.expiresIn > 0 ? String(Date.now() + payload.expiresIn * 1e3) : (() => {
@@ -36230,6 +36778,9 @@ var LobsteraiAdapter = class extends LlmAdapter3 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? LOBSTERAI;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.fallbackIndex = new Map(
@@ -36244,7 +36795,7 @@ var LobsteraiAdapter = class extends LlmAdapter3 {
    * 目录加载闸门：并发去重 + 失败/空结果冷却。
    * 依据见 `src/remote-catalog-gate.ts`（首屏「加载模型巨长」的实测归因）。
    */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /** 远端下发的模型元数据（id → 条目），listModels/resolveModel 共用。 */
   remoteMeta = /* @__PURE__ */ new Map();
   /** 产品级兜底模型索引（`product.fallbackModels` 的 id → 条目）。 */
@@ -36871,7 +37422,7 @@ function buildLobsteraiModelsUrl(product, credential, clientVersion) {
 import { LlmAdapter as LlmAdapter4, LlmError as LlmError7, ReasoningEffortId as ReasoningEffortId4 } from "@deepseek-ai/dsh-llm";
 
 // vendor/channel-pack/src/qoder.ts
-import { createHash as createHash2, randomUUID, randomBytes } from "node:crypto";
+import { createHash as createHash3, randomUUID as randomUUID2, randomBytes as randomBytes3 } from "node:crypto";
 var QODER_REQUEST_TIMEOUT_MS = 3e4;
 var QODER_LOGIN_TIMEOUT_MS = 3e5;
 var QODER_POLL_INTERVAL_MS = 1e3;
@@ -36883,19 +37434,19 @@ var QODER_USERINFO_PATH = "/api/v1/userinfo";
 var PKCE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 function createQoderPkce() {
   const length = 43 + Math.floor(86 * Math.random());
-  const bytes = randomBytes(length);
+  const bytes = randomBytes3(length);
   let verifier = "";
   for (let i = 0; i < length; i++) {
     verifier += PKCE_ALPHABET[bytes[i] % PKCE_ALPHABET.length];
   }
-  const challenge = createHash2("sha256").update(verifier).digest().toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const challenge = createHash3("sha256").update(verifier).digest().toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   return { verifier, challenge };
 }
 function createQoderDeviceSession(machineId) {
   return {
     pkce: createQoderPkce(),
-    nonce: randomUUID(),
-    machineId: machineId ?? randomUUID()
+    nonce: randomUUID2(),
+    machineId: machineId ?? randomUUID2()
   };
 }
 function buildQoderAuthUrl(session, product) {
@@ -37133,7 +37684,7 @@ async function createGlue() {
     }
     return cachedView;
   };
-  const readString8 = (ptr, len) => decoder2.decode(heap().subarray(ptr >>> 0, (ptr >>> 0) + len));
+  const readString9 = (ptr, len) => decoder2.decode(heap().subarray(ptr >>> 0, (ptr >>> 0) + len));
   const objects = new Array(1024).fill(void 0);
   objects.push(void 0, null, true, false);
   let firstFree = objects.length;
@@ -37172,7 +37723,7 @@ async function createGlue() {
       len = v.getInt32(stack + 4, true);
       const isError = v.getInt32(stack + 12, true);
       if (isError) throw takeObject(v.getInt32(stack + 8, true));
-      return readString8(ptr, len);
+      return readString9(ptr, len);
     } finally {
       exports.__wbindgen_add_to_stack_pointer(16);
       if (ptr) exports.__wbindgen_export4(ptr, len, 1);
@@ -37202,7 +37753,7 @@ async function createGlue() {
     __wbindgen_object_drop_ref: (a) => takeObject(a),
     __wbindgen_object_clone_ref: (a) => pushObject(heapObject(a)),
     __wbindgen_cast_0000000000000001: (a, e) => pushObject(heap().subarray(a >>> 0, (a >>> 0) + e)),
-    __wbindgen_cast_0000000000000002: (a, e) => pushObject(readString8(a, e)),
+    __wbindgen_cast_0000000000000002: (a, e) => pushObject(readString9(a, e)),
     __wbg_set_08463b1df38a7e29: (a, e, t) => pushObject(heapObject(a).set(heapObject(e), heapObject(t))),
     // ⚠️ 这两个签名**方向相反**：一个写 wasm 内存，一个调 JS 对象。
     // 写反会得到 Rust panic `unreachable`。
@@ -37240,9 +37791,9 @@ async function createGlue() {
     __wbg_static_accessor_SELF_24f78b6d23f286ea: () => globalThis.self === void 0 ? 0 : pushObject(globalThis.self),
     __wbg_static_accessor_WINDOW_59fd959c540fe405: () => globalThis.window === void 0 ? 0 : pushObject(globalThis.window),
     __wbg___wbindgen_throw_81fc77679af83bc6: (p, l) => {
-      throw new Error(readString8(p, l));
+      throw new Error(readString9(p, l));
     },
-    __wbg_Error_2e59b1b37a9a34c3: (p, l) => pushObject(new Error(readString8(p, l))),
+    __wbg_Error_2e59b1b37a9a34c3: (p, l) => pushObject(new Error(readString9(p, l))),
     __wbg___wbindgen_is_object_40c5a80572e8f9d3: (id) => {
       const v = heapObject(id);
       return typeof v === "object" && v !== null;
@@ -37257,7 +37808,7 @@ async function createGlue() {
     exports,
     heap,
     view,
-    readString: readString8,
+    readString: readString9,
     writeString,
     lastLength: () => lastLength,
     heapObject,
@@ -37940,6 +38491,16 @@ function errorDetail4(body) {
   } catch {
   }
   return body;
+}
+function detailFieldText(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const detail = value.detail;
+  if (typeof detail === "string") return detail.length > 0 ? detail : void 0;
+  if (detail !== null && typeof detail === "object" && !Array.isArray(detail)) {
+    const message2 = detail.message;
+    if (typeof message2 === "string" && message2.length > 0) return message2;
+  }
+  return void 0;
 }
 function httpErrorCode4(status) {
   if (status === 401 || status === 403) return "AUTH";
@@ -38782,14 +39343,14 @@ var QoderAdapter = class extends LlmAdapter4 {
     );
   }
   /** 发送一次**加密**推理请求（`agent_chat_generation`）。 */
-  async sendEncrypted(request2, options) {
-    const headers = new Headers(request2.headers);
+  async sendEncrypted(request3, options) {
+    const headers = new Headers(request3.headers);
     headers.set("Accept", "text/event-stream");
     try {
-      return await this.fetchImpl(request2.url, {
+      return await this.fetchImpl(request3.url, {
         method: "POST",
         headers,
-        body: request2.body,
+        body: request3.body,
         signal: options.signal
       });
     } catch (error) {
@@ -38916,7 +39477,7 @@ function canonicalReasoningEffortFor(effort) {
 }
 
 // vendor/channel-pack/src/trae.ts
-import { createHash as createHash3 } from "node:crypto";
+import { createHash as createHash4 } from "node:crypto";
 
 // vendor/channel-pack/src/trae-product.ts
 var TRAE_AGENT_HOST = "https://trae-api-cn.mchost.guru";
@@ -39134,7 +39695,7 @@ function seededStream(seed, salt, nbytes) {
     counterBuf[1] = counter >> 16 & 255;
     counterBuf[2] = counter >> 8 & 255;
     counterBuf[3] = counter & 255;
-    const h = createHash3("sha256");
+    const h = createHash4("sha256");
     h.update(prefix, "utf8");
     h.update(counterBuf);
     for (const b of h.digest()) {
@@ -39475,7 +40036,7 @@ function generateDeviceId() {
 }
 function deriveRotatingMachineId(baseMachineId, generation) {
   if (!Number.isFinite(generation) || generation <= 0) return baseMachineId;
-  return createHash3("sha256").update(`${baseMachineId}#machine${Math.floor(generation)}`, "utf8").digest("hex").slice(0, 32);
+  return createHash4("sha256").update(`${baseMachineId}#machine${Math.floor(generation)}`, "utf8").digest("hex").slice(0, 32);
 }
 var TRAE_DEFAULT_MAX_COMPLETION_TOKENS = 64e3;
 function resolveTraeMaxCompletionTokens() {
@@ -39964,6 +40525,9 @@ var TraeAdapter = class extends LlmAdapter5 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? TRAE;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.fallbackIndex = new Map(
@@ -39978,7 +40542,7 @@ var TraeAdapter = class extends LlmAdapter5 {
    * 目录加载闸门：并发去重 + 失败/空结果冷却。
    * 依据见 `src/remote-catalog-gate.ts`（首屏「加载模型巨长」的实测归因）。
    */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /** 远端模型元数据索引。 */
   remoteMeta = /* @__PURE__ */ new Map();
   /** 产品级兜底模型索引。 */
@@ -41087,9 +41651,20 @@ function mergeClineModels(product, remote) {
   for (const id of remote.remoteIds) push(id);
   return out;
 }
+function isClineRecommendedShape(value) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value;
+  return Array.isArray(record.free) || Array.isArray(record.recommended) || Array.isArray(record.clinePass);
+}
+function isClineModelsShape(value) {
+  if (typeof value !== "object" || value === null) return false;
+  return Array.isArray(value.data);
+}
 async function fetchClineRemoteModels(product, options = {}) {
   const fetcher = options.fetcher ?? fetch;
   const warnings = [];
+  let recommendedOk = false;
+  let modelsOk = false;
   const recommendedPromise = (async () => {
     try {
       const response = await fetcher(`${product.apiBase}${CLINE_RECOMMENDED_MODELS_PATH}`, {
@@ -41101,14 +41676,23 @@ async function fetchClineRemoteModels(product, options = {}) {
         warnings.push(`recommended-models HTTP ${response.status}`);
         return { free: [], recommended: [], clinePass: [] };
       }
-      return parseClineRecommendedModels(await response.json());
+      const payload = await response.json();
+      if (!isClineRecommendedShape(payload)) {
+        warnings.push("recommended-models \u54CD\u5E94\u5F62\u72B6\u4E0D\u53EF\u8BC6\u522B\uFF08\u7F3A free/recommended/clinePass \u6570\u7EC4\uFF09");
+        return { free: [], recommended: [], clinePass: [] };
+      }
+      recommendedOk = true;
+      return parseClineRecommendedModels(payload);
     } catch (error) {
       warnings.push(`recommended-models ${error instanceof Error ? error.message : String(error)}`);
       return { free: [], recommended: [], clinePass: [] };
     }
   })();
   const modelsPromise = (async () => {
-    if (options.credential === void 0) return [];
+    if (options.credential === void 0) {
+      warnings.push("models \u5DF2\u8DF3\u8FC7\uFF1A\u65E0\u53EF\u7528\u51ED\u636E\uFF08\u8BE5\u6765\u6E90\u7684\u6A21\u578B\u672C\u6B21\u672A\u83B7\u53D6\uFF09");
+      return [];
+    }
     try {
       const response = await fetcher(`${product.apiBase}${CLINE_MODELS_PATH}`, {
         method: "GET",
@@ -41119,7 +41703,13 @@ async function fetchClineRemoteModels(product, options = {}) {
         warnings.push(`models HTTP ${response.status}`);
         return [];
       }
-      return parseClineRemoteModelIds(await response.json());
+      const payload = await response.json();
+      if (!isClineModelsShape(payload)) {
+        warnings.push("models \u54CD\u5E94\u5F62\u72B6\u4E0D\u53EF\u8BC6\u522B\uFF08\u7F3A data \u6570\u7EC4\uFF09");
+        return [];
+      }
+      modelsOk = true;
+      return parseClineRemoteModelIds(payload);
     } catch (error) {
       warnings.push(`models ${error instanceof Error ? error.message : String(error)}`);
       return [];
@@ -41133,7 +41723,10 @@ async function fetchClineRemoteModels(product, options = {}) {
     // description，后者保证订阅制模型也能在列表里被发现（它们不是免费，
     // 但用户可能在 Cline 里已订阅）。
     entries: [...recommended.free, ...recommended.recommended, ...recommended.clinePass],
-    warnings
+    warnings,
+    // ⚠️ 完整性**由两个来源各自的取数结果给出**，不由 warnings 反推 —— 见
+    // `ClineRemoteModels.complete` 的注释（「跳过」与「取到」在 warnings 上同形）。
+    complete: recommendedOk && modelsOk
   };
 }
 async function loadClineModels(product, options = {}) {
@@ -41218,7 +41811,7 @@ var TtlCache = class {
 
 // vendor/channel-pack/src/cline-models-dev.ts
 var CLINE_MODELS_DEV_URL = "https://models.dev/api.json";
-var CLINE_MODELS_DEV_TIMEOUT_MS = 2e4;
+var CLINE_MODELS_DEV_TIMEOUT_MS = 6e4;
 var CLINE_MODELS_DEV_TTL_MS = 6 * 60 * 60 * 1e3;
 function parseClineModelsDev(value) {
   const out = /* @__PURE__ */ new Map();
@@ -41253,7 +41846,7 @@ function applyModelsDevCatalog(models, dev) {
   if (dev.size === 0) return [...models];
   const out = [];
   const present = new Set(models.map((model) => model.id));
-  const pending = /* @__PURE__ */ new Map();
+  const pending2 = /* @__PURE__ */ new Map();
   const prefixOf = (id) => {
     const slash = id.indexOf("/");
     return slash > 0 ? id.slice(0, slash) : "";
@@ -41261,15 +41854,25 @@ function applyModelsDevCatalog(models, dev) {
   for (const [id, entry] of dev) {
     if (present.has(id)) continue;
     const prefix = prefixOf(id);
-    const bucket = pending.get(prefix) ?? [];
+    const bucket = pending2.get(prefix) ?? [];
     bucket.push({
       id,
       name: entry.name ?? id,
       isFree: false,
       ...entry.contextWindow === void 0 ? {} : { contextWindow: entry.contextWindow },
-      ...entry.supportsImage ? { supportsImage: true } : {}
+      // ⚠️ **原样落 `supportsImage`（含 `false`），不能只写 true**（上游 issue IKKZUG）。
+      // 原写法 `...entry.supportsImage ? { supportsImage: true } : {}` 在 models.dev
+      // **明确说 false** 时让字段**缺席**，被读成「未知」而非「确认不支持」。
+      //
+      // ⚠️ 如实说明：**本 fork 当前无害** —— 我们的 `inputModalitiesFor` 是两态
+      //（`=== true ? ['text','image'] : ['text']`），`undefined` 与 `false` 外部行为一致；
+      // 上游那套「未知 vs 不支持」的三态改造（`c770cf8`）**不在本 fork**。
+      // 之所以仍然修：①它与本文件另一处（`fallbackCatalog`，本来就原样带 `false`）
+      // 口径不一致；②一旦将来移植三态改造，这就是个已埋好的静默错配
+      //（会按「未知」**放行**图片给不支持图的模型）。两处入口必须同修。
+      supportsImage: entry.supportsImage
     });
-    pending.set(prefix, bucket);
+    pending2.set(prefix, bucket);
   }
   const lastIndexOfPrefix = /* @__PURE__ */ new Map();
   models.forEach((model, index) => {
@@ -41282,43 +41885,67 @@ function applyModelsDevCatalog(models, dev) {
       // 网关把 id 当名字下发时（`name === id`）才用可读名替换。
       ...entry.name !== void 0 && model.name === model.id ? { name: entry.name } : {},
       ...model.contextWindow === void 0 && entry.contextWindow !== void 0 ? { contextWindow: entry.contextWindow } : {},
-      // ⚠️ `supportsImage` 只在**缺失**时补：本地兜底表显式 `false` 也照样赢。
-      ...model.supportsImage === void 0 && entry.supportsImage ? { supportsImage: true } : {}
+      // ⚠️ `supportsImage` 只在**本地缺失**时采用 models.dev 的值：本地兜底
+      // 表显式 `false` 也照样赢（策展数据优先于社区目录）。
+      // ⚠️ 但必须**原样采用，含 `false`**（上游 issue IKKZUG）—— 原写法
+      // `&& entry.supportsImage` 会在 dev 说 false 时让字段仍**缺席**，
+      // 与上面「补缺」分支是同一缺陷的两个入口，只修一个会从另一个漏回去。
+      // （本 fork 当前两态、无害；理由同上，为三态改造预留口径一致。）
+      ...model.supportsImage === void 0 ? { supportsImage: entry.supportsImage } : {}
     });
     const prefix = prefixOf(model.id);
     if (lastIndexOfPrefix.get(prefix) === index) {
-      const extra = pending.get(prefix);
+      const extra = pending2.get(prefix);
       if (extra !== void 0) {
         out.push(...extra);
-        pending.delete(prefix);
+        pending2.delete(prefix);
       }
     }
   });
-  for (const bucket of pending.values()) out.push(...bucket);
+  for (const bucket of pending2.values()) out.push(...bucket);
   return out;
 }
 function makeClineModelsDevLoader(options = {}) {
   const fetcher = options.fetcher ?? fetch;
+  let lastEtag;
+  let lastResult;
   const cache5 = new TtlCache({
     ttlMs: options.ttlMs ?? CLINE_MODELS_DEV_TTL_MS,
     ...options.now === void 0 ? {} : { now: options.now },
     load: async () => {
       const response = await fetcher(CLINE_MODELS_DEV_URL, {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers: {
+          Accept: "application/json",
+          // ⚠️ **必须显式声明**（上游 issue IKKZUG）：服务端支持 Brotli，而
+          // Node 原生 `fetch` **默认不带** `Accept-Encoding` ⇒ 每次都在下
+          // **解压后 5.39 MB** 的明文。代价不只是慢，而是**极易撞上超时上限**
+          // （成功那次只用 1.9 秒，失败的都是整段卡死）。
+          "Accept-Encoding": "br, gzip",
+          // 条件请求：带上次的 ETag，命中就只回一个 304 而不重下 5.39MB。
+          ...lastEtag === void 0 ? {} : { "If-None-Match": lastEtag }
+        },
         signal: AbortSignal.timeout(CLINE_MODELS_DEV_TIMEOUT_MS)
       });
+      if (response.status === 304) {
+        if (lastResult !== void 0) return lastResult;
+        throw new Error("models.dev \u8FD4\u56DE 304 \u4F46\u672C\u5730\u6CA1\u6709\u53EF\u56DE\u843D\u7684\u7ED3\u679C");
+      }
       if (!response.ok) throw new Error(`models.dev HTTP ${response.status}`);
-      return parseClineModelsDev(await response.json());
+      const parsed = parseClineModelsDev(await response.json());
+      lastResult = parsed;
+      const etag = response.headers.get("etag");
+      lastEtag = etag ?? void 0;
+      return parsed;
     }
   });
   return async () => await cache5.get();
 }
 
 // vendor/channel-pack/src/cline-routing.ts
-function dig(value, path2) {
+function dig(value, path3) {
   let current = value;
-  for (const key of path2) {
+  for (const key of path3) {
     if (typeof current !== "object" || current === null) return void 0;
     current = current[key];
   }
@@ -41426,6 +42053,9 @@ var ClineAdapter = class extends LlmAdapter6 {
     this.options = options;
     this.product = options.product ?? CLINE;
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.loadModelsDev = options.loadModelsDev ?? makeClineModelsDevLoader({ fetcher: this.fetchImpl });
   }
   product;
@@ -41434,6 +42064,18 @@ var ClineAdapter = class extends LlmAdapter6 {
   remoteModels;
   /** 正在进行中的目录加载（避免并发重复请求）。 */
   loading;
+  /**
+   * 远端目录是否**已完整**（两个来源都取到了）—— 上游 issue IKJVTF。
+   *
+   * ⚠️ 短路判据必须是它、而**不是** `remoteModels !== undefined`：两个端点里
+   * 只有一个成功时 `remoteModels` 也已赋值，旧判据会让**残缺目录永久固化**
+   * （此后连预热重试都在短路处直接返回），只能重启 DSH 才能恢复。
+   *
+   * ⚠️⚠️ 还有一层更隐蔽的：`RemoteCatalogGate` 的冷却在生产里**只有闸门自己
+   * 那一处调用点**，而它排在短路**之后** ⇒ 只把 `complete` 传对是**没用的**，
+   * 短路照样命中、`cooling()` 永远读不到。故短路判据本身必须一起改。
+   */
+  remoteComplete = false;
   /**
    * models.dev 目录（`模型 id → 条目`，含名字/窗口/图片能力）。
    *
@@ -41452,8 +42094,10 @@ var ClineAdapter = class extends LlmAdapter6 {
    * 此前这里只有 in-flight 去重（`private loading`），失败后立刻允许重试 ⇒
    * `buildModelCatalog` 的「每模型一次 resolveModel」会把一次失败放大成 N 次。
    * 详见 `src/remote-catalog-gate.ts` 的实测依据。
+   *
+   * ⚠️ 通知挂在**闸门**上（各适配器的单点收口），理由见 `catalog-broadcast.ts`。
    */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /**
    * 描述本适配器拥有的 provider 路由。
    *
@@ -41497,7 +42141,7 @@ var ClineAdapter = class extends LlmAdapter6 {
    * 不去重会打出多份重复的远端请求（两个端点各一次，乘以并发数）。
    */
   async ensureRemoteModels() {
-    if (this.remoteModels !== void 0) return;
+    if (this.remoteComplete) return;
     await this.catalogGate.run(async () => {
       try {
         const credential = await this.options.resolveCredential();
@@ -41518,8 +42162,8 @@ var ClineAdapter = class extends LlmAdapter6 {
         }
         if (!gotRemote) return false;
         this.remoteModels = merged;
-        return true;
-        return true;
+        this.remoteComplete = (remote?.complete ?? true) && this.modelsDev !== void 0;
+        return { got: true, complete: this.remoteComplete };
       } catch (error) {
         console.warn(`[cline] \u6A21\u578B\u76EE\u5F55\u62C9\u53D6\u5931\u8D25\uFF1A${error instanceof Error ? error.message : String(error)}`);
         return false;
@@ -42028,6 +42672,17 @@ function loomyChatHeaders(token) {
 // vendor/channel-pack/src/loomy-product.ts
 var LOOMY_EFFORTS = ["none", "low", "medium", "high", "xhigh"];
 var LOOMY_DEFAULT_EFFORT = "high";
+var LOOMY_CONTEXT_WINDOW_OVERRIDES = {
+  // 远端虚报 1048576，官方客户端本地表与上游墙位都是 262144（见上）。
+  // ⚠️ 键必须**小写**：查表经 `loomyCatalogKey()` 归一，混入大写键会恒不命中。
+  "spark-x": 262144
+};
+function loomyCatalogKey(modelId) {
+  return modelId.trim().toLowerCase();
+}
+function loomyContextWindow(modelId, declared) {
+  return LOOMY_CONTEXT_WINDOW_OVERRIDES[loomyCatalogKey(modelId)] ?? declared;
+}
 var LOOMY_FALLBACK_MODELS = [
   { id: "deepseek-v4-flash-0731", name: "DeepSeek V4 Flash 0731 \xB7 x3.0", contextWindow: 1048576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: "MiniMax-M3", name: "MiniMax M3 \xB7 x4.0", contextWindow: 1048576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
@@ -42035,7 +42690,7 @@ var LOOMY_FALLBACK_MODELS = [
   { id: "qwen-3.8-max", name: "Qwen 3.8 Max \xB7 x12.0", contextWindow: 1e6, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: "GLM-5.3-Flash", name: "GLM 5.3 Flash \xB7 x0.8", contextWindow: 1048576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: "qwen3.8-flash", name: "qwen 3.8 flash \xB7 x0.8", contextWindow: 1e6, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
-  { id: "spark-x", name: "Spark X2.5 \xB7 x0.1", contextWindow: 1048576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
+  { id: "spark-x", name: "Spark X2.5 \xB7 x0.1", contextWindow: 262144, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: "mimo-v2.5", name: "MiMo V2.5 \xB7 x3.3", contextWindow: 1048576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT }
 ];
 var LOOMY = {
@@ -42097,7 +42752,10 @@ function parseLoomyRemoteModels(payload) {
     models.push({
       id,
       name: loomyDisplayName(rawName),
-      contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 0,
+      // ⚠️⚠️ **必须过 `loomyContextWindow`**（上游 issue IKJW31）：远端对
+      // `spark-x` 虚报 1048576，真实墙在 262144。只改兜底表是**无效**的 ——
+      // 远端可用时走的就是这里。判据与证据见 `loomy-product.ts` 的覆盖表注释。
+      contextWindow: Number.isFinite(contextWindow) && contextWindow > 0 ? loomyContextWindow(id, contextWindow) : 0,
       supportsImage: readInputModalities(entry).includes("image"),
       supportsThinking: capabilities.reasoning === true,
       // ⚠️ 档位缺失时**不写这两个键**（而不是写空数组）：下游据此区分
@@ -42112,7 +42770,9 @@ function fallbackToRemote(model) {
   return {
     id: model.id,
     name: model.name,
-    contextWindow: model.contextWindow,
+    // ⚠️ 兜底表的值同样过一遍覆盖表（两条路径**同一判据**，别让它们分叉 ——
+    // 覆盖表本身就是对「照抄声明值」的纠正，与值来自哪条路径无关）。
+    contextWindow: loomyContextWindow(model.id, model.contextWindow),
     // 兜底表不声明图片能力：宁可少报（用户改用文本描述），
     // 也不要报一个服务端可能不认的模态。
     supportsImage: false,
@@ -42125,6 +42785,9 @@ var LoomyAdapter = class extends LlmAdapter7 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? LOOMY;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.fallbackIndex = new Map(this.product.fallbackModels.map((model) => [model.id, model]));
@@ -42136,7 +42799,7 @@ var LoomyAdapter = class extends LlmAdapter7 {
   /** 远端模型缓存（含展示名与能力）；未拉取时为 undefined。 */
   remoteModels;
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /**
    * 描述本适配器拥有的 provider 路由。
    *
@@ -42367,7 +43030,7 @@ function registerLoomyLlm(ctx, options) {
 import { LlmAdapter as LlmAdapter8, LlmError as LlmError11, ReasoningEffortId as ReasoningEffortId8 } from "@deepseek-ai/dsh-llm";
 
 // vendor/channel-pack/src/raccoon.ts
-import { createCipheriv, randomBytes as randomBytes2 } from "node:crypto";
+import { createCipheriv, randomBytes as randomBytes4 } from "node:crypto";
 var RACCOON_API_BASE = "https://xiaohuanxiong.com";
 var RACCOON_POINTS_PREFIX = "/api/web/points/v1";
 var RACCOON_DESKTOP_PREFIX = "/api/web/desktop/v1";
@@ -42411,7 +43074,7 @@ function isRaccoonRefreshable(credential) {
 }
 function encryptRaccoonPhone(phone, iv) {
   const key = Buffer.from(RACCOON_PHONE_CIPHER_SECRET, "utf8");
-  const nonce = iv ?? randomBytes2(16);
+  const nonce = iv ?? randomBytes4(16);
   const cipher = createCipheriv("aes-128-cfb", key, nonce);
   cipher.setAutoPadding(false);
   const ciphertext = Buffer.concat([cipher.update(Buffer.from(phone, "utf8")), cipher.final()]);
@@ -42461,8 +43124,8 @@ var RACCOON_EFFORT_NAMES = Object.freeze({
   [RACCOON_EFFORT_OFF]: "\u5173\u95ED"
 });
 var RACCOON_REASONING_EFFORTS = Object.freeze([
-  RACCOON_EFFORT_ON,
-  RACCOON_EFFORT_OFF
+  RACCOON_EFFORT_OFF,
+  RACCOON_EFFORT_ON
 ]);
 var RACCOON_DEFAULT_EFFORT = RACCOON_EFFORT_ON;
 var RACCOON_FALLBACK_MODELS = [
@@ -42552,12 +43215,17 @@ function raccoonThinkingExtraBody(effort) {
   const type = effort === RACCOON_EFFORT_OFF ? "disabled" : "enabled";
   return { thinking: { type } };
 }
+function raccoonDefaultEffort(declared, preferred) {
+  return declared.includes(preferred) ? preferred : RACCOON_EFFORT_ON;
+}
 function raccoonReasoningInfo() {
   const efforts = RACCOON_REASONING_EFFORTS.map((id) => ({
     id: ReasoningEffortId8(id),
     name: RACCOON_EFFORT_NAMES[id] ?? id
   }));
-  const defaultEffort = RACCOON_REASONING_EFFORTS.includes(RACCOON_DEFAULT_EFFORT) ? ReasoningEffortId8(RACCOON_DEFAULT_EFFORT) : ReasoningEffortId8(RACCOON_REASONING_EFFORTS[0] ?? RACCOON_EFFORT_ON);
+  const defaultEffort = ReasoningEffortId8(
+    raccoonDefaultEffort(RACCOON_REASONING_EFFORTS, RACCOON_DEFAULT_EFFORT)
+  );
   return { efforts, defaultEffort };
 }
 function positiveMaxTokens2(value) {
@@ -42577,6 +43245,9 @@ var RaccoonAdapter = class extends LlmAdapter8 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? RACCOON;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.fallbackIndex = new Map(this.product.fallbackModels.map((model) => [model.id, model]));
@@ -42588,7 +43259,7 @@ var RaccoonAdapter = class extends LlmAdapter8 {
   /** 远端模型缓存；未拉取时为 undefined。 */
   remoteModels;
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /**
    * 描述本适配器拥有的 provider 路由。
    *
@@ -43416,16 +44087,37 @@ var CodeArtsAuth = class extends Service {
    * 无需为每个账号各拉一次。
    */
   async refreshModels(pool) {
-    if (!this.active) return [];
+    if (!this.active) {
+      if (this.lastCatalogOutcome !== void 0) {
+        this.lastCatalogOutcome.gatewayOk = false;
+        this.lastCatalogOutcome.builtinOk = false;
+      }
+      return [];
+    }
     const credential = await this.firstUsableCredential(pool);
-    if (credential === void 0) return [];
-    const models = await fetchCodeArtsRemoteModels(credential, this.fetchImpl);
+    if (credential === void 0) {
+      if (this.lastCatalogOutcome !== void 0) {
+        this.lastCatalogOutcome.gatewayOk = false;
+        this.lastCatalogOutcome.builtinOk = false;
+      }
+      return [];
+    }
+    const models = await fetchCodeArtsRemoteModels(credential, this.fetchImpl, this.lastCatalogOutcome);
     if (models.length > 0) {
       setMemoryCache(models);
       saveModelsCache(models);
     }
     return models;
   }
+  /**
+   * 最近一次 {@link refreshModels} 的各来源成败（上游 issue IKJVTF，审计 I3）。
+   *
+   * ⚠️ 由 `index.ts` 在**构造时**注入一个空对象，此后 `refreshModels`
+   * 每轮原地写入 —— 适配器在 `fetchRemoteModels()` 返回后读它，即可判
+   * 「这次目录完不完整」。用「出参对象」而不是改 `refreshModels` 的返回类型：
+   * 该签名被既有调用方与单测按「返回数组」使用，改形状会波及它们。
+   */
+  lastCatalogOutcome;
   /**
    * 取账号池里第一个**凭据可解析且含 AK/SK** 的账号凭据。
    *
@@ -43447,329 +44139,6 @@ var CodeArtsAuth = class extends Service {
 // vendor/channel-pack/src/buddy-auth.ts
 import { Service as Service2 } from "@deepseek-ai/cordis";
 import { credentialRef as credentialRef3 } from "@deepseek-ai/dsh-credentials";
-
-// vendor/channel-pack/src/buddy-oauth.ts
-function responseCode(body) {
-  if (typeof body !== "object" || body === null) return 0;
-  const code = body.code;
-  return typeof code === "number" ? code : 0;
-}
-function responseMessage(body) {
-  if (typeof body !== "object" || body === null) return "";
-  const message2 = body.message;
-  return typeof message2 === "string" ? message2 : "";
-}
-function responseData(body) {
-  if (typeof body !== "object" || body === null) return void 0;
-  const data = body.data;
-  return data === null ? void 0 : data;
-}
-async function request(method, url, headers, options) {
-  const signal = options.signal === void 0 ? AbortSignal.timeout(options.timeoutMs) : AbortSignal.any([AbortSignal.timeout(options.timeoutMs), options.signal]);
-  let response;
-  try {
-    response = await options.fetcher(url, { method, headers, signal });
-  } catch (error) {
-    throw new Error(`CodeBuddy ${method} ${url} network error: ${String(error)}`);
-  }
-  let body = null;
-  try {
-    body = await response.json();
-  } catch {
-    body = null;
-  }
-  return { status: response.status, body };
-}
-async function fetchAuthState(fetcher = fetch, signal, product = CODEBUDDY) {
-  const url = `${product.endpoint}${AUTH_STATE_PATH}?platform=${product.platform}`;
-  const headers = {
-    [HTTP_HEADER_DOMAIN]: product.apiDomain,
-    [HTTP_HEADER_NO_AUTHORIZATION]: "true",
-    [HTTP_HEADER_NO_USER_ID]: "true",
-    [HTTP_HEADER_NO_ENTERPRISE_ID]: "true",
-    [HTTP_HEADER_NO_DEPARTMENT_INFO]: "true",
-    "User-Agent": product.userAgent
-  };
-  const { status, body } = await request("POST", url, headers, {
-    fetcher,
-    timeoutMs: STATE_REQUEST_TIMEOUT_MS,
-    ...signal !== void 0 ? { signal } : {}
-  });
-  if (status !== 200) {
-    throw new Error(`auth/state HTTP ${status}: ${responseMessage(body)}`);
-  }
-  const data = responseData(body);
-  if (typeof data !== "object" || data === null) {
-    throw new Error(`auth/state \u54CD\u5E94\u7F3A\u5C11 data \u5B57\u6BB5: ${JSON.stringify(body)}`);
-  }
-  const record = data;
-  const state = typeof record.state === "string" ? record.state : "";
-  const authUrl = typeof record.authUrl === "string" ? record.authUrl : "";
-  if (state.length === 0) throw new Error("auth/state \u54CD\u5E94\u7F3A\u5C11 state \u5B57\u6BB5");
-  if (authUrl.length === 0) throw new Error("auth/state \u54CD\u5E94\u7F3A\u5C11 authUrl \u5B57\u6BB5");
-  return { state, authUrl };
-}
-async function loopGetToken(state, options = {}) {
-  const fetcher = options.fetcher ?? fetch;
-  const product = options.product ?? CODEBUDDY;
-  const url = `${product.endpoint}${AUTH_TOKEN_PATH}?state=${encodeURIComponent(state)}`;
-  const headers = {
-    [HTTP_HEADER_NO_AUTHORIZATION]: "true",
-    "User-Agent": product.userAgent
-  };
-  const deadline = Date.now() + (options.timeoutMs ?? LOGIN_TIMEOUT_MS);
-  const interval = options.pollIntervalMs ?? POLL_INTERVAL_MS;
-  for (; ; ) {
-    if (Date.now() >= deadline) throw new Error("\u83B7\u53D6 token \u8D85\u65F6\uFF085 \u5206\u949F\uFF09");
-    if (options.signal?.aborted) throw new Error("\u767B\u5F55\u5DF2\u53D6\u6D88");
-    await sleep(interval);
-    let result;
-    try {
-      result = await request("GET", url, headers, {
-        fetcher,
-        timeoutMs: REQUEST_TIMEOUT_MS,
-        ...options.signal !== void 0 ? { signal: options.signal } : {}
-      });
-    } catch {
-      continue;
-    }
-    const { status, body } = result;
-    if (status === 200) {
-      const data = responseData(body);
-      if (data !== void 0) return parseTokenData(data);
-      continue;
-    }
-    const code = responseCode(body);
-    if (code === CODE_TOKEN_NOT_READY) continue;
-    throw new Error(`auth/token HTTP ${status} code=${code}: ${responseMessage(body)}`);
-  }
-}
-async function getAccount(state, token, options = {}) {
-  const fetcher = options.fetcher ?? fetch;
-  const product = options.product ?? CODEBUDDY;
-  const url = `${product.endpoint}${LOGIN_ACCOUNT_PATH}?state=${encodeURIComponent(state)}`;
-  const headers = {
-    // ⚠️ `||` 而非裸 `token.domain`：token 由 `parseTokenData` → `readStringField`
-    // 产出，该函数在字段缺失/类型不符时返回**空串**（不是 `undefined`），裸用会
-    // 让 X-Domain 以空值发出。这与 `buddy-adapter.ts` 的 chat 头、`buddy.ts` 的
-    // `credentialRequestHeaders` 是同一形态（PR!19 修了那两处，这是第三处）。
-    //
-    // 兜底取 `product.apiDomain` 而非常量 `API_DOMAIN`：本请求的 URL 是
-    // `` `${product.endpoint}${LOGIN_ACCOUNT_PATH}` ``，X-Domain 必须与产品端点一致。
-    //
-    // ⚠️ **非空时仍以服务端下发的 `token.domain` 为准**（故不写成产品优先）：
-    // 这里是登录流程，该值是服务端**本次刚下发**的权威值，不是跨产品迁移后
-    // 会过期的历史快照 —— 与 adapter 那处的方向差异是有意的，差异只在「兜底值
-    // 取谁」，判据一致（空串必回退）。回归用例见 `tests/unit/buddy-oauth.spec.ts`
-    // 的「token.domain 为空串时…」与「token.domain 非空时…」两条。
-    [HTTP_HEADER_DOMAIN]: token.domain || product.apiDomain,
-    Authorization: `Bearer ${token.accessToken}`,
-    [HTTP_HEADER_NO_USER_ID]: "true",
-    [HTTP_HEADER_NO_ENTERPRISE_ID]: "true",
-    "User-Agent": (options.product ?? CODEBUDDY).userAgent
-  };
-  const deadline = Date.now() + (options.timeoutMs ?? LOGIN_TIMEOUT_MS);
-  const interval = options.pollIntervalMs ?? POLL_INTERVAL_MS;
-  for (; ; ) {
-    if (Date.now() >= deadline) throw new Error("\u83B7\u53D6\u8D26\u6237\u4FE1\u606F\u8D85\u65F6\uFF085 \u5206\u949F\uFF09");
-    if (options.signal?.aborted) throw new Error("\u767B\u5F55\u5DF2\u53D6\u6D88");
-    await sleep(interval);
-    let result;
-    try {
-      result = await request("GET", url, headers, {
-        fetcher,
-        timeoutMs: REQUEST_TIMEOUT_MS,
-        ...options.signal !== void 0 ? { signal: options.signal } : {}
-      });
-    } catch {
-      continue;
-    }
-    const { status, body } = result;
-    if (status === 200) {
-      const data = responseData(body);
-      if (data !== void 0) return parseAccountData(data);
-      continue;
-    }
-    const code = responseCode(body);
-    if (code === CODE_ACCOUNT_NOT_READY) continue;
-    throw new Error(`login/account HTTP ${status} code=${code}: ${responseMessage(body)}`);
-  }
-}
-async function refreshToken(credential, fetcher = fetch, signal, product = CODEBUDDY) {
-  if (!isRefreshable(credential)) {
-    throw new RefreshTokenExpiredError2("\u65E0 refresh_token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
-  }
-  const url = `${product.endpoint}${AUTH_REFRESH_PATH}`;
-  const headers = {
-    ...credentialRequestHeaders(credential),
-    // credentialRequestHeaders 走的是 CodeBuddy 的 UA/域名常量，这里按产品覆盖，
-    // 否则 WorkBuddy 续期时会以 CodeBuddy 的身份标识发请求。
-    [HTTP_HEADER_DOMAIN]: product.apiDomain,
-    "User-Agent": product.userAgent,
-    Authorization: `Bearer ${credential.access_token}`,
-    [HTTP_HEADER_REFRESH_TOKEN]: credential.refresh_token,
-    [HTTP_HEADER_AUTH_REFRESH_SOURCE]: AUTH_REFRESH_SOURCE
-  };
-  const { status, body } = await request("POST", url, headers, {
-    fetcher,
-    timeoutMs: REQUEST_TIMEOUT_MS,
-    ...signal !== void 0 ? { signal } : {}
-  });
-  if (status !== 200) {
-    const code = responseCode(body);
-    const message2 = responseMessage(body);
-    const expired = status === 401 || status === 403 || code === 401 || code === 403 || message2.includes("expired") || message2.includes("invalid");
-    if (expired) {
-      throw new RefreshTokenExpiredError2(message2.length > 0 ? message2 : `HTTP ${status}`);
-    }
-    throw new Error(`\u5237\u65B0 token HTTP ${status} code=${code}: ${message2}`);
-  }
-  const data = responseData(body);
-  if (data === void 0) throw new Error("\u5237\u65B0 token \u54CD\u5E94\u7F3A\u5C11 data \u5B57\u6BB5");
-  return parseTokenData(data);
-}
-var RefreshTokenExpiredError2 = class extends Error {
-  constructor(message2) {
-    super(message2);
-    this.name = "RefreshTokenExpiredError";
-  }
-};
-async function fetchModels(credential, fetcher = fetch, signal, product = CODEBUDDY) {
-  if (credential.access_token.length === 0) return [];
-  const headers = {
-    ...credentialAuthHeaders(credential),
-    // credentialAuthHeaders 内置 CodeBuddy 的 UA/域名，这里按产品覆盖。
-    [HTTP_HEADER_DOMAIN]: product.apiDomain,
-    "User-Agent": product.userAgent,
-    // X-Product 是**部署类型**（SaaS），CodeBuddy 与 WorkBuddy 共用同一取值，
-    // 故保持常量；随产品变化的是 X-Product-Code。
-    [HTTP_HEADER_PRODUCT]: BUDDY_DEPLOYMENT_TYPE,
-    [HTTP_HEADER_PRODUCT_CODE]: product.productCode
-  };
-  const scoped = await requestScopedModels(credential, headers, fetcher, signal, product);
-  if (scoped !== void 0) {
-    const config = await requestConfig(headers, fetcher, signal, product);
-    const merged = mergeRemoteModels(scoped, config.models);
-    return config.promotions.size === 0 ? merged : applyPromotions(merged, config.promotions);
-  }
-  const url = `${product.endpoint}${CONFIG_PATH}`;
-  try {
-    const { status, body } = await request("GET", url, headers, {
-      fetcher,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      ...signal !== void 0 ? { signal } : {}
-    });
-    if (status !== 200) return [];
-    return parseModelsFromConfig(body);
-  } catch {
-    return [];
-  }
-}
-function mergeRemoteModels(primary, extra) {
-  const known = new Set(primary.map((model) => model.id));
-  return [...primary, ...extra.filter((model) => !known.has(model.id))];
-}
-async function requestConfig(headers, fetcher, signal, product) {
-  const empty = { models: [], promotions: /* @__PURE__ */ new Map() };
-  try {
-    const { status, body } = await request("GET", `${product.endpoint}${CONFIG_PATH}`, headers, {
-      fetcher,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      ...signal !== void 0 ? { signal } : {}
-    });
-    if (status !== 200 || typeof body !== "object" || body === null) return empty;
-    const data = body.data;
-    if (typeof data !== "object" || data === null) return empty;
-    return {
-      models: parseModelsFromConfig(body),
-      promotions: parsePromotions(data)
-    };
-  } catch {
-    return empty;
-  }
-}
-function applyPromotions(models, promotions) {
-  return models.map((model) => {
-    const discounted = promotions.get(model.id);
-    return discounted === void 0 ? model : { ...model, discountedCreditsRate: discounted };
-  });
-}
-var ENTERPRISE_MODELS_SCOPE = "personal";
-async function requestScopedModels(credential, headers, fetcher, signal, product) {
-  const url = `${product.endpoint}/console/enterprises/${ENTERPRISE_MODELS_SCOPE}/models`;
-  try {
-    const { status, body } = await request("GET", url, headers, {
-      fetcher,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      ...signal !== void 0 ? { signal } : {}
-    });
-    if (status !== 200) return void 0;
-    const models = parseModelsFromConfig(body);
-    return models.length > 0 ? models : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function sleep(ms) {
-  return new Promise((resolve2) => {
-    setTimeout(resolve2, ms).unref?.();
-  });
-}
-async function defaultOpenBrowser(url) {
-  const { openBrowser: openBrowser2 } = await Promise.resolve().then(() => (init_login(), login_exports));
-  openBrowser2(url);
-}
-function decorateLoginUrl(authUrl, product) {
-  if (!product.appendSessionParams) return authUrl;
-  try {
-    const url = new URL(authUrl);
-    if (product.pluginVersion !== void 0 && product.pluginVersion.length > 0) {
-      url.searchParams.set("version", product.pluginVersion);
-    }
-    url.searchParams.set("loginSessionId", crypto.randomUUID());
-    return url.toString();
-  } catch {
-    return authUrl;
-  }
-}
-async function runBuddyLoginFlow(options = {}) {
-  const fetcher = options.fetcher ?? fetch;
-  const open = options.openBrowser ?? defaultOpenBrowser;
-  const product = options.product ?? CODEBUDDY;
-  let state;
-  let authUrl;
-  if (options.state) {
-    state = options.state;
-    authUrl = "";
-  } else {
-    const result = await fetchAuthState(fetcher, void 0, product);
-    state = result.state;
-    authUrl = result.authUrl;
-    const decorated = decorateLoginUrl(authUrl, product);
-    await open(decorated);
-    authUrl = decorated;
-  }
-  const pollOptions = {
-    fetcher,
-    ...options.timeoutMs !== void 0 ? { timeoutMs: options.timeoutMs } : {},
-    ...options.pollIntervalMs !== void 0 ? { pollIntervalMs: options.pollIntervalMs } : {},
-    // 轮询 token / 账户两步同样带产品身份标识，否则 WorkBuddy 登录会以
-    // CodeBuddy 的 UA 发请求。
-    product
-  };
-  const token = await loopGetToken(state, pollOptions);
-  const account = await getAccount(state, token, pollOptions);
-  const credential = buildCredential(token, account);
-  return {
-    access: JSON.stringify(credential),
-    // 对齐 Rust 的 expires_at_ms(...).unwrap_or(0)：无法解析时报告 0。
-    expires: credentialExpiresAtMs(credential) ?? 0,
-    loginUrl: authUrl,
-    refreshable: isRefreshable(credential)
-  };
-}
-
-// vendor/channel-pack/src/buddy-auth.ts
 var BUDDY_EXPIRY_ACCESSORS = {
   expiresAtOf: credentialExpiresAtMs,
   refreshableOf: isRefreshable,
@@ -44081,14 +44450,43 @@ var BuddyAuth = class extends Service2 {
   async fetchModels(pool) {
     if (pool) {
       const available2 = await pool.getAvailableAccount(this.product.id, "");
-      if (available2) return fetchModels(available2.credential, this.fetchImpl, void 0, this.product);
+      if (available2) {
+        return fetchModels(
+          available2.credential,
+          this.fetchImpl,
+          void 0,
+          this.product,
+          this.lastCatalogOutcome
+        );
+      }
     }
     const resolved = await this.ctx.credentials.resolve(credentialRef3(this.credentialRefName));
-    if (!resolved) return [];
+    if (!resolved) {
+      if (this.lastCatalogOutcome !== void 0) {
+        this.lastCatalogOutcome.scopedOk = false;
+        this.lastCatalogOutcome.configOk = false;
+      }
+      return [];
+    }
     const credential = parseCredential2(resolved.value);
-    if (!credential) return [];
-    return fetchModels(credential, this.fetchImpl, void 0, this.product);
+    if (!credential) {
+      if (this.lastCatalogOutcome !== void 0) {
+        this.lastCatalogOutcome.scopedOk = false;
+        this.lastCatalogOutcome.configOk = false;
+      }
+      return [];
+    }
+    return fetchModels(credential, this.fetchImpl, void 0, this.product, this.lastCatalogOutcome);
   }
+  /**
+   * 最近一次 {@link fetchModels} 的各来源成败（上游 issue IKJVTF，审计 I3）。
+   *
+   * ⚠️ 由 `index.ts` 在**构造时**注入一个空对象，此后 `fetchModels`
+   * 每轮原地写入 —— 适配器在 `fetchRemoteModels()` 返回后读它，即可判
+   * 「这次目录完不完整」。用「出参对象」而不是改 `fetchModels` 的返回类型：
+   * 该签名被既有调用方与单测按「返回数组」使用，改形状会波及它们。
+   */
+  lastCatalogOutcome;
   /** 注入的 fetch（测试用）；默认为全局 fetch。 */
   get fetchImpl() {
     return this.options.fetcher ?? fetch;
@@ -44175,8 +44573,8 @@ function toLoginFlowResult(credential, loginUrl) {
   };
 }
 async function defaultOpenBrowser2(url) {
-  const { openBrowser: openBrowser2 } = await Promise.resolve().then(() => (init_login(), login_exports));
-  openBrowser2(url);
+  const { openBrowser: openBrowser3 } = await Promise.resolve().then(() => (init_login(), login_exports));
+  openBrowser3(url);
 }
 async function startLobsteraiLoginFlow(options) {
   const fetcher = options.fetcher ?? fetch;
@@ -44191,8 +44589,8 @@ async function startLobsteraiLoginFlow(options) {
   });
   result.catch(() => {
   });
-  const server = createServer2((request2, response) => {
-    const url = new URL(request2.url ?? "/", `http://127.0.0.1:${request2.socket.localPort}`);
+  const server = createServer2((request3, response) => {
+    const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort}`);
     if (!url.pathname.startsWith(LOBSTERAI_CALLBACK_PATH)) {
       response.writeHead(404).end("Not found");
       return;
@@ -44205,7 +44603,7 @@ async function startLobsteraiLoginFlow(options) {
     }
     void exchangeLobsteraiAuthCode(code, session, clientVersion, product, fetcher, options.signal).then((credential) => {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" }).end("<html><body><h2>\u767B\u5F55\u6210\u529F\uFF0C\u53EF\u4EE5\u5173\u95ED\u6B64\u7A97\u53E3\u4E86</h2></body></html>");
-      const port2 = request2.socket.localPort ?? 0;
+      const port2 = request3.socket.localPort ?? 0;
       resolveResult(toLoginFlowResult(credential, buildLobsteraiLoginUrl(port2, state, product)));
     }).catch((error) => {
       response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" }).end("\u767B\u5F55\u6362\u53D6\u51ED\u636E\u5931\u8D25");
@@ -44853,8 +45251,8 @@ function toLoginFlowResult2(credential, loginUrl, machineId) {
   };
 }
 async function defaultOpenBrowser3(url) {
-  const { openBrowser: openBrowser2 } = await Promise.resolve().then(() => (init_login(), login_exports));
-  openBrowser2(url);
+  const { openBrowser: openBrowser3 } = await Promise.resolve().then(() => (init_login(), login_exports));
+  openBrowser3(url);
 }
 async function startQoderLoginFlow(options) {
   const session = createQoderDeviceSession();
@@ -46332,8 +46730,8 @@ function toLoginFlowResult3(credential, loginUrl, userCode) {
   };
 }
 async function defaultOpenBrowser4(url) {
-  const { openBrowser: openBrowser2 } = await Promise.resolve().then(() => (init_login(), login_exports));
-  openBrowser2(url);
+  const { openBrowser: openBrowser3 } = await Promise.resolve().then(() => (init_login(), login_exports));
+  openBrowser3(url);
 }
 async function startClineLoginFlow(options) {
   const controller = new AbortController();
@@ -46831,19 +47229,19 @@ function buildLoomyAccountBody(product, param) {
     param
   };
 }
-async function postLoomyAccount(path2, body, product, fetcher) {
+async function postLoomyAccount(path3, body, product, fetcher) {
   const serialized = JSON.stringify(body);
   const headers = loomyAuthHeaders({
     accessKeyId: product.accessKeyId,
     accessKeySecret: product.accessKeySecret,
     method: "POST",
-    path: path2,
+    path: path3,
     body: serialized,
     contentType: "application/json"
   });
   let response;
   try {
-    response = await fetcher(`${product.accountBase}${path2}`, {
+    response = await fetcher(`${product.accountBase}${path3}`, {
       method: "POST",
       headers,
       body: serialized,
@@ -46851,18 +47249,18 @@ async function postLoomyAccount(path2, body, product, fetcher) {
     });
   } catch (error) {
     throw new Error(
-      `\u8BAF\u98DE\u8D26\u53F7\u8BF7\u6C42\u5931\u8D25\uFF08${path2}\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`
+      `\u8BAF\u98DE\u8D26\u53F7\u8BF7\u6C42\u5931\u8D25\uFF08${path3}\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`
     );
   }
   let parsed;
   try {
     parsed = await response.json();
   } catch {
-    throw new Error(`\u8BAF\u98DE\u8D26\u53F7\u54CD\u5E94\u4E0D\u662F JSON\uFF08${path2}\uFF0CHTTP ${response.status}\uFF09`);
+    throw new Error(`\u8BAF\u98DE\u8D26\u53F7\u54CD\u5E94\u4E0D\u662F JSON\uFF08${path3}\uFF0CHTTP ${response.status}\uFF09`);
   }
   const envelope = parseLoomyEnvelope(parsed);
   if (!envelope.ok) {
-    throw new Error(envelope.message.length > 0 ? envelope.message : `\u8BAF\u98DE\u8D26\u53F7\u8BF7\u6C42\u5931\u8D25\uFF08${path2}\uFF09`);
+    throw new Error(envelope.message.length > 0 ? envelope.message : `\u8BAF\u98DE\u8D26\u53F7\u8BF7\u6C42\u5931\u8D25\uFF08${path3}\uFF09`);
   }
   return envelope.data;
 }
@@ -47114,8 +47512,8 @@ async function startLoomyWechatLoginFlow(options) {
     rejectResult(error);
   };
   state.uuid = await fetchLoomyWechatUuid(randomUUID6(), fetcher);
-  const server = createServer4((request2, response) => {
-    void handleRequest(request2, response, {
+  const server = createServer4((request3, response) => {
+    void handleRequest(request3, response, {
       state,
       product,
       fetcher,
@@ -47148,8 +47546,8 @@ async function startLoomyWechatLoginFlow(options) {
   });
   return { loginUrl, result, close };
 }
-async function handleRequest(request2, response, deps) {
-  const url = new URL(request2.url ?? "/", `http://127.0.0.1:${request2.socket.localPort ?? 0}`);
+async function handleRequest(request3, response, deps) {
+  const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort ?? 0}`);
   const { state } = deps;
   if (url.pathname === LOOMY_WECHAT_QR_PATH) {
     const qrDataUrl = await fetchLoomyWechatQrImage(state.uuid, deps.fetcher);
@@ -47188,8 +47586,8 @@ async function handleRequest(request2, response, deps) {
     writeJson(response, { status: polled.status });
     return;
   }
-  if (url.pathname === LOOMY_WECHAT_COMPLETE_PATH && request2.method === "POST") {
-    const body = await readJsonBody(request2);
+  if (url.pathname === LOOMY_WECHAT_COMPLETE_PATH && request3.method === "POST") {
+    const body = await readJsonBody(request3);
     const action = typeof body.action === "string" ? body.action : "";
     try {
       if (action === "send_sms") {
@@ -47229,10 +47627,10 @@ function writeJson(response, payload) {
   response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
 }
-async function readJsonBody(request2) {
+async function readJsonBody(request3) {
   const chunks = [];
   let total = 0;
-  for await (const chunk of request2) {
+  for await (const chunk of request3) {
     const buf = chunk;
     total += buf.length;
     if (total > 64 * 1024) throw new Error("\u8BF7\u6C42\u4F53\u8FC7\u5927");
@@ -47420,7 +47818,7 @@ function renderQrPage(qrDataUrl) {
 }
 
 // vendor/channel-pack/src/loomy-credits.ts
-async function tryRequestLoomy(credential, product, path2, init, fetcher) {
+async function tryRequestLoomy(credential, product, path3, init, fetcher) {
   const headers = { Accept: "application/json", token: credential.access_token };
   let payload;
   if (init.body !== void 0) {
@@ -47429,7 +47827,7 @@ async function tryRequestLoomy(credential, product, path2, init, fetcher) {
   }
   let response;
   try {
-    response = await fetcher(`${product.apiBase}${path2}`, {
+    response = await fetcher(`${product.apiBase}${path3}`, {
       method: init.method,
       headers,
       ...payload === void 0 ? {} : { body: payload },
@@ -47561,7 +47959,7 @@ function normalizeTasks(raw) {
   }
   return normalized;
 }
-async function requestLoomy(credential, product, path2, init, fetcher) {
+async function requestLoomy(credential, product, path3, init, fetcher) {
   const headers = { Accept: "application/json", token: credential.access_token };
   let payload;
   if (init.body !== void 0) {
@@ -47570,20 +47968,20 @@ async function requestLoomy(credential, product, path2, init, fetcher) {
   }
   let response;
   try {
-    response = await fetcher(`${product.apiBase}${path2}`, {
+    response = await fetcher(`${product.apiBase}${path3}`, {
       method: init.method,
       headers,
       ...payload === void 0 ? {} : { body: payload },
       signal: AbortSignal.timeout(LOOMY_REQUEST_TIMEOUT_MS)
     });
   } catch (error) {
-    throw new Error(`loomy: \u8BF7\u6C42\u5931\u8D25\uFF08${path2}\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`loomy: \u8BF7\u6C42\u5931\u8D25\uFF08${path3}\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`);
   }
   let parsed;
   try {
     parsed = await response.json();
   } catch {
-    throw new Error(`loomy: \u54CD\u5E94\u4E0D\u662F JSON\uFF08${path2}\uFF0CHTTP ${response.status}\uFF09`);
+    throw new Error(`loomy: \u54CD\u5E94\u4E0D\u662F JSON\uFF08${path3}\uFF0CHTTP ${response.status}\uFF09`);
   }
   const envelope = parseLoomyEnvelope(parsed);
   if (!envelope.ok) {
@@ -48720,8 +49118,8 @@ async function startRaccoonLoginFlow(options = {}) {
     settled = true;
     rejectResult(error);
   };
-  const server = createServer5((request2, response) => {
-    void handleRequest2(request2, response, { state, product, fetcher, settleOk }).catch(
+  const server = createServer5((request3, response) => {
+    void handleRequest2(request3, response, { state, product, fetcher, settleOk }).catch(
       (error) => {
         try {
           response.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" }).end(`\u5185\u90E8\u9519\u8BEF\uFF1A${error instanceof Error ? error.message : String(error)}`);
@@ -48758,8 +49156,8 @@ async function startRaccoonLoginFlow(options = {}) {
   });
   return { loginUrl, result, close };
 }
-async function handleRequest2(request2, response, deps) {
-  const url = new URL(request2.url ?? "/", `http://127.0.0.1:${request2.socket.localPort ?? 0}`);
+async function handleRequest2(request3, response, deps) {
+  const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort ?? 0}`);
   const { state, product } = deps;
   if (url.pathname === RACCOON_LOGIN_PAGE_PATHS.login) {
     response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -48790,8 +49188,8 @@ async function handleRequest2(request2, response, deps) {
     });
     return;
   }
-  if (url.pathname === RACCOON_LOGIN_PAGE_PATHS.smsSend && request2.method === "POST") {
-    const body = await readJsonBody2(request2);
+  if (url.pathname === RACCOON_LOGIN_PAGE_PATHS.smsSend && request3.method === "POST") {
+    const body = await readJsonBody2(request3);
     const phone = typeof body.phone === "string" ? body.phone.trim() : "";
     const captchaParam = typeof body.captchaParam === "string" ? body.captchaParam : "";
     if (!/^1[3-9]\d{9}$/.test(phone)) {
@@ -48811,8 +49209,8 @@ async function handleRequest2(request2, response, deps) {
     }
     return;
   }
-  if (url.pathname === RACCOON_LOGIN_PAGE_PATHS.smsVerify && request2.method === "POST") {
-    const body = await readJsonBody2(request2);
+  if (url.pathname === RACCOON_LOGIN_PAGE_PATHS.smsVerify && request3.method === "POST") {
+    const body = await readJsonBody2(request3);
     const smsCode = typeof body.smsCode === "string" ? body.smsCode.trim() : "";
     if (state.phone.length === 0) {
       response.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
@@ -48842,10 +49240,10 @@ function writeJson2(response, payload) {
   response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
 }
-async function readJsonBody2(request2) {
+async function readJsonBody2(request3) {
   const chunks = [];
   let total = 0;
-  for await (const chunk of request2) {
+  for await (const chunk of request3) {
     const buf = chunk;
     total += buf.length;
     if (total > 64 * 1024) throw new Error("\u8BF7\u6C42\u4F53\u8FC7\u5927");
@@ -49771,7 +50169,7 @@ function zcodeProductById(id) {
 
 // vendor/channel-pack/src/zcode-captcha.ts
 import { spawn as spawn2, spawnSync } from "node:child_process";
-import { existsSync as existsSync5, mkdtempSync, rmSync, writeFileSync as writeFileSync5 } from "node:fs";
+import { existsSync as existsSync6, mkdtempSync, rmSync, writeFileSync as writeFileSync5 } from "node:fs";
 import { createServer as createServer6 } from "node:net";
 import { homedir as homedir2, tmpdir } from "node:os";
 import { basename, isAbsolute, join as join4, posix } from "node:path";
@@ -49908,7 +50306,7 @@ function findBrowserExecutable() {
   for (const candidate of browserCandidates()) {
     try {
       if (candidate.length === 0 || !isAbsolute(candidate)) continue;
-      if (existsSync5(candidate)) return candidate;
+      if (existsSync6(candidate)) return candidate;
     } catch {
     }
   }
@@ -51368,8 +51766,8 @@ var CarrierPageServer = class {
   /** 真绑一次端口。成功 ⇒ 记下 server 并回 true；`EADDRINUSE` 之类 ⇒ 回 false（换候选）。 */
   tryListen(port) {
     return new Promise((resolve2) => {
-      const server = createHttpServer((request2, response) => {
-        this.handle(request2, response);
+      const server = createHttpServer((request3, response) => {
+        this.handle(request3, response);
       });
       const settle = (ok) => {
         resolve2(ok);
@@ -51398,14 +51796,14 @@ var CarrierPageServer = class {
    * ⚠ 判**路径**而不是「路径含 carrier」：`/api/channel-pack/captcha-carrier`（插件自己那条
    * 旧路由）在这个服务上必须 404，否则两处语义会悄悄合并成一条。
    */
-  handle(request2, response) {
-    const path2 = (request2.url ?? "").split("?")[0];
-    if (path2 !== CARRIER_PAGE_ROUTE) {
+  handle(request3, response) {
+    const path3 = (request3.url ?? "").split("?")[0];
+    if (path3 !== CARRIER_PAGE_ROUTE) {
       response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
       response.end("not found");
       return;
     }
-    if (request2.method !== "GET") {
+    if (request3.method !== "GET") {
       response.writeHead(405, { "content-type": "text/plain; charset=utf-8", allow: "GET" });
       response.end("method not allowed");
       return;
@@ -53718,9 +54116,9 @@ function buildEnvironmentSection(options) {
 }
 function isGitRepo(cwd) {
   try {
-    const { existsSync: existsSync12 } = __require("node:fs");
-    const { join: join13 } = __require("node:path");
-    return existsSync12(join13(cwd, ".git"));
+    const { existsSync: existsSync13 } = __require("node:fs");
+    const { join: join14 } = __require("node:path");
+    return existsSync13(join14(cwd, ".git"));
   } catch {
     return false;
   }
@@ -54294,6 +54692,9 @@ var ZcodeAdapter = class extends LlmAdapter9 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? ZCODE;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.fallbackIndex = new Map(this.product.fallbackModels.map((model) => [model.id, model]));
@@ -54310,7 +54711,7 @@ var ZcodeAdapter = class extends LlmAdapter9 {
   fallbackIndex;
   remoteModels;
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   /** 自建的常驻浏览器（仅当调用方没注入 `mintCaptcha` 时用）。 */
   captchaBrowser;
   /** captcha 配置缓存（配置很少变，但与凭据一样**不长期缓存**）。 */
@@ -55261,6 +55662,9 @@ function buddyExpiringWindowDays(env = process.env) {
   if (!Number.isFinite(parsed) || parsed < 0) return BUDDY_EXPIRING_WINDOW_DAYS;
   return parsed;
 }
+function buddyExpiringWindowMs(env = process.env) {
+  return buddyExpiringWindowDays(env) * 24 * 60 * 60 * 1e3;
+}
 var BUDDY_BALANCE_TIER = Object.freeze({
   /** 有 15 天内到期的积分 —— 优先消耗（再不用就作废）。 */
   expiring: 0,
@@ -55530,9 +55934,9 @@ function readStringArray(source, key) {
   return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 }
 var UNPARSABLE_RESPONSE_MESSAGE = "\u8BF7\u6C42\u5931\u8D25\u6216\u54CD\u5E94\u65E0\u6CD5\u89E3\u6790";
-async function postJson2(path2, credential, product, fetcher) {
+async function postJson2(path3, credential, product, fetcher) {
   try {
-    const response = await fetcher(`${product.endpoint}${path2}`, {
+    const response = await fetcher(`${product.endpoint}${path3}`, {
       method: "POST",
       headers: checkinHeaders(credential, product),
       body: "{}",
@@ -55874,8 +56278,8 @@ async function requestEnvelope(url, credential, init, fetcher) {
     };
   }
 }
-function withTimezone(base, path2, timezoneId) {
-  const url = new URL(`${base}${path2}`);
+function withTimezone(base, path3, timezoneId) {
+  const url = new URL(`${base}${path3}`);
   url.searchParams.set("timezone_id", timezoneId);
   return url.toString();
 }
@@ -56204,6 +56608,316 @@ function normalizeBase64(data) {
   return cleaned;
 }
 
+// vendor/channel-pack/src/officeace-product.ts
+var DEFAULT_BASE_URL = "https://officeace.cn-southwest-2.huaweicloud-agentarts.com";
+var OFFICEACE = {
+  id: "officeace",
+  displayName: "OfficeAce",
+  quotaUnit: "Token",
+  defaultBaseUrl: DEFAULT_BASE_URL,
+  chatPath: "/v2/chat/completions",
+  modelsPath: "/v2/models",
+  requestTimeoutMs: 6e5,
+  headerTimeoutMs: 18e4,
+  chunkTimeoutMs: 3e5
+};
+var OFFICEACE_MODELS = [
+  { id: "glm-5.3", name: "GLM-5.3", contextWindow: 202752, maxTokens: 131072 },
+  { id: "glm-5.2", name: "GLM-5.2", contextWindow: 202752, maxTokens: 131072 },
+  { id: "glm-5.1", name: "GLM-5.1", contextWindow: 202752, maxTokens: 131072 },
+  { id: "deepseek-v4.1-flash", name: "DeepSeek-V4.1-Flash", contextWindow: 196608, maxTokens: 131072, multimodal: true },
+  { id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash", contextWindow: 196608, maxTokens: 131072 },
+  { id: "kimi-k2.6", name: "Kimi-K2.6", contextWindow: 196608, maxTokens: 131072, multimodal: true },
+  { id: "qwen3-32b", name: "Qwen3-32B", contextWindow: 131072, maxTokens: 65536 },
+  { id: "qwen3-30b-a3b", name: "Qwen3-30B-A3B", contextWindow: 131072, maxTokens: 65536 }
+];
+
+// vendor/channel-pack/src/accio-product.ts
+var ACCIO_TOKEN_EXCHANGE_PATH = "/api/oauth/token";
+var ACCIO_REFRESH_PATH = "/api/auth/refresh_token";
+var ACCIO_LLM_PATH = "/api/adk/llm/generateContent";
+var ACCIO_CATALOG_PATH = "/api/llm/config/v2";
+var ACCIO_USERINFO_PATH = "/api/auth/userinfo";
+var ACCIO_SUBSCRIPTION_PATH = "/api/entitlement/currentSubscription";
+var ACCIO_QUOTA_PATH = "/api/entitlement/quota";
+var ACCIO_REQUEST_TIMEOUT_MS = 3e4;
+var ACCIO_LOGIN_TIMEOUT_MS = 6e5;
+var ACCIO_REGIONS = Object.freeze(["cn", "global"]);
+var LOGIN_BASE = Object.freeze({
+  cn: "https://www.accio-ai.com",
+  global: "https://zh.accio.com"
+});
+var FALLBACK_MODELS = Object.freeze([
+  { id: "1Drift-N8kP2Q7wR5mX", name: "Qwen 3.8 27B", contextWindow: 512e3, supportsImage: true, multiple: 0.013 },
+  { id: "1Drift-F8hS3mK7pL2n", name: "Qwen 3.8 Flash", contextWindow: 1e6, supportsImage: true, multiple: 0.03 },
+  { id: "1Chronos-F53X9nQ3rT8w", name: "GLM 5.3 Flash", contextWindow: 1e6, supportsImage: true, multiple: 0.03 },
+  { id: "1Nova-Q3xM8vJ1rH6z", name: "DeepSeek V4.1 Flash", contextWindow: 1e6, supportsImage: true, multiple: 0.045 },
+  { id: "1Zenith-M27hS2SR5xQ2p", name: "MiniMax M3", contextWindow: 1e6, supportsImage: true, multiple: 0.08 },
+  { id: "1Chronos-dX3cV9sA2mK7", name: "GLM 5.1", contextWindow: 2e5, supportsImage: false, multiple: 0.12 },
+  { id: "1Nexus-R3wF8qJ5vB6h", name: "Standard", contextWindow: 1e6, supportsImage: true, multiple: 0.13 },
+  { id: "1Drift-A3bM5nK8pQ2w", name: "Qwen 3.5 A3B", contextWindow: 256e3, supportsImage: false, multiple: 0.13 },
+  { id: "1Synapse-G5aJ8wL1dV4s", name: "Kimi K2.6", contextWindow: 256e3, supportsImage: true, multiple: 0.14 },
+  { id: "1Chronos-L53W8nP2qR6m", name: "GLM-5.3", contextWindow: 1e6, supportsImage: false, multiple: 0.16 },
+  { id: "1Chronos-G5p2V9sA2mK7", name: "GLM-5.2", contextWindow: 1e6, supportsImage: false, multiple: 0.16 },
+  { id: "1Nova-bW7yT4kL9pN2", name: "DeepSeek V4 Pro", contextWindow: 1e6, supportsImage: false, multiple: 0.17 },
+  { id: "1Drift-T3TB6WS9a23w", name: "Qwen 3.8 Max", contextWindow: 1e6, supportsImage: true, multiple: 0.44 },
+  { id: "1Orbit-I9eY4tK8bW1f", name: "Professional", contextWindow: 1e6, supportsImage: true, multiple: 1 },
+  { id: "1Orbit-Q7hN3xR6cP2m", name: "Ultimate", contextWindow: 1e6, supportsImage: true, multiple: 2.8 }
+]);
+var ACCIO = {
+  id: "accio",
+  displayName: "Accio (\u963F\u91CC)",
+  gatewayBaseUrl: "https://phoenix-gw.alibaba.com",
+  loginBaseUrlOf(region) {
+    return LOGIN_BASE[region] ?? LOGIN_BASE.cn;
+  },
+  clientId: "accio-work",
+  defaultCredentialRef: "ACCIO_ACCESS_TOKEN",
+  appKey: "OneChat",
+  appVersion: "0.34.4",
+  fallbackModels: FALLBACK_MODELS
+};
+
+// vendor/channel-pack/src/accio-credits.ts
+var ACCIO_CREDIT_UNIT = "credit";
+var ACCIO_CREDIT_BUCKETS = Object.freeze([
+  { key: "daily", label: "\u6BCF\u65E5\u79EF\u5206" },
+  { key: "monthly", label: "\u6BCF\u6708\u79EF\u5206" },
+  { key: "referral", label: "\u63A8\u8350\u79EF\u5206" }
+]);
+var ACCIO_NOT_LOGIN_BASE = "\u672A\u767B\u5F55\u6216\u767B\u5F55\u5DF2\u8FC7\u671F\uFF08NOT_LOGIN\uFF09\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55 Accio \u8D26\u53F7";
+var ACCIO_TIER_LABELS = /* @__PURE__ */ new Map([
+  ["freemember", "Free"]
+]);
+function accioAccessToken(credential) {
+  return typeof credential?.access_token === "string" ? credential.access_token : "";
+}
+function readRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : void 0;
+}
+function readString4(source, key) {
+  const value = source[key];
+  return typeof value === "string" ? value : "";
+}
+function readScalarString(source, key) {
+  const value = source[key];
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+function readNumber4(source, key) {
+  const value = source[key];
+  if (typeof value === "number") return Number.isFinite(value) ? value : void 0;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : void 0;
+  }
+  return void 0;
+}
+function parseAccioEnvelope(parsed, httpStatus, text) {
+  const statusOk = httpStatus >= 200 && httpStatus < 300;
+  const record = readRecord(parsed);
+  if (record === void 0) {
+    return {
+      httpStatus,
+      ok: false,
+      authFailed: httpStatus === 401 || httpStatus === 403,
+      message: `HTTP ${httpStatus} ${text.slice(0, 200)}`.trim()
+    };
+  }
+  const code = readScalarString(record, "code");
+  const message2 = readScalarString(record, "message") || readScalarString(record, "error");
+  const data = readRecord(record.data);
+  const codeUpper = code.toUpperCase();
+  const authFailed = httpStatus === 401 || httpStatus === 403 || codeUpper === "401" || codeUpper === "NOT_LOGIN" || message2.toUpperCase() === "NOT_LOGIN";
+  const summary = [
+    httpStatus > 0 ? `HTTP ${httpStatus}` : "",
+    code.length > 0 ? `code=${code}` : "",
+    message2
+  ].filter((part) => part.length > 0).join(" ");
+  return {
+    httpStatus,
+    ok: statusOk && record.success !== false && data !== void 0,
+    authFailed,
+    data,
+    message: summary.length > 0 ? summary : `HTTP ${httpStatus}`
+  };
+}
+async function callAccioEndpoint(options) {
+  const token = accioAccessToken(options.credential);
+  const base = `${ACCIO.gatewayBaseUrl}${options.path}`;
+  const headers = { Accept: "application/json" };
+  let url = base;
+  let body;
+  if (options.method === "POST") {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify({ accessToken: token });
+  } else {
+    url = `${base}?${new URLSearchParams({ accessToken: token }).toString()}`;
+  }
+  const init = {
+    method: options.method,
+    headers,
+    signal: AbortSignal.timeout(ACCIO_REQUEST_TIMEOUT_MS),
+    ...body === void 0 ? {} : { body }
+  };
+  try {
+    const response = await options.fetcher(url, init);
+    const text = await response.text();
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = void 0;
+    }
+    return parseAccioEnvelope(parsed, response.status, text);
+  } catch (error) {
+    return {
+      httpStatus: 0,
+      ok: false,
+      authFailed: false,
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+function accioNotLoginMessage(envelope) {
+  return envelope.message.length > 0 ? `${ACCIO_NOT_LOGIN_BASE}\uFF08\u670D\u52A1\u7AEF\u539F\u6587\uFF1A${envelope.message}\uFF09` : ACCIO_NOT_LOGIN_BASE;
+}
+function accioCreditBuckets(subscription) {
+  const root = readRecord(subscription);
+  if (root === void 0) return [];
+  const entitlement = readRecord(root.entitlement);
+  if (entitlement === void 0) return [];
+  const rows = [];
+  for (const bucket of ACCIO_CREDIT_BUCKETS) {
+    const value = readRecord(entitlement[bucket.key]);
+    if (value === void 0) continue;
+    const remaining = readNumber4(value, "remaining");
+    if (remaining === void 0) continue;
+    rows.push({
+      key: bucket.key,
+      label: bucket.label,
+      total: readNumber4(value, "total") ?? 0,
+      used: readNumber4(value, "used") ?? 0,
+      remaining
+    });
+  }
+  return rows;
+}
+async function fetchAccioUserInfo(credential, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  if (accioAccessToken(credential) === "") return void 0;
+  const envelope = await callAccioEndpoint({
+    path: ACCIO_USERINFO_PATH,
+    method: "POST",
+    credential,
+    fetcher
+  });
+  if (!envelope.ok || envelope.data === void 0) return void 0;
+  const data = envelope.data;
+  return {
+    userId: readString4(data, "userId"),
+    userName: readString4(data, "userName"),
+    routeRegion: readString4(data, "routeRegion"),
+    userLevel: readString4(data, "userLevel"),
+    maskedMobile: readString4(data, "maskedMobile")
+  };
+}
+async function fetchAccioQuota(credential, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  if (accioAccessToken(credential) === "") return void 0;
+  const envelope = await callAccioEndpoint({
+    path: ACCIO_QUOTA_PATH,
+    method: "GET",
+    credential,
+    fetcher
+  });
+  if (!envelope.ok || envelope.data === void 0) return void 0;
+  const data = envelope.data;
+  const usagePercent = readNumber4(data, "usagePercent");
+  const refreshCountdownSeconds = readNumber4(data, "refreshCountdownSeconds");
+  return {
+    ...usagePercent === void 0 ? {} : { usagePercent },
+    ...refreshCountdownSeconds === void 0 ? {} : { refreshCountdownSeconds }
+  };
+}
+function accioQuotaResetIso(quota, nowMs = Date.now()) {
+  const seconds = quota?.refreshCountdownSeconds;
+  if (seconds === void 0 || !Number.isFinite(seconds) || seconds <= 0) return "";
+  return new Date(nowMs + seconds * 1e3).toISOString();
+}
+function accioAccountTierExtra(userInfo) {
+  const level = userInfo?.userLevel ?? "";
+  if (level === "") return void 0;
+  const label = ACCIO_TIER_LABELS.get(level.toLowerCase()) ?? level;
+  return { accountTier: { label, title: `Accio \u8D26\u53F7\u7B49\u7EA7\uFF08${level}\uFF09` } };
+}
+function makeAccioPackage(name2, total, used, remaining, cycleEndTime) {
+  return {
+    name: name2,
+    unit: ACCIO_CREDIT_UNIT,
+    remaining,
+    total,
+    used,
+    active: true,
+    cycleStartTime: "",
+    cycleEndTime,
+    expiredTime: ""
+  };
+}
+async function fetchAccioBalanceDetailed(credential, options = {}) {
+  const fetcher = options.fetcher ?? fetch;
+  if (accioAccessToken(credential) === "") {
+    return { balance: null, error: ACCIO_NOT_LOGIN_BASE };
+  }
+  const subscription = await callAccioEndpoint({
+    path: ACCIO_SUBSCRIPTION_PATH,
+    method: "GET",
+    credential,
+    fetcher
+  });
+  if (subscription.authFailed) {
+    return { balance: null, error: accioNotLoginMessage(subscription) };
+  }
+  if (!subscription.ok || subscription.data === void 0) {
+    return { balance: null, error: `\u79EF\u5206\u67E5\u8BE2\u5931\u8D25\uFF1A${subscription.message}` };
+  }
+  const data = subscription.data;
+  const buckets = accioCreditBuckets(data);
+  const topRemaining = readNumber4(data, "remaining");
+  if (buckets.length === 0 && topRemaining === void 0) {
+    return { balance: null, error: "\u79EF\u5206\u67E5\u8BE2\u5931\u8D25\uFF1A\u54CD\u5E94\u672A\u5305\u542B\u4F59\u989D\u5B57\u6BB5" };
+  }
+  const [quota, userInfo] = await Promise.all([
+    fetchAccioQuota(credential, { fetcher }),
+    fetchAccioUserInfo(credential, { fetcher })
+  ]);
+  const dailyResetAt = accioQuotaResetIso(quota);
+  const packages = buckets.map((bucket) => makeAccioPackage(
+    bucket.label,
+    roundCredits(bucket.total),
+    roundCredits(bucket.used),
+    roundCredits(bucket.remaining),
+    // 只有 daily 知道周期何时结束（quota 的倒计时）；其余留空而不是复用它的值。
+    bucket.key === "daily" ? dailyResetAt : ""
+  ));
+  const total = roundCredits(
+    topRemaining ?? buckets.reduce((sum, bucket) => sum + bucket.remaining, 0)
+  );
+  if (packages.length === 0) {
+    packages.push(makeAccioPackage("\u53EF\u7528\u79EF\u5206", total, 0, total, dailyResetAt));
+  }
+  const balance = { total, packages, expiredTotal: 0 };
+  const extra = accioAccountTierExtra(userInfo);
+  return {
+    balance,
+    ...extra === void 0 ? {} : { extra }
+  };
+}
+
+// vendor/channel-pack/src/channel-pack-rpc.ts
+init_login();
+
 // vendor/channel-pack/src/gemini-credits.ts
 var GEMINI_UNAUTHORIZED_MESSAGE = "\u5C1A\u672A\u6388\u6743 Google \u8D26\u53F7";
 var GEMINI_BUCKET_FIVE_HOUR = "gemini-5h";
@@ -56394,8 +57108,8 @@ function quotaRejectionHint(text) {
 }
 
 // vendor/channel-pack/src/qoder-machine.ts
-import { execFileSync, spawn as spawn3 } from "node:child_process";
-import { existsSync as existsSync6, readFileSync as readFileSync6, readdirSync } from "node:fs";
+import { execFileSync as execFileSync2, spawn as spawn3 } from "node:child_process";
+import { existsSync as existsSync7, readFileSync as readFileSync6, readdirSync } from "node:fs";
 import { homedir as homedir3 } from "node:os";
 import { join as join5 } from "node:path";
 var RUNTIME_INFO_TIMEOUT_MS = 2e4;
@@ -56417,10 +57131,10 @@ function candidatePaths() {
   }
   return paths;
 }
-function parseFile(path2) {
+function parseFile(path3) {
   let raw;
   try {
-    raw = readFileSync6(path2, "utf8");
+    raw = readFileSync6(path3, "utf8");
   } catch {
     return void 0;
   }
@@ -56445,8 +57159,8 @@ async function resolveQoderMachineIdentityAsync(forceExecutable) {
     cached2 = live;
     return live;
   }
-  for (const path2 of candidatePaths()) {
-    const identity = parseFile(path2);
+  for (const path3 of candidatePaths()) {
+    const identity = parseFile(path3);
     if (identity !== void 0) {
       cached2 = identity;
       return identity;
@@ -56469,7 +57183,7 @@ function findRuntimeInfoExecutable(home, dataDirNames = QODER_DATA_DIR_NAMES) {
     const dir = entries.find((name2) => name2.startsWith("umid-"));
     if (dir === void 0) continue;
     const exe = join5(binDir, dir, exeName);
-    if (existsSync6(exe)) return exe;
+    if (existsSync7(exe)) return exe;
   }
   return void 0;
 }
@@ -56477,7 +57191,7 @@ function locateRuntimeInfo(override) {
   const fromEnv = process.env.QODER_RUNTIME_INFO;
   const candidate = override ?? (fromEnv !== void 0 && fromEnv.length > 0 ? fromEnv : void 0);
   if (candidate !== void 0) {
-    return existsSync6(candidate) ? candidate : void 0;
+    return existsSync7(candidate) ? candidate : void 0;
   }
   return findRuntimeInfoExecutable(homedir3());
 }
@@ -56599,7 +57313,7 @@ async function creditsHeaders(credential, product) {
     "User-Agent": "Qoder"
   });
 }
-function readNumber4(source, key) {
+function readNumber5(source, key) {
   if (typeof source !== "object" || source === null) return void 0;
   const value = source[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -56609,16 +57323,16 @@ function readNumber4(source, key) {
   }
   return void 0;
 }
-function readString4(source, key) {
+function readString5(source, key) {
   if (typeof source !== "object" || source === null) return void 0;
   const value = source[key];
   return typeof value === "string" && value.length > 0 ? value : void 0;
 }
 var QODER_PLAN_PACKAGE = "\u5957\u9910\u989D\u5EA6";
 function toPackage(name2, quota, options = {}) {
-  const total = readNumber4(quota, "total");
-  const used = readNumber4(quota, "used");
-  const remainingRaw = readNumber4(quota, "remaining");
+  const total = readNumber5(quota, "total");
+  const used = readNumber5(quota, "used");
+  const remainingRaw = readNumber5(quota, "remaining");
   if (total === void 0 && used === void 0 && remainingRaw === void 0) return void 0;
   const totalValue = Math.max(0, total ?? 0);
   const usedValue = Math.max(0, used ?? 0);
@@ -56626,7 +57340,7 @@ function toPackage(name2, quota, options = {}) {
   const expMs = options.expiredTime && options.expiredTime.length > 0 ? Date.parse(options.expiredTime.replace(" ", "T")) : Number.NaN;
   return {
     name: name2,
-    unit: readString4(quota, "unit") ?? "credits",
+    unit: readString5(quota, "unit") ?? "credits",
     remaining,
     total: totalValue,
     used: usedValue,
@@ -56669,9 +57383,9 @@ async function fetchQoderCreditBalance(credential, product, fetcher = fetch) {
   if (Array.isArray(dedicated)) {
     for (const item of dedicated) {
       const pkg = toPackage(
-        readString4(item, "name") ?? readString4(item, "id") ?? "\u4E13\u7528\u8D44\u6E90\u5305",
+        readString5(item, "name") ?? readString5(item, "id") ?? "\u4E13\u7528\u8D44\u6E90\u5305",
         item,
-        { expiredTime: readString4(item, "expiresAt") ?? readString4(item, "expires_at") ?? "" }
+        { expiredTime: readString5(item, "expiresAt") ?? readString5(item, "expires_at") ?? "" }
       );
       if (pkg !== void 0) packages.push(pkg);
     }
@@ -56687,13 +57401,13 @@ function parseQoderCampaigns(body) {
   const campaigns = [];
   if (Array.isArray(raw)) {
     for (const item of raw) {
-      const id = readString4(item, "campaignId");
+      const id = readString5(item, "campaignId");
       if (id === void 0) continue;
       campaigns.push({
         campaignId: id,
-        ...readString4(item, "campaignKey") !== void 0 ? { campaignKey: readString4(item, "campaignKey") } : {},
-        ...readString4(item, "actionType") !== void 0 ? { actionType: readString4(item, "actionType") } : {},
-        ...readString4(item, "claimStatus") !== void 0 ? { claimStatus: readString4(item, "claimStatus") } : {},
+        ...readString5(item, "campaignKey") !== void 0 ? { campaignKey: readString5(item, "campaignKey") } : {},
+        ...readString5(item, "actionType") !== void 0 ? { actionType: readString5(item, "actionType") } : {},
+        ...readString5(item, "claimStatus") !== void 0 ? { claimStatus: readString5(item, "claimStatus") } : {},
         ...benefitAmount(item) !== void 0 ? { amount: benefitAmount(item) } : {}
       });
     }
@@ -56706,7 +57420,7 @@ function parseQoderCampaigns(body) {
 }
 function benefitAmount(item) {
   if (typeof item !== "object" || item === null) return void 0;
-  return readNumber4(item.benefit, "amount");
+  return readNumber5(item.benefit, "amount");
 }
 async function loadCampaigns(credential, product, fetcher) {
   let response;
@@ -56737,7 +57451,7 @@ function parseClaimResult(body) {
   if (typeof body !== "object" || body === null || Array.isArray(body)) return {};
   const root = body;
   return {
-    ...readString4(root, "status") !== void 0 ? { status: readString4(root, "status") } : {},
+    ...readString5(root, "status") !== void 0 ? { status: readString5(root, "status") } : {},
     ...typeof root.replayed === "boolean" ? { replayed: root.replayed } : {},
     ...benefitAmount(root) !== void 0 ? { amount: benefitAmount(root) } : {}
   };
@@ -56816,7 +57530,7 @@ async function claimQoderDailyCheckin(credential, product, fetcher = fetch, nowM
 // vendor/channel-pack/src/cline-credits.ts
 var CLINE_CREDITS_TIMEOUT_MS = 3e4;
 var CLINE_BALANCE_SCALE = 1e5;
-function readNumber5(source, key) {
+function readNumber6(source, key) {
   const value = source[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -56851,7 +57565,7 @@ function parseClineBalanceResponse(value) {
   }
   const data = typeof record.data === "object" && record.data !== null && !Array.isArray(record.data) ? record.data : void 0;
   if (data === void 0) return { error: "\u54CD\u5E94\u7F3A\u5C11 data \u5B57\u6BB5" };
-  const rawBalance = readNumber5(data, "balance");
+  const rawBalance = readNumber6(data, "balance");
   if (rawBalance === void 0) return { error: "\u54CD\u5E94\u7F3A\u5C11 balance \u5B57\u6BB5" };
   return { rawBalance };
 }
@@ -56897,7 +57611,7 @@ async function fetchClineCreditBalance(credential, product, fetcher = fetch, opt
 // vendor/channel-pack/src/cline-quota.ts
 var CLINE_QUOTA_TIMEOUT_MS = 3e4;
 var CLINE_USAGE_LIMITS_PATH = "/api/v1/users/me/plan/usage-limits";
-function readNumber6(source, key) {
+function readNumber7(source, key) {
   const value = source[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -56906,7 +57620,7 @@ function readNumber6(source, key) {
   }
   return void 0;
 }
-function readString5(source, key) {
+function readString6(source, key) {
   const value = source[key];
   if (typeof value !== "string") return void 0;
   const trimmed = value.trim();
@@ -56950,15 +57664,15 @@ function parseClineUsageLimits(value) {
   for (const item of raw) {
     if (typeof item !== "object" || item === null || Array.isArray(item)) continue;
     const entry = item;
-    const type = readString5(entry, "type");
+    const type = readString6(entry, "type");
     if (type === void 0) continue;
     windows.push({
       type,
-      percentUsed: readNumber6(entry, "percentUsed") ?? 0,
+      percentUsed: readNumber7(entry, "percentUsed") ?? 0,
       // ⚠️ `resetsAt` 是 ISO 字符串。若网关某天回数字时间戳，也不要在这里
       // 猜单位（秒/毫秒），原样转成字符串交由展示层判定 —— 猜错会显示
       // 1970 年或 5 万年后的时间，比不显示更难排查。
-      resetsAt: readString5(entry, "resetsAt") ?? ""
+      resetsAt: readString6(entry, "resetsAt") ?? ""
     });
   }
   return { windows, error: serverError === "" ? void 0 : serverError };
@@ -57049,7 +57763,7 @@ function describeNonJsonResponse2(status, text) {
 function readBool2(source, key) {
   return source[key] === true;
 }
-function readNumber7(source, key) {
+function readNumber8(source, key) {
   const value = source[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
@@ -57081,7 +57795,7 @@ async function fetchLobsteraiActivitySlot(credential, product, clientVersion, fe
   return {
     slotState: typeof envelope.data.slotState === "string" ? envelope.data.slotState : "",
     activityCode,
-    configRevision: readNumber7(activity, "configRevision")
+    configRevision: readNumber8(activity, "configRevision")
   };
 }
 async function fetchLobsteraiActivityContext(credential, product, slot2, fetcher = fetch) {
@@ -57160,7 +57874,7 @@ async function fetchLobsteraiCreditBalance(credential, product, fetcher = fetch)
     for (const item of items) {
       if (typeof item !== "object" || item === null) continue;
       const record = item;
-      const remaining = readNumber7(record, "creditsRemaining");
+      const remaining = readNumber8(record, "creditsRemaining");
       const type = typeof record.type === "string" ? record.type : "";
       const label = typeof record.label === "string" ? record.label : "";
       const expiresAt = typeof record.expiresAt === "string" ? record.expiresAt : "";
@@ -57200,7 +57914,7 @@ async function fetchLobsteraiCreditBalance(credential, product, fetcher = fetch)
       if (pkg.used <= 0) pkg.used = roundCredits2(Math.max(0, face - pkg.remaining));
     }
   }
-  const total = roundCredits2(Math.max(0, readNumber7(envelope.data, "totalCreditsRemaining")));
+  const total = roundCredits2(Math.max(0, readNumber8(envelope.data, "totalCreditsRemaining")));
   if (total === 0 && packages.length === 0) return null;
   const expiredTotal = roundCredits2(
     packages.reduce((sum, pkg) => sum + (pkg.active ? 0 : Math.max(0, pkg.remaining)), 0)
@@ -57251,7 +57965,7 @@ function readBool3(source, key) {
   if (typeof value === "string") return value.trim().toLowerCase() === "true";
   return false;
 }
-function readNumber8(source, key) {
+function readNumber9(source, key) {
   const value = source[key];
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -57260,7 +57974,7 @@ function readNumber8(source, key) {
   }
   return 0;
 }
-function readString6(source, key) {
+function readString7(source, key) {
   const value = source[key];
   return typeof value === "string" ? value : "";
 }
@@ -57270,7 +57984,7 @@ function readIdentifier(source, key) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return "";
 }
-function readRecord(source, key) {
+function readRecord2(source, key) {
   const value = source[key];
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
 }
@@ -57279,7 +57993,7 @@ function unwrapSnapEnvelope(raw) {
   const hasCode = typeof code === "number";
   if (hasCode) {
     if (code !== 0) {
-      const message2 = readString6(raw, "message") || readString6(raw, "msg");
+      const message2 = readString7(raw, "message") || readString7(raw, "msg");
       return { ok: false, code, message: message2.length > 0 ? message2 : `\u4E1A\u52A1\u7801 ${code}` };
     }
     const data = raw.data;
@@ -57339,13 +58053,13 @@ function parseCreditBalance(metrics) {
   for (const item of metrics) {
     if (typeof item !== "object" || item === null) continue;
     const record = item;
-    const name2 = readString6(record, "name");
+    const name2 = readString7(record, "name");
     const label = CREDIT_METRIC_LABELS[name2];
     if (label === void 0) continue;
     sawAnyCreditMetric = true;
-    const amount = readNumber8(record, "package_credit_amount");
-    const used = readNumber8(record, "package_credit_used");
-    const remain = readNumber8(record, "package_credit_remain");
+    const amount = readNumber9(record, "package_credit_amount");
+    const used = readNumber9(record, "package_credit_used");
+    const remain = readNumber9(record, "package_credit_remain");
     if (name2 === TOTAL_CREDIT_METRIC) totalRemain = remain;
     if (amount <= 0 && remain <= 0) continue;
     packages.push({
@@ -57373,17 +58087,17 @@ async function fetchCodeArtsAccountInfoDetailed(credential, fetcher = fetch) {
   const result = await signedSnapRequest("GET", url, credential, void 0, fetcher);
   if (!result.ok) return { ok: false, message: result.message };
   const data = result.data;
-  const pkg = readRecord(data, "package");
-  const packageNameCn = readString6(pkg, "package_name_cn");
-  const packageNameEn = readString6(pkg, "package_name_en");
+  const pkg = readRecord2(data, "package");
+  const packageNameCn = readString7(pkg, "package_name_cn");
+  const packageNameEn = readString7(pkg, "package_name_en");
   return {
     ok: true,
     info: {
       isCreditPackage: readBool3(pkg, "is_credit_package"),
       isTokenPackage: readBool3(pkg, "is_token_package"),
-      specCode: readString6(pkg, "spec_code"),
+      specCode: readString7(pkg, "spec_code"),
       packageName: packageNameCn.length > 0 ? packageNameCn : packageNameEn,
-      packageStatus: readString6(pkg, "status"),
+      packageStatus: readString7(pkg, "status"),
       credit: parseCreditBalance(data.metrics)
     }
   };
@@ -57392,13 +58106,13 @@ function parseActivity(item) {
   return {
     // 用 readIdentifier 而非 readString：实测 campaignId 是**数字** 1。
     campaignId: readIdentifier(item, "campaignId"),
-    type: readString6(item, "type"),
-    title: readString6(item, "title"),
+    type: readString7(item, "type"),
+    title: readString7(item, "title"),
     claimable: readBool3(item, "claimable"),
-    status: readString6(item, "status"),
+    status: readString7(item, "status"),
     // 可领积分数：实测字段名是 `benefitAmount`（值 1000）。
     // 保留另两个候选名作兼容回退，取不到才为 0。
-    amount: readNumber8(item, "benefitAmount") || readNumber8(item, "amount") || readNumber8(item, "creditAmount")
+    amount: readNumber9(item, "benefitAmount") || readNumber9(item, "amount") || readNumber9(item, "creditAmount")
   };
 }
 async function fetchCodeArtsOpsActivitiesDetailed(credential, fetcher = fetch) {
@@ -57461,7 +58175,7 @@ async function claimCodeArtsDailyCheckin(credential, fetcher = fetch) {
       fetcher
     );
   }
-  const claimCredit = readNumber8(claimResult.data, "benefitAmount") || readNumber8(claimResult.data, "credit") || readNumber8(claimResult.data, "credits") || readNumber8(claimResult.data, "creditAmount") || readNumber8(claimResult.data, "amount");
+  const claimCredit = readNumber9(claimResult.data, "benefitAmount") || readNumber9(claimResult.data, "credit") || readNumber9(claimResult.data, "credits") || readNumber9(claimResult.data, "creditAmount") || readNumber9(claimResult.data, "amount");
   return {
     kind: "claimed",
     credit: claimCredit > 0 ? claimCredit : activity.amount,
@@ -57499,11 +58213,11 @@ function classifyTraeCheckinError(httpStatus, code) {
   }
   return { type: "Unknown", cooldownSecs: 0 };
 }
-function readNumber9(source, key) {
+function readNumber10(source, key) {
   const value = source[key];
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
-function readString7(source, key) {
+function readString8(source, key) {
   const value = source[key];
   return typeof value === "string" ? value : "";
 }
@@ -57513,13 +58227,13 @@ function readClaimCode(body) {
   if (typeof raw === "string" && /^-?\d+$/.test(raw.trim())) return Number(raw.trim());
   return raw === void 0 ? 0 : -1;
 }
-async function postJson3(path2, credential, body, fetcher, userId) {
+async function postJson3(path3, credential, body, fetcher, userId) {
   const uid = userId ?? credential.uid;
   if (uid.length === 0) {
     return { ok: false, message: "\u7F3A\u5C11 user_id\uFF0C\u65E0\u6CD5\u6784\u9020\u8BBE\u5907\u8EAB\u4EFD", httpStatus: 0 };
   }
   try {
-    const response = await fetcher(`https://api.trae.cn${path2}`, {
+    const response = await fetcher(`https://api.trae.cn${path3}`, {
       method: "POST",
       headers: traeCheckinHeaders(credential, {}, uid),
       body,
@@ -57554,11 +58268,11 @@ async function fetchTraeCheckinStatus(credential, _product, fetcher = fetch) {
   return {
     active: body.enable === true,
     todayCheckedIn: body.checked_in === true,
-    streakDays: readNumber9(body, "streak_days") || 0,
-    dailyCredit: readNumber9(body, "credits") || 0,
+    streakDays: readNumber10(body, "streak_days") || 0,
+    dailyCredit: readNumber10(body, "credits") || 0,
     todayCredit: 0,
     isStreakDay: false,
-    totalCredits: readNumber9(body, "total_credits") || 0,
+    totalCredits: readNumber10(body, "total_credits") || 0,
     checkinDates: [],
     activityName: "",
     themeName: "",
@@ -57595,12 +58309,12 @@ async function claimTraeDailyCheckin(credential, product, fetcher = fetch, gener
     return {
       kind: "failed",
       code: 9074,
-      message: readString7(body, "message") || readString7(body, "msg") || "\u7B7E\u5230\u4EBA\u6570\u8FC7\u591A\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5",
+      message: readString8(body, "message") || readString8(body, "msg") || "\u7B7E\u5230\u4EBA\u6570\u8FC7\u591A\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5",
       errorType: "BusinessError",
       cooldownSecs: 300
     };
   }
-  const msg = readString7(body, "message") || readString7(body, "msg") || "";
+  const msg = readString8(body, "message") || readString8(body, "msg") || "";
   if (code === 0) {
     const status = await fetchTraeCheckinStatus(credential, product, fetcher);
     return {
@@ -57641,16 +58355,16 @@ async function fetchTraeCreditBalance(credential, _product, fetcher = fetch) {
     if (typeof base !== "object" || base === null) continue;
     const quota = base.quota;
     if (typeof quota !== "object" || quota === null) continue;
-    const creditsLimit = readNumber9(quota, "credits_limit");
+    const creditsLimit = readNumber10(quota, "credits_limit");
     if (creditsLimit <= 0) continue;
     const usage = entry.usage;
-    const used = typeof usage === "object" && usage !== null ? readNumber9(usage, "credits_amount") : 0;
-    const expireSec = readNumber9(entry, "expire_time");
+    const used = typeof usage === "object" && usage !== null ? readNumber10(usage, "credits_amount") : 0;
+    const expireSec = readNumber10(entry, "expire_time");
     const deductionEndMs = expireSec > 0 ? expireSec * 1e3 : void 0;
     const pkg = {
       // ⚠️ 包名用 `display_desc`（实测"每月登录赠送"/"签到奖励"/"免费"），
       // 不是 `base.name` —— 后者实测为 undefined，旧代码全部回退成了"资源包"。
-      name: readString7(base, "display_desc") || readString7(entry, "display_desc") || "\u8D44\u6E90\u5305",
+      name: readString8(base, "display_desc") || readString8(entry, "display_desc") || "\u8D44\u6E90\u5305",
       unit: "credits",
       remaining: creditsLimit - used,
       total: creditsLimit,
@@ -57773,16 +58487,16 @@ function translateGeminiRequest(options) {
       generation
     ) : base;
   }
-  const request2 = {
+  const request3 = {
     contents,
     generationConfig: buildGenerationConfig(options.spec, options.maxTokens, options.temperature),
     sessionId
   };
   if (options.system !== void 0 && options.system !== "") {
-    request2.systemInstruction = { role: "system", parts: [{ text: options.system }] };
+    request3.systemInstruction = { role: "system", parts: [{ text: options.system }] };
   }
   if (options.tools !== void 0 && options.tools.length > 0) {
-    request2.tools = [{
+    request3.tools = [{
       functionDeclarations: options.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -57792,11 +58506,11 @@ function translateGeminiRequest(options) {
     }];
   }
   const toolConfig = buildToolConfig(options.toolChoice, options.tools);
-  if (toolConfig !== void 0) request2.toolConfig = toolConfig;
+  if (toolConfig !== void 0) request3.toolConfig = toolConfig;
   return {
     model: options.spec.upstream,
     project: options.project ?? GEMINI_DEFAULT_PROJECT,
-    request: request2,
+    request: request3,
     requestId: options.requestId,
     userAgent: "antigravity"
   };
@@ -59166,17 +59880,17 @@ async function openSocks5Tunnel(proxy, host, port) {
     socket.write(Buffer.from(bytes), (err) => err ? reject(err) : resolve2());
   });
   let leftover = Buffer.alloc(0);
-  let pending;
+  let pending2;
   const detach = () => {
     socket.off("data", onData);
     socket.off("error", onError);
     socket.off("close", onClose);
   };
   const fulfill = () => {
-    if (pending === void 0 || leftover.length < pending.n) return;
-    const n = pending.n;
-    const target = pending;
-    pending = void 0;
+    if (pending2 === void 0 || leftover.length < pending2.n) return;
+    const n = pending2.n;
+    const target = pending2;
+    pending2 = void 0;
     const value = new Uint8Array(leftover.subarray(0, n));
     leftover = leftover.subarray(n);
     detach();
@@ -59187,14 +59901,14 @@ async function openSocks5Tunnel(proxy, host, port) {
     fulfill();
   };
   const onError = (error) => {
-    const target = pending;
-    pending = void 0;
+    const target = pending2;
+    pending2 = void 0;
     detach();
     target?.reject(error);
   };
   const onClose = () => {
-    const target = pending;
-    pending = void 0;
+    const target = pending2;
+    pending2 = void 0;
     detach();
     target?.reject(new Error("SOCKS5 \u4EE3\u7406\u5728\u63E1\u624B\u5B8C\u6210\u524D\u5173\u95ED\u4E86\u8FDE\u63A5"));
   };
@@ -59203,7 +59917,7 @@ async function openSocks5Tunnel(proxy, host, port) {
       resolve2(new Uint8Array(0));
       return;
     }
-    pending = { n, resolve: resolve2, reject };
+    pending2 = { n, resolve: resolve2, reject };
     socket.on("data", onData);
     socket.once("error", onError);
     socket.once("close", onClose);
@@ -59394,7 +60108,7 @@ async function handleOpencodeRpc(ctx, pool, method, payload) {
 }
 
 // vendor/channel-pack/src/badge-preferences.ts
-import { existsSync as existsSync7, mkdirSync as mkdirSync5, readFileSync as readFileSync7, renameSync as renameSync5, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync8, mkdirSync as mkdirSync5, readFileSync as readFileSync7, renameSync as renameSync5, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join6 } from "node:path";
 var BADGE_PREFERENCES_FILE = "ui-preferences.json";
 var BADGE_PREFERENCES = ["auto", "subscription", "credits"];
@@ -59413,14 +60127,14 @@ var MemoryPreferenceStore = class {
   }
 };
 var FilePreferenceStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
   }
   kind = "file";
   load() {
     try {
-      if (!existsSync7(this.path)) return DEFAULT_BADGE_PREFERENCE;
+      if (!existsSync8(this.path)) return DEFAULT_BADGE_PREFERENCE;
       const parsed = JSON.parse(readFileSync7(this.path, "utf-8"));
       return sanitizeBadgePreference(preferenceFieldOf(parsed));
     } catch (error) {
@@ -59628,7 +60342,7 @@ function isAllFailed(snapshot) {
 }
 
 // vendor/channel-pack/src/auto-checkin.ts
-import { existsSync as existsSync8, mkdirSync as mkdirSync6, readFileSync as readFileSync8, renameSync as renameSync6, writeFileSync as writeFileSync7 } from "node:fs";
+import { existsSync as existsSync9, mkdirSync as mkdirSync6, readFileSync as readFileSync8, renameSync as renameSync6, writeFileSync as writeFileSync7 } from "node:fs";
 import { join as join7 } from "node:path";
 var AUTO_CHECKIN_FILE = "auto-checkin.json";
 var SCHEMA4 = "dsh-codearts-auth/auto-checkin/v1";
@@ -59694,14 +60408,14 @@ var MemoryAutoCheckinStore = class {
   }
 };
 var FileAutoCheckinStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
   }
   kind = "file";
   load() {
     try {
-      if (!existsSync8(this.path)) return { ...DEFAULT_AUTO_CHECKIN };
+      if (!existsSync9(this.path)) return { ...DEFAULT_AUTO_CHECKIN };
       return sanitizeAutoCheckin(JSON.parse(readFileSync8(this.path, "utf-8")));
     } catch (error) {
       this.logger?.warn(`[channel-pack] \u8BFB\u53D6 ${this.path} \u5931\u8D25\uFF0C\u81EA\u52A8\u7B7E\u5230\u6309\u9ED8\u8BA4\u8BBE\u7F6E\uFF08\u5F00\u542F\uFF09\u5904\u7406: ${String(error)}`);
@@ -59777,7 +60491,7 @@ function createAutoCheckin(deps) {
   let doc = deps.store.load();
   let running2 = false;
   let inflight = null;
-  let pending = null;
+  let pending2 = null;
   const today = () => utc8DateString(now());
   function state() {
     return {
@@ -59892,17 +60606,17 @@ function createAutoCheckin(deps) {
       return state();
     },
     start() {
-      if (pending !== null) return;
+      if (pending2 !== null) return;
       const ms = deps.delayMs ?? autoCheckinDelayMs();
       const fire = () => {
-        pending = null;
+        pending2 = null;
         void runIfDue();
       };
       if (ms <= 0) {
         fire();
         return;
       }
-      pending = (deps.schedule ?? defaultSchedule)(fire, ms);
+      pending2 = (deps.schedule ?? defaultSchedule2)(fire, ms);
     },
     runIfDue,
     async dismiss() {
@@ -59915,12 +60629,12 @@ function createAutoCheckin(deps) {
       return state();
     },
     stop() {
-      pending?.cancel();
-      pending = null;
+      pending2?.cancel();
+      pending2 = null;
     }
   };
 }
-function defaultSchedule(fn, ms) {
+function defaultSchedule2(fn, ms) {
   const timer = setTimeout(fn, ms);
   timer.unref?.();
   return { cancel: () => clearTimeout(timer) };
@@ -60008,7 +60722,8 @@ function buildRaccoonNickname(credential, fallbackId) {
 var PERMANENT_LOCK_PROVIDERS = /* @__PURE__ */ new Set([
   LOOMY.id,
   CODEBUDDY.id,
-  WORKBUDDY.id
+  WORKBUDDY.id,
+  OFFICEACE.id
 ]);
 function computeClaimSummary(outcomes) {
   const summary = {
@@ -60194,7 +60909,7 @@ function providerIdsOf(llm, modelAdapters) {
   const keys = Object.keys(modelAdapters ?? {});
   return keys.length > 0 ? keys.map((id) => ({ id })) : void 0;
 }
-function registerChannelPackRpc(ctx, pool, codearts, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, modelAdapters, config = {}) {
+function registerChannelPackRpc(ctx, pool, codearts, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, officeace, accio, modelAdapters, config = {}) {
   ctx.inject(["connection"], (connectionCtx) => {
     registerChannelPackEndpoints(
       connectionCtx,
@@ -60212,12 +60927,14 @@ function registerChannelPackRpc(ctx, pool, codearts, buddy, workbuddy, lobsterai
       minimax,
       zcode,
       gemini,
+      officeace,
+      accio,
       modelAdapters,
       config
     );
   });
 }
-function broadcastCatalogChanged(ctx) {
+function broadcastCatalogChanged2(ctx) {
   try {
     ctx.emit("llm/adapters-updated");
   } catch (error) {
@@ -60236,7 +60953,7 @@ async function fullCatalogIds(ctx, modelAdapters, provider) {
     return { error: `\u8BFB\u53D6\u6A21\u578B\u5217\u8868\u5931\u8D25\uFF1A${reason}` };
   }
 }
-function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, modelAdapters, config = {}) {
+function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, officeace, accio, modelAdapters, config = {}) {
   const connection = ctx.connection ?? ctx.get("connection");
   if (!connection || typeof connection.fetch?.register !== "function") {
     ctx.logger.warn("[channel-pack] connection.fetch not available, RPC endpoints not registered");
@@ -60254,6 +60971,8 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
   };
   const pendingSmsMsgid = /* @__PURE__ */ new Map();
   const pendingLoginFailures = /* @__PURE__ */ new Map();
+  const pendingOfficeAceState = /* @__PURE__ */ new Map();
+  const officeAceExchangeInFlight = /* @__PURE__ */ new Map();
   const badgePreferences = createBadgePreferenceStore(ctx);
   const autoCheckin = createAutoCheckin({
     store: createAutoCheckinStore(ctx),
@@ -60278,17 +60997,17 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
     path: CHANNEL_PACK_API_PATH,
     methods: ["POST"],
     requestBody: "buffered",
-    async fetch(request2) {
-      if (request2.method !== "POST") {
+    async fetch(request3) {
+      if (request3.method !== "POST") {
         return new Response("method not allowed", { status: 405 });
       }
-      const contentType = request2.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+      const contentType = request3.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
       if (contentType !== "application/json") {
         return new Response("content type must be application/json", { status: 415 });
       }
       let message2;
       try {
-        message2 = await request2.json();
+        message2 = await request3.json();
       } catch {
         return new Response("body is not JSON", { status: 400 });
       }
@@ -60298,7 +61017,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         return reply(rpcId, { ok: false, error: { code: "gateway/bad-request", message: "Invalid Channel Pack management request." } });
       }
       try {
-        const result = await handleMethod(call.method, call.payload, request2.signal);
+        const result = await handleMethod(call.method, call.payload, request3.signal);
         return reply(rpcId, result);
       } catch (error) {
         const message3 = error instanceof Error ? error.message : String(error);
@@ -60322,8 +61041,8 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
     path: CAPTCHA_CARRIER_PATH,
     methods: ["GET"],
     requestBody: "buffered",
-    async fetch(request2) {
-      if (request2.method !== "GET") {
+    async fetch(request3) {
+      if (request3.method !== "GET") {
         return new Response("method not allowed", { status: 405 });
       }
       const html = buildCarrierPageHtml(await carrierCaptchaConfig());
@@ -60411,6 +61130,46 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
       const handled = await handleOpencodeRpc(ctx, pool, method, payload);
       if (handled !== void 0) return handled;
     }
+    const exchangeOfficeAceLogin = async (accountId, entry, pending2) => {
+      const code = await officeace.pollLoginCode(pending2.state).catch(() => void 0);
+      if (code === void 0) return { done: false };
+      const exchanged = await officeace.completeLogin(code, pending2.codeVerifier, pending2.dpopPrivateJwk).then(
+        (credential) => ({ ok: true, credential }),
+        (error) => ({ ok: false, error })
+      );
+      if (!exchanged.ok) {
+        const persisted = await ctx.credentials.resolve(credentialRef13(entry.credentialRef)).catch(() => void 0);
+        pendingOfficeAceState.delete(accountId);
+        if (persisted !== void 0) {
+          pendingLoginFailures.delete(accountId);
+          return { done: true, success: true };
+        }
+        const reason = exchanged.error instanceof Error ? exchanged.error.message : String(exchanged.error);
+        void pool.removeAccount(accountId).catch(() => {
+        });
+        return { done: true, success: false, error: `OfficeAce \u6388\u6743\u7801\u4EA4\u6362\u5931\u8D25\uFF1A${reason}` };
+      }
+      try {
+        await officeace.persistLogin(exchanged.credential, {
+          refName: pending2.credentialRef,
+          credentials: ctx.credentials
+        });
+      } catch (error) {
+        void pool.removeAccount(accountId).catch(() => {
+        });
+        pendingOfficeAceState.delete(accountId);
+        const reason = error instanceof Error ? error.message : String(error);
+        return { done: true, success: false, error: `OfficeAce \u51ED\u636E\u4FDD\u5B58\u5931\u8D25\uFF1A${reason}` };
+      }
+      pendingOfficeAceState.delete(accountId);
+      pendingLoginFailures.delete(accountId);
+      try {
+        await pool.updateAccount(accountId, { refreshable: true });
+      } catch (error) {
+        ctx.logger.warn(`[channel-pack] OfficeAce \u8D26\u53F7\u56DE\u586B\u5931\u8D25\uFF08\u51ED\u636E\u5DF2\u843D\u5E93\uFF0C\u767B\u5F55\u4ECD\u7B97\u6210\u529F\uFF09\uFF1A${String(error)}`);
+      }
+      return { done: true, success: true };
+    };
     switch (method) {
       case "account.list": {
         const req = payload;
@@ -60815,6 +61574,61 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
             });
           });
           return { ok: true, value: { accountId: id, loginUrl: geminiStarted.loginUrl } };
+        } else if (provider === OFFICEACE.id) {
+          await pool.addAccount({
+            id,
+            provider: OFFICEACE.id,
+            nickname: id,
+            enabled: true,
+            credentialRef: refName,
+            refreshable: false,
+            createdAt: Date.now()
+          });
+          pendingLoginFailures.delete(id);
+          let started;
+          try {
+            started = await officeace.startLogin();
+          } catch (error) {
+            void pool.removeAccount(id).catch(() => {
+            });
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new Error(`\u65E0\u6CD5\u542F\u52A8 OfficeAce \u767B\u5F55\uFF08\u534E\u4E3A\u4E91\u6388\u6743\u72B6\u6001\u83B7\u53D6\u5931\u8D25\uFF09\uFF1A${reason}`);
+          }
+          pendingOfficeAceState.set(id, {
+            state: started.state,
+            codeVerifier: started._internal.codeVerifier,
+            dpopPrivateJwk: started._internal.dpopPrivateJwk,
+            // ⚠️ 必须带 ref：`completeLogin` 按它分文件落盘。缺省会让新账号的
+            // 凭据写进公共 `session.json`，覆盖其他账号的凭据（多账号共存的前提）。
+            credentialRef: refName
+          });
+          const incognitoOpened = openIncognitoWindow(started.authorizeUrl);
+          return {
+            ok: true,
+            value: {
+              accountId: id,
+              // ⚠️ 仍然回 URL（客户端在 `incognitoOpened === false` 时用它开窗）。
+              loginUrl: started.authorizeUrl,
+              ...incognitoOpened ? { openedByHost: true } : {}
+            }
+          };
+        } else if (provider === ACCIO.id) {
+          pendingLoginFailures.delete(id);
+          let started;
+          try {
+            started = await accio.startLogin({ refName, pool, accountId: id });
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new Error(`\u65E0\u6CD5\u542F\u52A8 Accio \u767B\u5F55\uFF08\u672C\u5730\u56DE\u8C03\u670D\u52A1\u542F\u52A8\u5931\u8D25\uFF09\uFF1A${reason}`);
+          }
+          started.result.then(() => {
+            pendingLoginFailures.delete(id);
+          }).catch((error) => {
+            const reason = error instanceof Error ? error.message : String(error);
+            ctx.logger.warn(`[channel-pack] background ${ACCIO.id} login failed for ${id}: ${reason}`);
+            pendingLoginFailures.set(id, reason.slice(0, 500));
+          });
+          return { ok: true, value: { accountId: id, loginUrl: started.loginUrl } };
         } else {
           return { ok: false, error: { code: "bad-request", message: `unknown provider: ${provider}` } };
         }
@@ -60896,6 +61710,17 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
             case GEMINI.id:
               await gemini.refreshAccountCredential(entry.credentialRef, pool, entry.id);
               break;
+            case OFFICEACE.id:
+              await officeace.refreshAccountCredential(
+                entry.credentialRef,
+                pool,
+                entry.id,
+                ctx.credentials
+              );
+              break;
+            case ACCIO.id:
+              await accio.refreshAccountCredential(entry.credentialRef, pool, entry.id);
+              break;
             default:
               throw new Error(`Unknown provider: ${entry.provider}`);
           }
@@ -60920,6 +61745,23 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         const accounts = await pool.listAllAccounts();
         const entry = accounts.find((a) => a.id === req.accountId);
         if (!entry) return { ok: true, value: { done: false } };
+        if (entry.provider === OFFICEACE.id) {
+          const pending2 = pendingOfficeAceState.get(req.accountId);
+          if (pending2 === void 0) return { ok: true, value: { done: false } };
+          const shared = officeAceExchangeInFlight.get(req.accountId);
+          if (shared !== void 0) return { ok: true, value: await shared };
+          const task = exchangeOfficeAceLogin(req.accountId, entry, pending2);
+          officeAceExchangeInFlight.set(req.accountId, task);
+          void (async () => {
+            try {
+              await task;
+            } catch {
+            } finally {
+              officeAceExchangeInFlight.delete(req.accountId);
+            }
+          })();
+          return { ok: true, value: await task };
+        }
         const ref = credentialRef13(entry.credentialRef);
         const resolved = await ctx.credentials.resolve(ref);
         if (!resolved) return { ok: true, value: { done: false } };
@@ -60967,8 +61809,8 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         if (req.provider !== LOOMY.id) {
           return { ok: false, error: { code: "bad-request", message: `unsupported provider: ${req.provider}` } };
         }
-        const pending = pendingSmsMsgid.get(req.accountId);
-        if (pending === void 0 || pending.msgid.length === 0) {
+        const pending2 = pendingSmsMsgid.get(req.accountId);
+        if (pending2 === void 0 || pending2.msgid.length === 0) {
           return {
             ok: true,
             value: { done: false, error: "\u8BF7\u5148\u53D1\u9001\u9A8C\u8BC1\u7801" }
@@ -60982,7 +61824,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
           };
         }
         try {
-          const result = await loomy.loginWithSmsCode(pending.phone, req.code, pending.msgid, {
+          const result = await loomy.loginWithSmsCode(pending2.phone, req.code, pending2.msgid, {
             refName: account.credentialRef
           });
           const credential = JSON.parse(result.access);
@@ -61089,7 +61931,11 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         const lockResponse = () => ({
           provider,
           locked: pool.permanentLocked(provider),
-          ...provider === CODEBUDDY.id || provider === WORKBUDDY.id ? { windowDays: buddyExpiringWindowDays() } : {}
+          // ⚠️ 凡「按到期时间分桶」的渠道都要回传窗口天数，且与
+          // `credits.balances` 那条**同一判据** —— 两处不一致会让前端在
+          // 「读余额」与「拨开关」两个路径上看到不同的分桶口径。
+          // OfficeAce 与 buddy 系同构（`splitOfficeAceCreditsByExpiry`）。
+          ...provider === CODEBUDDY.id || provider === WORKBUDDY.id || provider === OFFICEACE.id ? { windowDays: buddyExpiringWindowDays() } : {}
         });
         if (req.locked === void 0) {
           return { ok: true, value: lockResponse() };
@@ -61816,6 +62662,102 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
           }
           return { ok: true, value: { accounts: values2 } };
         }
+        if (req.provider === OFFICEACE.id) {
+          const fetchSummary = officeace?.fetchSubscriptionSummary;
+          const values2 = [];
+          for (const account of accounts) {
+            const subscription = fetchSummary === void 0 ? void 0 : await fetchSummary.call(
+              officeace,
+              48,
+              account.credentialRef,
+              void 0,
+              ctx.credentials
+            ).catch(() => void 0);
+            if (subscription === void 0) {
+              values2.push({
+                accountId: account.id,
+                nickname: account.nickname,
+                balance: null,
+                error: "\u79EF\u5206\u67E5\u8BE2\u5931\u8D25\uFF08\u534E\u4E3A\u4E91\u8BA2\u9605\u63A5\u53E3\u4E0D\u53EF\u8FBE\u6216\u51ED\u636E\u5DF2\u5931\u6548\uFF09"
+              });
+              continue;
+            }
+            values2.push({
+              accountId: account.id,
+              nickname: account.nickname,
+              balance: {
+                total: subscription.totalCredits,
+                packages: subscription.creditGroups.map((group) => ({
+                  name: group.name,
+                  unit: OFFICEACE.quotaUnit,
+                  remaining: group.remaining,
+                  total: group.total,
+                  used: group.used ?? 0,
+                  active: !group.expired,
+                  cycleStartTime: "",
+                  cycleEndTime: "",
+                  expiredTime: group.expiresAt ?? "",
+                  // 分桶判据字段：订阅套餐包无固定到期（永久桶），活动/签到包有明确到期。
+                  ...group.expiresAt !== void 0 && group.expiresAt !== null ? { deductionEndTime: new Date(group.expiresAt).getTime() } : {}
+                })),
+                expiredTotal: subscription.creditGroups.filter((g) => g.expired).length
+              }
+            });
+          }
+          return {
+            ok: true,
+            value: {
+              accounts: values2,
+              // ⚠️ **成功/失败都要回传 `windowDays`**：它表达的是「本渠道按到期时间
+              // 分桶」，与本次读数成功与否**无关**。只在成功路径带它会让
+              //「空账号池 / 查询失败」时形状不一致，守卫用例遍历 registry 时正会红。
+              windowDays: buddyExpiringWindowDays()
+            }
+          };
+        }
+        if (req.provider === ACCIO.id) {
+          const values2 = [];
+          for (const account of accounts) {
+            const resolved = await ctx.credentials.resolve(credentialRef13(account.credentialRef));
+            if (!resolved) {
+              values2.push({
+                accountId: account.id,
+                nickname: account.nickname,
+                balance: null,
+                error: "\u51ED\u636E\u672A\u914D\u7F6E"
+              });
+              continue;
+            }
+            let credential;
+            try {
+              credential = JSON.parse(resolved.value);
+            } catch {
+              values2.push({
+                accountId: account.id,
+                nickname: account.nickname,
+                balance: null,
+                error: "\u51ED\u636E\u89E3\u6790\u5931\u8D25"
+              });
+              continue;
+            }
+            const detail = await fetchAccioBalanceDetailed(credential).catch((error) => ({
+              balance: null,
+              error: `\u79EF\u5206\u67E5\u8BE2\u5931\u8D25\uFF1A${error instanceof Error ? error.message : String(error)}`
+            }));
+            values2.push({
+              accountId: account.id,
+              nickname: account.nickname,
+              balance: detail.balance,
+              // ⚠️ `error` 与 `extra` 都要**如实传播**（照 gemini / officeace 的既有约定）：
+              // `error` 区分「未登录」「上游拒绝」与「查询失败」；`extra.accountTier`
+              // 是账号档位（Free / Pro / Ultra）—— 它取不到时整行不渲染，**不是错误**。
+              // 第一版把 `extra` 漏掉了 ⇒ 面板少一栏本可显示的档位信息（静默降级）。
+              ...detail.error === void 0 ? {} : { error: detail.error },
+              ...detail.extra === void 0 ? {} : { extra: detail.extra }
+            });
+          }
+          return { ok: true, value: { accounts: values2 } };
+        }
         const product = productById(req.provider);
         if (product === void 0) {
           return { ok: false, error: { code: "bad-request", message: `unsupported provider: ${req.provider}` } };
@@ -62005,7 +62947,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         ctx.logger.info(
           `[channel-pack] ${req.disabled === true ? "\u5173\u95ED" : "\u6253\u5F00"}\u6A21\u578B ${req.provider}/${req.modelId}`
         );
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         const value = {
           provider: req.provider,
           disabledModels: pool.listDisabledModels(req.provider)
@@ -62040,7 +62982,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
           };
         }
         const removed = clearDeadModels(req.provider, req.modelId);
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         ctx.logger.info(
           `[channel-pack] \u6062\u590D ${removed} \u4E2A\u5931\u6548\u6A21\u578B\uFF1A${req.provider}${req.modelId === void 0 ? "" : `/${req.modelId}`}`
         );
@@ -62079,7 +63021,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
         ctx.logger.info(
           `[channel-pack] ${req.disabled ? "\u5173\u95ED" : "\u6253\u5F00"} ${req.provider} \u7684 ${ids.length} \u4E2A\u6A21\u578B\uFF08\u6309\u5206\u7EC4\uFF09`
         );
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         const value = {
           provider: req.provider,
           disabledModels: pool.listDisabledModels(req.provider)
@@ -62122,7 +63064,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
           await pool.clearDisabledModels(req.provider);
           ctx.logger.info(`[channel-pack] \u6253\u5F00 ${req.provider} \u7684\u5168\u90E8\u6A21\u578B`);
         }
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         const value = {
           provider: req.provider,
           disabledModels: pool.listDisabledModels(req.provider)
@@ -62233,7 +63175,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
           modelCount = catalog.ids.length;
         }
         const accountCount = await pool.setAccountsEnabled(req.provider, req.enabled);
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         ctx.logger.info(
           `[channel-pack] ${req.enabled ? "\u6253\u5F00" : "\u5173\u95ED"}\u4F9B\u5E94\u5546 ${req.provider}\uFF1A${req.enabled ? "\u6E05\u7A7A" : "\u5199\u5165"} ${modelCount} \u4E2A\u6A21\u578B\u3001${req.enabled ? "\u542F\u7528" : "\u505C\u7528"} ${accountCount} \u4E2A\u8D26\u53F7`
         );
@@ -62424,7 +63366,7 @@ function registerChannelPackEndpoints(ctx, pool, codearts, buddy, workbuddy, lob
       case "backup.import": {
         const req = payload;
         const result = await importBackup(ctx.credentials, pool, req.payload);
-        broadcastCatalogChanged(ctx);
+        broadcastCatalogChanged2(ctx);
         const value = {
           credentialsImported: result.credentialsImported,
           accountsImported: result.accountsImported,
@@ -62600,7 +63542,7 @@ import { homedir as homedir4 } from "node:os";
 import { join as join9 } from "node:path";
 
 // vendor/channel-pack/src/openai-gateway/auth.ts
-import { mkdirSync as mkdirSync7, readFileSync as readFileSync9, renameSync as renameSync7, writeFileSync as writeFileSync8, existsSync as existsSync9 } from "node:fs";
+import { mkdirSync as mkdirSync7, readFileSync as readFileSync9, renameSync as renameSync7, writeFileSync as writeFileSync8, existsSync as existsSync10 } from "node:fs";
 import { randomBytes as randomBytes11 } from "node:crypto";
 import { join as join8 } from "node:path";
 var KEY_FILE = "api-key";
@@ -62609,32 +63551,32 @@ function loadOrCreateApiKey(home, env = process.env) {
   const configured = env.DSH_OPENAI_GATEWAY_API_KEY?.trim();
   if (configured) return { value: configured, fromEnv: true, path: null };
   const directory = join8(home, "openai-gateway");
-  const path2 = join8(directory, KEY_FILE);
+  const path3 = join8(directory, KEY_FILE);
   let stored;
   try {
-    stored = readFileSync9(path2, "utf8").trim();
+    stored = readFileSync9(path3, "utf8").trim();
   } catch {
   }
   if (stored) {
-    if (KEY_PATTERN2.test(stored)) return { value: stored, fromEnv: false, path: path2 };
+    if (KEY_PATTERN2.test(stored)) return { value: stored, fromEnv: false, path: path3 };
     throw new Error(
-      `\u7F51\u5173\u5BC6\u94A5\u6587\u4EF6\u5185\u5BB9\u5F02\u5E38\uFF08\u4E0D\u662F\u672C\u63D2\u4EF6\u751F\u6210\u7684\u5F62\u6001\uFF09\uFF1A${path2}\u3002\u53EF\u80FD\u662F\u88AB\u624B\u5DE5\u7F16\u8F91\u6216\u88AB\u5176\u5B83\u7A0B\u5E8F\u6539\u5199\uFF1B\u672C\u63D2\u4EF6\u4E0D\u4F1A\u9759\u9ED8\u66F4\u6362\u5B83\uFF0C\u5426\u5219\u5DF2\u914D\u7F6E\u7684\u5BA2\u6237\u7AEF\u4F1A\u5168\u90E8\u5931\u6548\u3002\u5982\u9700\u66F4\u6362\uFF1A\u5220\u9664\u8BE5\u6587\u4EF6\u540E\u91CD\u542F DSH\uFF08\u4F1A\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u6216\u6539\u7528 DSH_OPENAI_GATEWAY_API_KEY \u73AF\u5883\u53D8\u91CF\u3002`
+      `\u7F51\u5173\u5BC6\u94A5\u6587\u4EF6\u5185\u5BB9\u5F02\u5E38\uFF08\u4E0D\u662F\u672C\u63D2\u4EF6\u751F\u6210\u7684\u5F62\u6001\uFF09\uFF1A${path3}\u3002\u53EF\u80FD\u662F\u88AB\u624B\u5DE5\u7F16\u8F91\u6216\u88AB\u5176\u5B83\u7A0B\u5E8F\u6539\u5199\uFF1B\u672C\u63D2\u4EF6\u4E0D\u4F1A\u9759\u9ED8\u66F4\u6362\u5B83\uFF0C\u5426\u5219\u5DF2\u914D\u7F6E\u7684\u5BA2\u6237\u7AEF\u4F1A\u5168\u90E8\u5931\u6548\u3002\u5982\u9700\u66F4\u6362\uFF1A\u5220\u9664\u8BE5\u6587\u4EF6\u540E\u91CD\u542F DSH\uFF08\u4F1A\u91CD\u65B0\u751F\u6210\uFF09\uFF0C\u6216\u6539\u7528 DSH_OPENAI_GATEWAY_API_KEY \u73AF\u5883\u53D8\u91CF\u3002`
     );
   }
   const key = randomBytes11(32).toString("base64url");
   mkdirSync7(directory, { recursive: true });
-  const temporary = `${path2}.${process.pid}.${Date.now()}.tmp`;
+  const temporary = `${path3}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync8(temporary, key, { encoding: "utf8", mode: 384 });
   try {
-    renameSync7(temporary, path2);
+    renameSync7(temporary, path3);
   } catch (error) {
-    if (existsSync9(path2)) {
-      const existing = readFileSync9(path2, "utf8").trim();
-      if (KEY_PATTERN2.test(existing)) return { value: existing, fromEnv: false, path: path2 };
+    if (existsSync10(path3)) {
+      const existing = readFileSync9(path3, "utf8").trim();
+      if (KEY_PATTERN2.test(existing)) return { value: existing, fromEnv: false, path: path3 };
     }
     throw error;
   }
-  return { value: key, fromEnv: false, path: path2 };
+  return { value: key, fromEnv: false, path: path3 };
 }
 
 // vendor/channel-pack/src/openai-gateway/messages.ts
@@ -62761,6 +63703,7 @@ var OpenAiGatewayError = class extends Error {
     this.name = "OpenAiGatewayError";
   }
 };
+var GATEWAY_SOURCE_KIND = "openai-gateway";
 function normalizeMaxTokens(value, provider, model) {
   if (value === void 0) return void 0;
   if (provider === "codearts" && (/^deepseek-v4-(flash|pro)$/.test(model) || model === "GLM-5.2")) {
@@ -62885,10 +63828,7 @@ async function convertMessage(raw, provider, model, bridge, limits) {
     return createGatewayMessage("system", [{
       type: "text",
       text: rewriteTencentContentFingerprints(textFromContent(value.content), provider)
-    }], {
-      kind: "plugin",
-      plugin: "dsh-openai-gateway"
-    });
+    }], { kind: GATEWAY_SOURCE_KIND });
   }
   if (role === "user") {
     return createGatewayMessage("user", await partsFromContent(value.content, bridge, limits), { kind: "user" });
@@ -63452,10 +64392,7 @@ async function toMessages(input, provider, model, bridge, limits) {
         messages.push(createGatewayMessage("system", [{
           type: "text",
           text: rewriteTencentContentFingerprints(textFromContent(content), provider)
-        }], {
-          kind: "plugin",
-          plugin: "dsh-openai-gateway"
-        }));
+        }], { kind: GATEWAY_SOURCE_KIND }));
         continue;
       }
       throw new OpenAiGatewayError(`unsupported message role: ${String(raw.role)}`);
@@ -63543,10 +64480,7 @@ async function toResponsesGenerateOptions(body, signal, reasoningEffortOverride,
     messages.push(createGatewayMessage("system", [{
       type: "text",
       text: rewriteTencentContentFingerprints(body.instructions, provider)
-    }], {
-      kind: "plugin",
-      plugin: "dsh-openai-gateway"
-    }));
+    }], { kind: GATEWAY_SOURCE_KIND }));
   }
   messages.push(...await toMessages(body.input, provider, model, images.bridge, limits));
   const reasoningEffort = reasoningEffortOverride;
@@ -63689,8 +64623,8 @@ function hasContent(item) {
   return finalText(item).length > 0;
 }
 function responseJson(options) {
-  const request2 = options.request;
-  const effort = isObject2(request2.reasoning) ? request2.reasoning.effort ?? null : null;
+  const request3 = options.request;
+  const effort = isObject2(request3.reasoning) ? request3.reasoning.effort ?? null : null;
   return {
     id: options.id,
     object: "response",
@@ -63699,23 +64633,23 @@ function responseJson(options) {
     background: false,
     error: options.error ?? null,
     incomplete_details: options.status === "incomplete" ? { reason: "max_output_tokens" } : null,
-    instructions: typeof request2.instructions === "string" ? request2.instructions : null,
-    max_output_tokens: typeof request2.max_output_tokens === "number" ? request2.max_output_tokens : null,
+    instructions: typeof request3.instructions === "string" ? request3.instructions : null,
+    max_output_tokens: typeof request3.max_output_tokens === "number" ? request3.max_output_tokens : null,
     model: options.model,
     output: options.output,
-    parallel_tool_calls: request2.parallel_tool_calls === false ? false : true,
+    parallel_tool_calls: request3.parallel_tool_calls === false ? false : true,
     previous_response_id: null,
     reasoning: { effort, summary: null },
     store: false,
-    temperature: typeof request2.temperature === "number" ? request2.temperature : null,
+    temperature: typeof request3.temperature === "number" ? request3.temperature : null,
     text: { format: { type: "text" } },
-    tool_choice: request2.tool_choice ?? "auto",
-    tools: Array.isArray(request2.tools) ? request2.tools : [],
-    top_p: typeof request2.top_p === "number" ? request2.top_p : null,
-    truncation: typeof request2.truncation === "string" ? request2.truncation : "disabled",
+    tool_choice: request3.tool_choice ?? "auto",
+    tools: Array.isArray(request3.tools) ? request3.tools : [],
+    top_p: typeof request3.top_p === "number" ? request3.top_p : null,
+    truncation: typeof request3.truncation === "string" ? request3.truncation : "disabled",
     usage: options.usage,
-    user: typeof request2.user === "string" ? request2.user : null,
-    metadata: isObject2(request2.metadata) ? request2.metadata : {}
+    user: typeof request3.user === "string" ? request3.user : null,
+    metadata: isObject2(request3.metadata) ? request3.metadata : {}
   };
 }
 function statusOf(state) {
@@ -63741,12 +64675,12 @@ function responsesError(converted) {
   const code = converted.type === "rate_limit_exceeded" || converted.type === "rate_limit_error" ? "rate_limit_exceeded" : "server_error";
   return { code, message: converted.message, status: converted.status, dsh_code: converted.code };
 }
-async function collectResponsesResult(chunks, responseId, model, request2, suggest) {
+async function collectResponsesResult(chunks, responseId, model, request3, suggest) {
   const state = {};
   const items = [];
   const open = /* @__PURE__ */ new Map();
   const closed = /* @__PURE__ */ new Set();
-  const nsMap = responsesNamespaceToolMap(request2);
+  const nsMap = responsesNamespaceToolMap(request3);
   let outputIndex = 0;
   try {
     for await (const chunk of chunks) {
@@ -63788,25 +64722,25 @@ async function collectResponsesResult(chunks, responseId, model, request2, sugge
   return responseJson({
     id: responseId,
     model,
-    request: request2,
+    request: request3,
     status: statusOf(state),
     output: outputOf(items, nsMap),
     usage: state.usage === void 0 ? null : usageJson2(state.usage)
   });
 }
-async function* toResponsesSse(chunks, responseId, model, request2, suggest) {
+async function* toResponsesSse(chunks, responseId, model, request3, suggest) {
   const state = {};
   const items = [];
   const open = /* @__PURE__ */ new Map();
   const closed = /* @__PURE__ */ new Set();
   let outputIndex = 0;
   let sequence = 0;
-  const nsMap = responsesNamespaceToolMap(request2);
+  const nsMap = responsesNamespaceToolMap(request3);
   const emit = (type, payload) => `event: ${type}
 data: ${JSON.stringify({ type, sequence_number: sequence++, ...payload })}
 
 `;
-  const snapshot = (status, usage, error) => responseJson({ id: responseId, model, request: request2, status, output: status === "in_progress" ? [] : outputOf(items, nsMap), usage, error });
+  const snapshot = (status, usage, error) => responseJson({ id: responseId, model, request: request3, status, output: status === "in_progress" ? [] : outputOf(items, nsMap), usage, error });
   const emitStatus = (status, usage, error) => emit(`response.${status}`, { response: snapshot(status, usage, error) });
   const openItem = (index, kind, seed) => {
     const item = newItem(index, outputIndex++, kind);
@@ -64022,24 +64956,24 @@ function jsonResponse(response, status, value) {
   });
   response.end(body);
 }
-function readJson(request2, signal) {
+function readJson(request3, signal) {
   return new Promise((resolve2, reject) => {
     const chunks = [];
     let size = 0;
     const abort = () => reject(new OpenAiGatewayError("request was aborted", 499, "aborted", "aborted"));
     signal.addEventListener("abort", abort, { once: true });
-    request2.on("data", (chunk) => {
+    request3.on("data", (chunk) => {
       const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += data.length;
       if (size > BODY_LIMIT) {
         reject(new OpenAiGatewayError("request body is too large", 413, "invalid_request_error", "request_too_large"));
-        request2.destroy();
+        request3.destroy();
         return;
       }
       chunks.push(data);
     });
-    request2.on("error", reject);
-    request2.on("end", () => {
+    request3.on("error", reject);
+    request3.on("end", () => {
       signal.removeEventListener("abort", abort);
       try {
         const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
@@ -64051,8 +64985,8 @@ function readJson(request2, signal) {
     });
   });
 }
-function authorized(request2, key) {
-  const value = request2.headers.authorization;
+function authorized(request3, key) {
+  const value = request3.headers.authorization;
   return typeof value === "string" && value === `Bearer ${key}`;
 }
 function getHome(options) {
@@ -64135,14 +65069,14 @@ function createOpenAiGateway(options) {
     }
     return modelIdsHint;
   };
-  const withRequest = async (request2, response, run) => {
+  const withRequest = async (request3, response, run) => {
     const controller = new AbortController();
     active.add(controller);
     const abort = () => controller.abort();
     const onClose = () => {
       if (!response.writableEnded) controller.abort();
     };
-    request2.once("aborted", abort);
+    request3.once("aborted", abort);
     response.once("close", onClose);
     try {
       await run(controller.signal);
@@ -64152,7 +65086,7 @@ function createOpenAiGateway(options) {
         jsonResponse(response, converted.status, converted.body);
       }
     } finally {
-      request2.removeListener("aborted", abort);
+      request3.removeListener("aborted", abort);
       response.removeListener("close", onClose);
       active.delete(controller);
     }
@@ -64177,9 +65111,9 @@ function createOpenAiGateway(options) {
       `[openai-gateway] ${target}\uFF1A\u601D\u8003\u6863\u4F4D ${notice.requested} \u65E0\u6CD5\u8868\u8FBE\uFF08\u8BE5\u6A21\u578B\u6CA1\u6709\u8FD9\u4E00\u65CF\u7684\u6863\u4F4D\uFF09\uFF0C\u672C\u6B21\u4E0D\u4E0B\u53D1\u8BE5\u53C2\u6570\u3001\u6309\u6A21\u578B\u9ED8\u8BA4\u8D70`
     );
   };
-  const handleChat = async (request2, response) => {
-    await withRequest(request2, response, async (signal) => {
-      const body = await readJson(request2, signal);
+  const handleChat = async (request3, response) => {
+    await withRequest(request3, response, async (signal) => {
+      const body = await readJson(request3, signal);
       const route = parseModelRoute(body.model);
       const modelInfo = await resolveModelInfo(route, signal);
       const reasoningEffort = normalizeReasoningEffort(
@@ -64210,9 +65144,9 @@ function createOpenAiGateway(options) {
       }
     });
   };
-  const handleResponses = async (request2, response) => {
-    await withRequest(request2, response, async (signal) => {
-      const body = await readJson(request2, signal);
+  const handleResponses = async (request3, response) => {
+    await withRequest(request3, response, async (signal) => {
+      const body = await readJson(request3, signal);
       const route = parseModelRoute(body.model);
       const modelInfo = await resolveModelInfo(route, signal);
       const reasoningEffort = normalizeReasoningEffort(
@@ -64248,8 +65182,8 @@ function createOpenAiGateway(options) {
       }
     });
   };
-  const requestHandler = (request2, response) => {
-    if (request2.method === "OPTIONS") {
+  const requestHandler = (request3, response) => {
+    if (request3.method === "OPTIONS") {
       response.writeHead(204, {
         "access-control-allow-origin": "*",
         "access-control-allow-headers": "Authorization, Content-Type",
@@ -64258,25 +65192,25 @@ function createOpenAiGateway(options) {
       response.end();
       return;
     }
-    if (!authorized(request2, key)) {
+    if (!authorized(request3, key)) {
       jsonResponse(response, 401, { error: { message: "Missing or invalid API key", type: "authentication_error", code: "invalid_api_key" } });
       return;
     }
-    const path2 = new URL(request2.url ?? "/", "http://127.0.0.1").pathname;
-    if (path2 === "/v1/models" && request2.method === "GET") {
+    const path3 = new URL(request3.url ?? "/", "http://127.0.0.1").pathname;
+    if (path3 === "/v1/models" && request3.method === "GET") {
       void handleModels(response).catch((error) => jsonResponse(response, 502, { error: { message: String(error), type: "server_error", code: "model_list_failed" } }));
       return;
     }
-    if (path2 === "/v1/reasoning-efforts" && request2.method === "GET") {
+    if (path3 === "/v1/reasoning-efforts" && request3.method === "GET") {
       void handleReasoningEfforts(response).catch((error) => jsonResponse(response, 502, { error: { message: String(error), type: "server_error", code: "model_list_failed" } }));
       return;
     }
-    if ((path2 === "/v1/chat/completions" || path2 === "/v1/responses") && request2.method === "POST") {
-      if (!request2.headers["content-type"]?.toLowerCase().startsWith("application/json")) {
+    if ((path3 === "/v1/chat/completions" || path3 === "/v1/responses") && request3.method === "POST") {
+      if (!request3.headers["content-type"]?.toLowerCase().startsWith("application/json")) {
         jsonResponse(response, 415, { error: { message: "Content-Type must be application/json", type: "invalid_request_error", code: "invalid_content_type" } });
         return;
       }
-      void (path2 === "/v1/responses" ? handleResponses(request2, response) : handleChat(request2, response));
+      void (path3 === "/v1/responses" ? handleResponses(request3, response) : handleChat(request3, response));
       return;
     }
     jsonResponse(response, 404, { error: { message: "Not found", type: "invalid_request_error", code: "not_found" } });
@@ -64503,7 +65437,7 @@ function installLoopResume(ctx) {
 }
 
 // vendor/channel-pack/src/token-ledger-store.ts
-import { existsSync as existsSync10, mkdirSync as mkdirSync8, readFileSync as readFileSync10, renameSync as renameSync8, writeFileSync as writeFileSync9 } from "node:fs";
+import { existsSync as existsSync11, mkdirSync as mkdirSync8, readFileSync as readFileSync10, renameSync as renameSync8, writeFileSync as writeFileSync9 } from "node:fs";
 import { join as join10 } from "node:path";
 var TOKEN_LEDGER_FILE = "token-ledger.json";
 var TOKEN_LEDGER_DAYS = 90;
@@ -64531,8 +65465,8 @@ var MemoryLedgerStore = class {
   }
 };
 var FileLedgerStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
     this.days = this.readFile();
     this.written = cloneDays(this.days);
@@ -64553,7 +65487,7 @@ var FileLedgerStore = class {
   readFile() {
     const out = /* @__PURE__ */ new Map();
     try {
-      if (!existsSync10(this.path)) return out;
+      if (!existsSync11(this.path)) return out;
       const parsed = JSON.parse(readFileSync10(this.path, "utf-8"));
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return out;
       const record = parsed;
@@ -65770,8 +66704,8 @@ function minimaxReasoningInfo(entry) {
   if ((options === void 0 || options.length === 0) && !switchable) return void 0;
   const ids = [...options ?? []];
   if (switchable) {
-    if (!ids.includes("on")) ids.push("on");
     if (!ids.includes("none")) ids.push("none");
+    if (!ids.includes("on")) ids.push("on");
   }
   const efforts = ids.map((id) => {
     if (id === "none") return { id: ReasoningEffortId14(id), name: "\u5173\u95ED\u601D\u8003" };
@@ -65785,12 +66719,15 @@ var MinimaxAdapter = class extends LlmAdapter11 {
   constructor(options) {
     super();
     this.options = options;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
     this.product = options.product ?? MINIMAX;
   }
   product;
   remoteModels;
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  catalogGate = new RemoteCatalogGate();
+  catalogGate;
   providerInfo(provider) {
     const id = typeof provider === "string" && provider.length > 0 ? provider : this.product.id;
     return { id, name: this.product.displayName };
@@ -66775,16 +67712,2113 @@ var GeminiAuth = class extends Service11 {
   }
 };
 
+// vendor/channel-pack/src/accio-auth.ts
+import { createServer as createServer9 } from "node:http";
+import { Service as Service12 } from "@deepseek-ai/cordis";
+import { credentialRef as credentialRef16 } from "@deepseek-ai/dsh-credentials";
+
+// vendor/channel-pack/src/accio.ts
+import { createHash as createHash9, randomBytes as randomBytes14, randomUUID as randomUUID13 } from "node:crypto";
+function accioExpiresAtMs(raw) {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return void 0;
+  return n > 1e12 ? Math.round(n) : Math.round(n * 1e3);
+}
+function accioCredentialExpiresAtMs(credential) {
+  return accioExpiresAtMs(credential?.expires_at);
+}
+function isAccioExpired(credential) {
+  const at = accioCredentialExpiresAtMs(credential);
+  if (at === void 0) return false;
+  return at <= Date.now();
+}
+function isAccioRefreshable(credential) {
+  return typeof credential?.refresh_token === "string" && credential.refresh_token !== "";
+}
+function accioRequestId() {
+  return `req-${Date.now()}-${randomUUID13().slice(0, 8)}`;
+}
+function accioSgK(requestId) {
+  return createHash9("md5").update(requestId, "utf8").digest("hex");
+}
+function accioMessageId(requestId) {
+  return createHash9("md5").update(`${requestId}:${randomBytes14(16).toString("hex")}`, "utf8").digest("hex");
+}
+function accioToSnake(value) {
+  if (Array.isArray(value)) return value.map((v) => accioToSnake(v));
+  if (value !== null && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v === void 0) continue;
+      out[k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)] = accioToSnake(v);
+    }
+    return out;
+  }
+  return value;
+}
+function buildAccioBody(options) {
+  const camel = {
+    model: options.model,
+    empid: "",
+    tenant: "",
+    iaiTag: "",
+    requestId: options.requestId,
+    userRequestId: options.requestId,
+    contents: options.contents,
+    // ⚠️ 字符串原样传（不要包成 { parts: [...] }），空串时不产出该键
+    systemInstruction: options.systemInstruction === void 0 || options.systemInstruction === "" ? void 0 : options.systemInstruction,
+    // ⚠️⚠️ **tools 的 JSON Schema 必须保持「字符串化」**（`toAccioTools` 里
+    //    `JSON.stringify(fn.parameters)` ⇒ `parameters_json`），**不得**改成包装形态
+    //    `{ function_declarations: [{ name, parameters: {…对象…} }] }`。
+    //
+    //    理由：下面的 `accioToSnake` 会**递归下钻对象与数组**，而**不下钻字符串**。
+    //    参数名（`filePath` / `oldString` …）是**数据**，不是协议字段：
+    //    · 保持字符串 ⇒ 它们逐字节原样送到上游，不在改写路径上，安全；
+    //    · 改成对象   ⇒ 递归 snake 化会把 `filePath` **静默改写成** `file_path`，
+    //      与调用方按原 schema 消费的那份定义**失配**，且没有任何报错。
+    //    （本仓库首条红线「同一份语义两套判据」的变体：这里是 schema 被当协议字段改写。）
+    //
+    //    ⚠️ 实测依据见 `docs/agent-notes/providers-accio.md` §4.1.2：
+    //    真机探针用的就是扁平字符串形态，上游回了正确的 `function_call` 帧。
+    tools: options.tools !== void 0 && options.tools.length > 0 ? options.tools : void 0,
+    temperature: options.temperature,
+    maxOutputTokens: options.maxOutputTokens,
+    stopSequences: [],
+    properties: {
+      utdid: options.utdid,
+      version: ACCIO.appVersion,
+      appKey: ACCIO.appKey,
+      normalizedResponse: "true"
+    },
+    token: options.accessToken,
+    messageId: accioMessageId(options.requestId),
+    incremental: true
+  };
+  const body = accioToSnake(camel);
+  body.properties = {
+    utdid: options.utdid,
+    version: ACCIO.appVersion,
+    appKey: ACCIO.appKey,
+    normalized_response: "true"
+  };
+  return body;
+}
+function accioHeaders(options) {
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+    utdid: options.utdid,
+    version: ACCIO.appVersion,
+    appKey: ACCIO.appKey
+  };
+  if (typeof options.sgcookie === "string" && options.sgcookie !== "") {
+    headers.sgcookie = options.sgcookie;
+  }
+  return headers;
+}
+
+// vendor/channel-pack/src/accio-oauth.ts
+import { createHash as createHash10, randomBytes as randomBytes15 } from "node:crypto";
+import { execFile as execFile2 } from "node:child_process";
+function createAccioPkcePair() {
+  const verifier = randomBytes15(48).toString("base64url");
+  const challenge = createHash10("sha256").update(verifier).digest("base64url");
+  return { verifier, challenge };
+}
+function createAccioState() {
+  return randomBytes15(32).toString("hex");
+}
+function buildAccioAuthUrl(options) {
+  const params = new URLSearchParams({
+    return_url: options.redirectUri,
+    state: options.state,
+    code_challenge: options.codeChallenge,
+    code_challenge_method: "S256",
+    client_id: ACCIO.clientId,
+    ttid: `ttid_${randomBytes15(16).toString("hex")}`,
+    language: "zh"
+  });
+  return `${ACCIO.loginBaseUrlOf(options.region)}/login?${params.toString()}`;
+}
+function openBrowser2(url) {
+  try {
+    if (process.platform === "win32") {
+      execFile2("rundll32.exe", ["url.dll,FileProtocolHandler", url], () => {
+      });
+      return;
+    }
+    const cmd = process.platform === "darwin" ? "open" : "xdg-open";
+    execFile2(cmd, [url], () => {
+    });
+  } catch {
+  }
+}
+function unwrapTokenEnvelope(path3, status, text) {
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error(`accio: ${path3} \u8FD4\u56DE\u975E JSON\uFF08HTTP ${status}\uFF09\uFF1A${text.slice(0, 200)}`);
+  }
+  const env = body;
+  if (env?.success !== true) {
+    const code = env?.code ?? status;
+    const message2 = env?.message ?? "";
+    throw new Error(`accio: ${path3} \u5931\u8D25\uFF08${String(code)} ${String(message2)}\uFF09`.trim());
+  }
+  const data = env?.data;
+  if (data === null || typeof data !== "object") {
+    throw new Error(`accio: ${path3} \u54CD\u5E94\u7F3A data \u5BF9\u8C61`);
+  }
+  return data;
+}
+function toTokenResult(path3, data) {
+  const access = data.accessToken;
+  const refresh = data.refreshToken;
+  const expiresAt = accioExpiresAtMs(data.expiresAt);
+  if (typeof access !== "string" || access === "") throw new Error(`accio: ${path3} \u54CD\u5E94\u7F3A accessToken`);
+  if (typeof refresh !== "string" || refresh === "") throw new Error(`accio: ${path3} \u54CD\u5E94\u7F3A refreshToken`);
+  if (expiresAt === void 0) throw new Error(`accio: ${path3} \u54CD\u5E94\u7F3A expiresAt\uFF08\u6216\u975E\u6B63\u6570\uFF09`);
+  const out = { access_token: access, refresh_token: refresh, expires_at: expiresAt };
+  if (typeof data.sgcookie === "string" && data.sgcookie !== "") out.sgcookie = data.sgcookie;
+  return out;
+}
+async function exchangeAccioCode(options) {
+  const fetcher = options.fetcher ?? fetch;
+  const path3 = ACCIO_TOKEN_EXCHANGE_PATH;
+  const res = await fetcher(`${ACCIO.gatewayBaseUrl}${path3}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      code: options.code,
+      codeVerifier: options.codeVerifier,
+      clientId: ACCIO.clientId,
+      redirectUri: options.redirectUri
+    }),
+    signal: AbortSignal.timeout(ACCIO_REQUEST_TIMEOUT_MS)
+  });
+  const text = await res.text();
+  return toTokenResult(path3, unwrapTokenEnvelope(path3, res.status, text));
+}
+async function refreshAccioCredential(options) {
+  const fetcher = options.fetcher ?? fetch;
+  const path3 = ACCIO_REFRESH_PATH;
+  const res = await fetcher(`${ACCIO.gatewayBaseUrl}${path3}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      accessToken: options.credential.access_token,
+      refreshToken: options.credential.refresh_token
+    }),
+    signal: AbortSignal.timeout(ACCIO_REQUEST_TIMEOUT_MS)
+  });
+  const text = await res.text();
+  return toTokenResult(path3, unwrapTokenEnvelope(path3, res.status, text));
+}
+
+// vendor/channel-pack/src/accio-auth.ts
+var ACCIO_CALLBACK_PATH = "/auth/callback";
+var AccioRefreshTokenExpiredError = class extends Error {
+  constructor(message2) {
+    super(message2);
+    this.name = "AccioRefreshTokenExpiredError";
+  }
+};
+var ACCIO_TERMINAL_REFRESH_MARKERS = [
+  "invalid_grant",
+  "invalid refresh token",
+  "invalid refresh_token",
+  "refresh token has been used",
+  "refresh_token has been used",
+  "refresh token expired",
+  "refresh_token expired",
+  "expired refresh token",
+  "NOT_LOGIN",
+  "not_login"
+];
+function isAccioTerminalRefreshError(error) {
+  const message2 = error instanceof Error ? error.message : String(error);
+  const lowered = message2.toLowerCase();
+  return ACCIO_TERMINAL_REFRESH_MARKERS.some((marker) => lowered.includes(marker.toLowerCase()));
+}
+function normalizeAccioRegion(raw) {
+  return ACCIO_REGIONS.includes(raw) ? raw : "cn";
+}
+function parseCredential8(value) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed !== null && typeof parsed.access_token === "string" ? parsed : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function normalizeAccioModel(raw) {
+  if (raw === null || typeof raw !== "object") return void 0;
+  const row = raw;
+  if (row.visible !== true) return void 0;
+  const id = typeof row.modelCode === "string" ? row.modelCode : "";
+  if (id === "") return void 0;
+  const displayName = typeof row.modelDisplayName === "string" ? row.modelDisplayName : "";
+  const contextWindow = typeof row.contextWindow === "number" && Number.isFinite(row.contextWindow) ? row.contextWindow : 0;
+  const multiple = typeof row.effectiveMultiple === "number" && Number.isFinite(row.effectiveMultiple) ? row.effectiveMultiple : void 0;
+  const maxTokens = typeof row.maxTokens === "number" && Number.isFinite(row.maxTokens) ? row.maxTokens : void 0;
+  const efforts = Array.isArray(row.reasoningEfforts) ? row.reasoningEfforts.filter(
+    (e) => typeof e === "string" && e.trim() !== ""
+  ) : [];
+  const defaultEffort = typeof row.defaultReasoningEffort === "string" && row.defaultReasoningEffort.trim() !== "" ? row.defaultReasoningEffort : void 0;
+  return {
+    id,
+    name: displayName === "" ? id : displayName,
+    contextWindow,
+    supportsImage: row.multimodal === true,
+    ...multiple === void 0 ? {} : { multiple },
+    ...maxTokens === void 0 ? {} : { maxTokens },
+    ...efforts.length === 0 ? {} : { efforts },
+    ...defaultEffort === void 0 ? {} : { defaultEffort }
+  };
+}
+function parseAccioCatalog(body) {
+  const data = body?.data;
+  if (!Array.isArray(data)) return [];
+  const models = [];
+  for (const group of data) {
+    const list = group?.modelList;
+    if (!Array.isArray(list)) continue;
+    for (const raw of list) {
+      const entry = normalizeAccioModel(raw);
+      if (entry !== void 0) models.push(entry);
+    }
+  }
+  return models.sort((a, b) => {
+    const left = a.multiple;
+    const right = b.multiple;
+    if (left === void 0 && right === void 0) return 0;
+    if (left === void 0) return 1;
+    if (right === void 0) return -1;
+    return left - right;
+  });
+}
+var ACCIO_EXPIRY_ACCESSORS = {
+  expiresAtOf: accioCredentialExpiresAtMs,
+  refreshableOf: isAccioRefreshable,
+  identityOf: (credential) => credential.access_token ?? ""
+};
+var ACCIO_CREDENTIAL_REF = ACCIO.defaultCredentialRef;
+var HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function callbackPage(title, message2) {
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head><body style="font-family:system-ui;padding:2rem"><p>${escapeHtml(message2)}</p></body></html>`;
+}
+var AccioAuth = class extends Service12 {
+  constructor(ctx, options = {}) {
+    super(ctx, `${ACCIO.id}Auth`);
+    this.options = options;
+    this.credentialRefName = ACCIO.defaultCredentialRef;
+  }
+  /** 本实例默认读写的凭据 ref 名称（`ACCIO_ACCESS_TOKEN`）。 */
+  credentialRefName;
+  /**
+   * 按凭据 ref 分的**续期互斥队列**（进程内）。
+   *
+   * 为什么必须有它（Accio 尤其致命）：参考实现记录「刷新会**轮换**
+   * refresh_token」，而三条续期入口会并发消费**同一份** ——
+   * ① `src/index.ts` 每 30 分钟（含启动首轮）的 `refreshAll`；
+   * ② 推理路径的按需续期（DSH 会并发发主回复 + 标题生成 + 上下文压缩）；
+   * ③ Jet Hub 账号面板的「刷新」按钮。
+   * 不串行必然「1 个成功、其余 `invalid_grant`」，而失败方会把**好账号标死**。
+   *
+   * ⚠️ 这把锁只在**本进程**内有效：同机跑 dsh web 与 desktop 两个实例时
+   * 各自持锁、跨进程互踩仍会发生 —— 那部分靠 `refreshAll` 里「判终态前先
+   * 重读凭据」的防护兜住（**两处都必须有**，少一个都会复发）。
+   */
+  refreshQueues = /* @__PURE__ */ new Map();
+  /**
+   * 已就「refresh_token 失效」告警过的 ref → 上次告警的服务端原文。
+   *
+   * 同一账号连续多轮撞上同一个终态错误时只说一次，避免每 30 分钟刷满日志；
+   * 错误原文一变（说明状况变了）就重新告警。
+   */
+  terminalWarned = /* @__PURE__ */ new Map();
+  /** 登录态是否活跃；`stop()` / `logout()` 置 false，阻止在途续期回写已登出的凭据。 */
+  active = true;
+  /** 注入的 fetch（测试用）；默认为全局 fetch。 */
+  get fetchImpl() {
+    return this.options.fetcher ?? fetch;
+  }
+  /** 取（或建）某个凭据 ref 的续期队列。 */
+  queueFor(refName) {
+    let queue = this.refreshQueues.get(refName);
+    if (queue === void 0) {
+      queue = new SerialQueue();
+      this.refreshQueues.set(refName, queue);
+    }
+    return queue;
+  }
+  /** 读取某个凭据 ref 下的当前凭据；缺失或不可解析时 undefined。 */
+  async readCredential(refName) {
+    const resolved = await this.ctx.credentials.resolve(credentialRef16(refName));
+    if (!resolved) return void 0;
+    return parseCredential8(resolved.value);
+  }
+  /**
+   * 判断两份凭据是否「同一份」（用于识别他处是否已经续过）。
+   *
+   * ⚠️ 必须**按值**比：`parseCredential` 每次都产生新对象，引用比较恒为
+   * 「不相等」，会让幂等短路在每一轮都误判成「凭据已更新」。
+   */
+  sameCredential(a, b) {
+    return a.access_token === b.access_token && a.refresh_token === b.refresh_token && a.expires_at === b.expires_at;
+  }
+  /** 记录一条警告（经 `ctx.logger`）。 */
+  warn(message2) {
+    this.ctx.logger?.warn?.(message2);
+  }
+  /**
+   * 回写账号池的有效期（**失败只记日志、绝不上抛**）。
+   *
+   * `syncAccountExpiry` 自身已保证三条硬规矩：失败只 warn、优先用调用方给的
+   * `accountId`、现值一致时不写盘；且**凭据里读不到过期时间时不覆盖池内旧值**
+   * （写 `undefined` 落盘会被 `JSON.stringify` 丢弃，UI 会从「已过期」变成
+   * 「未知」—— 保留旧信息更有价值）。
+   */
+  async syncExpiry(pool, credential, accountId, current) {
+    await syncAccountExpiry({
+      pool,
+      provider: ACCIO.id,
+      credential,
+      accessors: ACCIO_EXPIRY_ACCESSORS,
+      accountId,
+      current,
+      tag: "[accio]",
+      warn: (message2) => this.warn(message2)
+    });
+  }
+  /**
+   * 运行完整登录流程（**阻塞**：打开浏览器并等用户授权完成）。
+   *
+   * ⚠️ Jet Hub 的「+ 新建账号」**不得**用它 —— 浏览器只在用户点击后的短暂
+   * 窗口（transient activation，约 5 秒）内允许 `window.open`，阻塞调用返回时
+   * 手势早已过期，弹窗被拦后前端兜底会 `window.location.href = loginUrl`
+   * 把整个设置页跳走。两步式请用 {@link startLogin}。
+   */
+  async login(options = {}) {
+    const started = await this.startLoginFlow(options);
+    try {
+      openBrowser2(started.loginUrl);
+      await started.result;
+    } finally {
+      started.close();
+    }
+  }
+  /**
+   * **两步式登录**：起 loopback → 生成 PKCE/state → **立即**返回 `loginUrl`
+   * （不打开浏览器、不等用户），后台再等回调。
+   *
+   * 顺序说明：**先监听拿到端口，再拼授权 URL** —— `return_url` 必须写实际
+   * 端口，否则回调会打到没人监听的地址上。
+   */
+  async startLogin(options = {}) {
+    return await this.startLoginFlow(options);
+  }
+  /** 两步式与阻塞式共用的实现（落库逻辑必须完全一致）。 */
+  async startLoginFlow(options) {
+    const rawRegion = options.region;
+    if (rawRegion !== void 0 && !ACCIO_REGIONS.includes(rawRegion)) {
+      this.warn(`[accio] \u672A\u8BC6\u522B\u7684\u767B\u5F55\u533A\u57DF ${String(rawRegion)}\uFF0C\u5DF2\u56DE\u843D\u5230 'cn'`);
+    }
+    const region = normalizeAccioRegion(rawRegion);
+    const refName = options.refName ?? this.credentialRefName;
+    const pkce = createAccioPkcePair();
+    const state = createAccioState();
+    let settled = false;
+    let serverClosed = false;
+    let timer;
+    let resolveResult;
+    let rejectResult;
+    const result = new Promise((resolve2, reject) => {
+      resolveResult = resolve2;
+      rejectResult = reject;
+    });
+    result.catch(() => {
+    });
+    const server = createServer9((request3, response) => {
+      const url = new URL(request3.url ?? "/", `http://127.0.0.1:${request3.socket.localPort ?? 0}`);
+      if (url.pathname !== ACCIO_CALLBACK_PATH) {
+        response.writeHead(404, HTML_HEADERS).end(callbackPage("Accio \u6388\u6743", "\u672A\u77E5\u7684\u56DE\u8C03\u8DEF\u5F84"));
+        return;
+      }
+      const params = url.searchParams;
+      if ((params.get("state") ?? "") !== state) {
+        response.writeHead(400, HTML_HEADERS).end(callbackPage("Accio \u6388\u6743\u5931\u8D25", "state \u6821\u9A8C\u5931\u8D25\uFF0C\u8BF7\u56DE\u5230\u9762\u677F\u91CD\u65B0\u53D1\u8D77\u767B\u5F55"));
+        fail(new Error("accio: \u767B\u5F55\u56DE\u8C03 state \u4E0D\u5339\u914D\uFF08\u53EF\u80FD\u662F\u4F2A\u9020\u7684\u56DE\u8C03\uFF09"));
+        return;
+      }
+      const errorCode = params.get("error");
+      if (errorCode !== null && errorCode !== "") {
+        response.writeHead(400, HTML_HEADERS).end(callbackPage("Accio \u6388\u6743\u5931\u8D25", `\u6388\u6743\u88AB\u62D2\u7EDD\uFF1A${errorCode}`));
+        fail(new Error(`accio: \u6388\u6743\u88AB\u62D2\u7EDD\uFF08${errorCode}\uFF09`));
+        return;
+      }
+      const code = params.get("code") ?? "";
+      if (code === "") {
+        response.writeHead(400, HTML_HEADERS).end(callbackPage("Accio \u6388\u6743\u5931\u8D25", "\u56DE\u8C03\u91CC\u6CA1\u6709\u6388\u6743\u7801"));
+        fail(new Error("accio: \u767B\u5F55\u56DE\u8C03\u7F3A\u5C11\u6388\u6743\u7801"));
+        return;
+      }
+      response.writeHead(200, HTML_HEADERS).end(callbackPage("Accio \u6388\u6743", "\u6388\u6743\u5DF2\u6536\u5230\uFF0C\u53EF\u4EE5\u5173\u95ED\u6B64\u9875\u9762\u5E76\u8FD4\u56DE\u9762\u677F\u3002"));
+      void this.finishLogin({
+        region,
+        code,
+        codeVerifier: pkce.verifier,
+        redirectUri,
+        refName,
+        pool: options.pool,
+        accountId: options.accountId
+      }).then(() => succeed()).catch((error) => fail(error instanceof Error ? error : new Error(String(error))));
+    });
+    const closeServer = () => {
+      if (serverClosed) return;
+      serverClosed = true;
+      server.close();
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      if (timer !== void 0) clearTimeout(timer);
+      timer = void 0;
+      closeServer();
+      void this.removePlaceholder(options).finally(() => {
+        rejectResult(error);
+      });
+    };
+    const succeed = () => {
+      if (settled) return;
+      settled = true;
+      if (timer !== void 0) clearTimeout(timer);
+      timer = void 0;
+      closeServer();
+      resolveResult();
+    };
+    timer = setTimeout(() => {
+      fail(new Error("accio: \u767B\u5F55\u8D85\u65F6\uFF08\u672A\u6536\u5230\u6388\u6743\u56DE\u8C03\uFF09"));
+    }, ACCIO_LOGIN_TIMEOUT_MS);
+    timer.unref?.();
+    let port;
+    try {
+      port = await new Promise((resolve2, reject) => {
+        let listenSettled = false;
+        const onListenError = (error) => {
+          if (listenSettled) return;
+          listenSettled = true;
+          reject(error);
+        };
+        server.once("error", onListenError);
+        server.listen(0, "127.0.0.1", () => {
+          listenSettled = true;
+          server.removeListener("error", onListenError);
+          server.on("error", () => {
+          });
+          const address = server.address();
+          resolve2(typeof address === "object" && address !== null ? address.port : 0);
+        });
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      const message2 = `accio: \u56DE\u8C03\u7AEF\u53E3\u65E0\u6CD5\u76D1\u542C\uFF08${reason}\uFF09\uFF1B\u7AEF\u53E3\u53EF\u80FD\u5DF2\u88AB\u5360\u7528\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002`;
+      fail(new Error(message2));
+      throw new Error(message2);
+    }
+    const redirectUri = `http://127.0.0.1:${port}${ACCIO_CALLBACK_PATH}`;
+    const loginUrl = buildAccioAuthUrl({ region, redirectUri, state, codeChallenge: pkce.challenge });
+    if (options.pool !== void 0 && options.accountId !== void 0 && options.accountId !== "") {
+      try {
+        await options.pool.addAccount({
+          id: options.accountId,
+          provider: ACCIO.id,
+          nickname: options.accountId,
+          enabled: true,
+          credentialRef: refName,
+          // 凭据还没拿到 ⇒ 此刻诚实标 false；登录成功后回填为真实值。
+          refreshable: false,
+          createdAt: Date.now()
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        fail(new Error(`accio: \u65E0\u6CD5\u767B\u8BB0\u8D26\u53F7\u6761\u76EE\uFF08${reason}\uFF09`));
+        throw new Error(`accio: \u65E0\u6CD5\u767B\u8BB0\u8D26\u53F7\u6761\u76EE\uFF08${reason}\uFF09`);
+      }
+    }
+    return {
+      loginUrl,
+      result,
+      close: () => {
+        if (timer !== void 0) clearTimeout(timer);
+        timer = void 0;
+        fail(new Error("accio: \u767B\u5F55\u5DF2\u53D6\u6D88"));
+        closeServer();
+      }
+    };
+  }
+  /** 删除登录占位条目；**任何异常只记日志**（清理不该反噬登录结果）。 */
+  async removePlaceholder(options) {
+    const { pool, accountId } = options;
+    if (pool === void 0 || accountId === void 0 || accountId === "") return;
+    try {
+      await pool.removeAccount(accountId);
+    } catch (error) {
+      this.warn(
+        `[accio] \u767B\u5F55\u5931\u8D25\u540E\u5220\u9664\u5360\u4F4D\u6761\u76EE ${accountId} \u5931\u8D25\uFF08\u8BF7\u624B\u52A8\u5220\u9664\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  /** 用授权码换 token、写凭据、回填账号池（两步式与阻塞式共用）。 */
+  async finishLogin(params) {
+    const token = await exchangeAccioCode({
+      region: params.region,
+      code: params.code,
+      codeVerifier: params.codeVerifier,
+      redirectUri: params.redirectUri,
+      ...this.options.fetcher === void 0 ? {} : { fetcher: this.options.fetcher }
+    });
+    const credential = {
+      access_token: token.access_token,
+      refresh_token: token.refresh_token,
+      // ⚠️ 已是**毫秒**（`accio-oauth.ts` 的兑换层做过一次性 ×1000）。
+      expires_at: token.expires_at,
+      // 登录时选的区域：续期与推理要按它选登录域（gateway 两个区域同一个）。
+      region: params.region,
+      ...token.sgcookie === void 0 ? {} : { sgcookie: token.sgcookie }
+    };
+    await this.persistLogin(credential, params.refName);
+    if (params.pool !== void 0 && params.accountId !== void 0 && params.accountId !== "") {
+      try {
+        await this.fillAccountEntry(params.pool, params.accountId, credential);
+      } catch (error) {
+        this.warn(
+          `[accio] \u8D26\u53F7 ${params.accountId} \u767B\u5F55\u6210\u529F\u4F46\u56DE\u586B\u8D26\u53F7\u6C60\u5931\u8D25\uFF08\u4E0D\u5F71\u54CD\u4F7F\u7528\uFF09\uFF1A${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  }
+  /**
+   * 落盘凭据。
+   *
+   * ⚠️ **必须写调用方给的 ref**（Jet Hub 传的是 `ACCIO_ACCOUNT_XXX`），
+   * 而不是本实例的默认单凭据 ref —— 后者会让「账号池里那个账号」拿不到凭据，
+   * 表现为「登录成功、账号一发请求就报未配置凭据」（本仓库真实缺陷形态）。
+   */
+  async persistLogin(credential, refName) {
+    this.active = true;
+    await this.ctx.credentials.set(credentialRef16(refName), JSON.stringify(credential));
+  }
+  /**
+   * 登录成功后回填账号池（占位条目的昵称 / 有效期 / 可续期标记）。
+   *
+   * ⚠️ 昵称暂时只有账号 id：兑换响应**不含任何身份字段**（`userinfo` 是另一个
+   * 端点，属 Task 5 的 `accio-credits.ts`）。本任务刻意不 import 那个尚不存在的
+   * 模块；它落地后可在登录成功后补一次 `userinfo` 拿真实昵称（与 Qoder 补昵称同款）。
+   */
+  async fillAccountEntry(pool, accountId, credential) {
+    const expiresAt = accioCredentialExpiresAtMs(credential);
+    const nickname = credential.nickname !== void 0 && credential.nickname !== "" ? credential.nickname : accountId;
+    await pool.updateAccount(accountId, {
+      nickname,
+      // ⚠️ **刻意不写 `enabled`**：占位条目本来就是启用的，而在这里多写一次
+      // 会在「把一个**已停用**的账号重新登录」时**静默重新启用**它 —— 那是用户
+      // 没要求的状态变更（停用是显式意图，见 AGENTS.md「停用只影响自动选号」）。
+      refreshable: isAccioRefreshable(credential),
+      // ⚠️ 读不到过期时间时**不写这个键**：`updateAccount` 做的是
+      // `{ ...entry, ...patch }`，写 `undefined` 落盘会被 `JSON.stringify`
+      // 整个丢弃，UI 于是从「已过期」变成「未知」—— 保留旧信息更有价值。
+      ...expiresAt === void 0 ? {} : { expiresAt }
+    });
+  }
+  /**
+   * 按凭据 ref 续期**指定账号**的凭据（Jet Hub 账号卡片 / 定时器路径）。
+   *
+   * ⚠️ **必须回写账号池的 `expiresAt`**（issue !IKIRTT 的真实缺陷）：UI 账号
+   * 卡片的「有效期」读的正是**池里的值**，而不是凭据里 access_token 的真实过期
+   * 时间。只 `credentials.set` 的后果是「凭据续好了、界面一直显示已过期」，
+   * 且没有任何自救手段（「重测」按钮的 refresh 是刻意的 no-op）。
+   * ⇒ `pool` 与 `accountId` **在实际调用中必须传**（签名保持可选只为兼容既有形态）。
+   *
+   * @param pool 账号池；提供时把新 `expiresAt` / `refreshable` 写回。
+   * @param accountId 账号 id。**调用方已知时请显式传入** —— 否则只能按凭据内容
+   *   反查，而 Accio 的 `access_token` 每次都会轮换，反查**可能失效**。
+   */
+  async refreshAccountCredential(refName, pool, accountId) {
+    await this.queueFor(refName).run(async () => {
+      const credential = await this.readCredential(refName);
+      if (credential === void 0) throw new Error("\u51ED\u636E\u672A\u914D\u7F6E");
+      if (!isAccioRefreshable(credential)) {
+        throw new AccioRefreshTokenExpiredError("\u65E0 refresh_token\uFF0C\u8BF7\u91CD\u65B0\u767B\u5F55");
+      }
+      if (!shouldRefreshNow(accioCredentialExpiresAtMs(credential))) {
+        await this.syncExpiry(pool, credential, accountId, void 0);
+        return;
+      }
+      const refreshed = await this.refreshCredential(credential);
+      if (!this.active) return;
+      await this.ctx.credentials.set(credentialRef16(refName), JSON.stringify(refreshed));
+      await this.syncExpiry(pool, refreshed, accountId, void 0);
+    });
+  }
+  /**
+   * 加锁续期：拿到锁后**重读凭据**，只在他处还没续过的时候真的发请求。
+   *
+   * 与 {@link refreshAccountCredential} 共用同一条 per-ref 队列，因此
+   * 「批量续期」「按需续期」「面板刷新」三条入口在同一进程内必然串行；
+   * 锁内重读则覆盖跨进程场景（同机 web + desktop 两个实例）—— 那种互斥锁
+   * 管不到，只能靠「先看当前值」兜，少烧一次 refresh_token。
+   *
+   * @param credential 调用方读到的那份凭据（可能已在等锁期间被他处续期）。
+   */
+  async refreshCredentialUnderLock(refName, credential) {
+    return await this.queueFor(refName).run(async () => {
+      const latest = await this.readCredential(refName) ?? credential;
+      if (!this.sameCredential(latest, credential) && !shouldRefreshNow(accioCredentialExpiresAtMs(latest))) {
+        this.ctx.logger?.info?.(
+          "[accio] \u51ED\u636E\u5DF2\u88AB\u4ED6\u5904\u7EED\u671F\uFF0C\u8DF3\u8FC7\u672C\u6B21\u7EED\u671F\u8BF7\u6C42\uFF08\u907F\u514D\u91CD\u590D\u6D88\u8D39 refresh_token\uFF09"
+        );
+        return latest;
+      }
+      return await this.refreshCredential(latest);
+    });
+  }
+  /**
+   * 对一份凭据执行一次续期并返回新凭据（**不触碰存储**）。
+   *
+   * 终态判定（只有服务端明确说 refresh_token 不认了才算）：
+   * `isAccioTerminalRefreshError` 命中 ⇒ 抛 {@link AccioRefreshTokenExpiredError}；
+   * 其余（网络抖动、5xx、超时、读体失败）⇒ 普通 `Error`，可重试。
+   */
+  async refreshCredential(credential) {
+    let token;
+    try {
+      token = await refreshAccioCredential({
+        credential,
+        ...this.options.fetcher === void 0 ? {} : { fetcher: this.options.fetcher }
+      });
+    } catch (error) {
+      if (isAccioTerminalRefreshError(error)) {
+        throw new AccioRefreshTokenExpiredError(
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+    return {
+      // 先铺开旧凭据：`region` / `user_id` / `accio_id` / `nickname` 等
+      // **不参与续期**的字段必须原样保留（丢了 region 会选错登录域）。
+      ...credential,
+      access_token: token.access_token,
+      refresh_token: token.refresh_token,
+      expires_at: token.expires_at,
+      ...token.sgcookie === void 0 ? {} : { sgcookie: token.sgcookie }
+    };
+  }
+  /**
+   * 批量续期本产品的所有账号（`src/index.ts` 的定时器，含启动首轮）。
+   *
+   * ## 两条**不得**过滤的铁律（各是一次真实事故）
+   *
+   * 1. **不看账号是否停用**：停用只应影响账号池的自动选号，与「凭据是否需要
+   *    保鲜」无关。真实缺陷：两处都按停用过滤 ⇒ 停用期间 refresh_token 一路
+   *    放到失效，用户重新启用后拿到的是**死凭据**，只能重新登录。
+   * 2. **不按池里的 `refreshable` 过滤**：那个布尔是**每轮由凭据对账出来的
+   *    结果**，不是「曾被服务端拒绝过」的案底。拿它当门禁会把一次瞬时失败
+   *    固化成**单向门**（codearts 真实事故：池里 2 个账号被误标后
+   *    「自动续期没工作、重启也还是 401」，而凭据本体完好）。
+   *
+   * ⇒ 权威判据只有**凭据材料**（`isAccioRefreshable`：`refresh_token` 非空）。
+   * 凭据缺材料才写 false，且写前先比现值（定时器每 30 分钟一轮，别重复整体落盘）。
+   *
+   * ⚠️ **「本轮不刷」的分支绝不能直接跳过对账**：存量账号的凭据早已在别处
+   * （IDE / 上一轮）续好，池里还是旧值；只修「续期时回写」是不够的，跳过时
+   * 若不对账，UI 会**永远**显示「已过期」。判据是「与凭据不一致」（不是
+   * 「池值已过期」），容差 1 秒 —— 由 `refreshAccountWithReconcile` 承担。
+   */
+  async refreshAll(pool) {
+    const accounts = await pool.listAccounts(ACCIO.id);
+    for (const entry of accounts) {
+      const ref = credentialRef16(entry.credentialRef);
+      let credential;
+      try {
+        const resolved = await this.ctx.credentials.resolve(ref);
+        if (!resolved) {
+          if (entry.refreshable) await pool.updateAccount(entry.id, { refreshable: false });
+          continue;
+        }
+        credential = parseCredential8(resolved.value);
+        if (credential === void 0 || !isAccioRefreshable(credential)) {
+          if (entry.refreshable) await pool.updateAccount(entry.id, { refreshable: false });
+          continue;
+        }
+        if (entry.refreshable === false) {
+          this.ctx.logger?.info?.(
+            `[accio] \u8D26\u53F7 ${entry.id} \u7684\u51ED\u636E\u5177\u5907\u7EED\u671F\u6750\u6599\uFF0C\u672C\u8F6E\u6062\u590D\u81EA\u52A8\u7EED\u671F\uFF08\u6B64\u524D\u7684\u6807\u8BB0\u4E0E\u51ED\u636E\u4E0D\u7B26\uFF09`
+          );
+        }
+        await refreshAccountWithReconcile({
+          pool,
+          provider: ACCIO.id,
+          tag: "[accio]",
+          accountId: entry.id,
+          credential,
+          accessors: ACCIO_EXPIRY_ACCESSORS,
+          current: entry,
+          refresh: (c) => this.refreshCredentialUnderLock(entry.credentialRef, c),
+          save: (c) => this.ctx.credentials.set(ref, JSON.stringify(c)),
+          warn: (message2) => this.warn(message2),
+          info: (message2) => this.ctx.logger?.info?.(message2)
+        });
+      } catch (error) {
+        if (error instanceof AccioRefreshTokenExpiredError) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const latest = await this.readCredential(entry.credentialRef).catch(() => void 0);
+          if (latest !== void 0 && isAccioRefreshable(latest) && credential !== void 0 && latest.refresh_token !== credential.refresh_token) {
+            this.ctx.logger?.info?.(
+              `[accio] \u8D26\u53F7 ${entry.id} \u7EED\u671F\u88AB\u62D2\u4F46\u51ED\u636E\u5DF2\u88AB\u4ED6\u5904\u66F4\u65B0\uFF08\u5E76\u53D1\u91CD\u653E\uFF09\uFF0C\u6309\u6700\u65B0\u51ED\u636E\u5BF9\u8D26\uFF0C\u4E0D\u6807\u8BB0\u4E3A\u4E0D\u53EF\u7EED\u671F`
+            );
+            await this.syncExpiry(pool, latest, entry.id, entry);
+            continue;
+          }
+          if (entry.refreshable) {
+            try {
+              await pool.updateAccount(entry.id, { refreshable: false });
+            } catch {
+            }
+          }
+          const last = this.terminalWarned.get(entry.credentialRef);
+          if (last !== detail) {
+            this.terminalWarned.set(entry.credentialRef, detail);
+            this.warn(
+              `[accio] \u8D26\u53F7 ${entry.id} \u7684 refresh_token \u5DF2\u5931\u6548\uFF0C\u5DF2\u6807\u8BB0\u4E3A\u4E0D\u53EF\u7EED\u671F\uFF08\u9700\u91CD\u65B0\u767B\u5F55\uFF09\uFF1B\u670D\u52A1\u7AEF\u539F\u6587\uFF1A${detail}`
+            );
+          }
+        } else {
+          this.warn(
+            `[accio] \u8D26\u53F7 ${entry.id} \u7EED\u671F\u5931\u8D25\uFF1A${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }
+  }
+  /**
+   * 拉取远端模型目录（`POST /api/llm/config/v2`，token 在 body）。
+   *
+   * 优先用账号池里的可用账号；无池或池为空时回退到本实例的默认凭据 ref。
+   * 失败或未登录一律返回**空数组**（调用方回退到 `ACCIO.fallbackModels`），
+   * 与 `TraeAuth.fetchModels` / `LobsteraiAuth.fetchModels` 同语义。
+   *
+   * ⚠️ **「没有凭据」不是异常**：未登录的用户每次列模型都会走到这条分支，
+   * 打日志只会制造噪声。只有真正的失败（HTTP 非 2xx、网络异常）才记录。
+   */
+  async fetchModels(pool) {
+    let credential;
+    if (pool !== void 0) {
+      const available2 = await pool.getAvailableAccount(ACCIO.id, "").catch(() => null);
+      if (available2 !== null) credential = available2.credential;
+    }
+    if (credential === void 0) {
+      credential = await this.readCredential(this.credentialRefName);
+    }
+    if (credential === void 0 || credential.access_token.length === 0) return [];
+    try {
+      const response = await this.fetchImpl(`${ACCIO.gatewayBaseUrl}${ACCIO_CATALOG_PATH}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ token: credential.access_token }),
+        signal: AbortSignal.timeout(ACCIO_REQUEST_TIMEOUT_MS)
+      });
+      if (!response.ok) {
+        this.warn(`fetchModels: HTTP ${response.status} ${response.statusText}`);
+        return [];
+      }
+      return parseAccioCatalog(await response.json());
+    } catch (error) {
+      this.warn(`fetchModels: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
+  }
+  /** 移除已存储的凭据（账号条目由调用方决定是否删除）。 */
+  async logout() {
+    this.active = false;
+    await this.ctx.credentials.unset(credentialRef16(this.credentialRefName));
+  }
+  /**
+   * 停止服务：置 inactive，阻止在途续期回写已登出的凭据。
+   *
+   * 与 CodeArts 同因：登录态与续期都归属账号池条目，续期由 `src/index.ts` 的
+   * 多账号调度器（{@link refreshAll}）驱动，本服务**没有**自己的调度器可停。
+   */
+  stop() {
+    this.active = false;
+  }
+};
+
+// vendor/channel-pack/src/accio-adapter.ts
+import { LlmAdapter as LlmAdapter12, LlmError as LlmError20, ReasoningEffortId as ReasoningEffortId15 } from "@deepseek-ai/dsh-llm";
+
+// vendor/channel-pack/src/model-catalog.ts
+function createModelCatalog(deps, config) {
+  const providerId = config.product.id;
+  let cached3;
+  function toModelInfo(entry) {
+    const info = { provider: providerId, id: entry.id, name: entry.name };
+    if (entry.inputModalities !== void 0) info.inputModalities = entry.inputModalities;
+    if (entry.description !== void 0) info.description = entry.description;
+    return info;
+  }
+  return {
+    async listModels(provider) {
+      if (!await providerCatalogVisible(deps.accountPool, providerId)) return [];
+      const all = await config.loadCatalog();
+      cached3 = all;
+      const disabled = deps.accountPool?.disabledModelsFor(providerId);
+      const listed = disabled === void 0 || disabled.size === 0 ? all : all.filter((entry) => !disabled.has(entry.id));
+      return listed.map(toModelInfo);
+    },
+    async resolveModel(provider, model, _signal) {
+      const all = await config.loadCatalog();
+      cached3 = all;
+      const entry = all.find((item) => item.id === model);
+      const resolved = {
+        provider,
+        id: model,
+        name: entry?.bareName ?? entry?.name ?? model
+      };
+      if (entry !== void 0) {
+        if (entry.inputModalities !== void 0) {
+          resolved.inputModalities = entry.inputModalities;
+        }
+        if (entry.description !== void 0) resolved.description = entry.description;
+      } else {
+        const unknownModalities = config.unknownModelInputModalities?.();
+        if (unknownModalities !== void 0) resolved.inputModalities = unknownModalities;
+      }
+      if (entry?.contextWindow !== void 0 && entry.contextWindow > 0) {
+        resolved.context = { contextWindow: entry.contextWindow };
+      }
+      const maxTokens = entry?.maxTokens;
+      if (maxTokens !== void 0 && Number.isSafeInteger(maxTokens) && maxTokens > 0) {
+        resolved.defaultMaxTokens = maxTokens;
+      }
+      const reasoning = entry !== void 0 ? entry.reasoning : config.unknownModelReasoning?.();
+      if (reasoning !== void 0 && reasoning.efforts.length > 0) {
+        const defaultEffort = reasoning.defaultEffort;
+        const legal = defaultEffort === void 0 || reasoning.efforts.some((effort) => effort.id === defaultEffort);
+        if (legal) resolved.reasoning = reasoning;
+      }
+      return resolved;
+    },
+    /**
+     * ⚠️ **同步**（契约要求，见 `ModelCatalogConfig.syncCatalog` 的说明）。
+     * **不套黑名单** —— 设置页要能看到已关闭模型的倍率（用户报障：
+     * 「关闭的就没有显示倍率」）。
+     */
+    listAllModels() {
+      const source = cached3 ?? config.syncCatalog();
+      return source.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        ...entry.isFree !== void 0 ? { isFree: entry.isFree } : {}
+      }));
+    }
+  };
+}
+
+// vendor/channel-pack/src/canonical-models.ts
+var PRIMARY_CHANNEL = Object.freeze({
+  qoder: "name",
+  qodercn: "name",
+  // ⚠️ accio（阿里 Accio Work，2026-10-13，用户要求）：与 qoder **完全同因** ——
+  //    它的 `modelCode` 是 `1Drift-F8hS3mK7pL2n` 这种**内部代号**（上游刻意不给
+  //    可读 id，真名只在 `modelDisplayName` 里，详见
+  //    `docs/agent-notes/providers-accio.md` §7）。走 id 通道的实测后果：
+  //    accio 的每个模型各自成一个**孤立虚拟模型**（键形如 `1drift-…`），
+  //    跨渠道聚合**完全不发生** ⇒ 用户在聚合的「Qwen3.8-Flash 轮换列表」里
+  //    **永远看不到 accio**（症状是静默的：它只是不在候选表里）。
+  //    ⚠️ 判据同 qoder：**该渠道的 id 对人类与其它渠道都无信息**，不是「哪个方便」。
+  accio: "name"
+});
+function normalizeModelKey(raw) {
+  let s = raw.trim().toLowerCase();
+  const slash = s.lastIndexOf("/");
+  if (slash >= 0) s = s.slice(slash + 1);
+  s = s.replace(/:free$/, "");
+  s = s.replace(/^sn-/, "");
+  s = s.replace(/\./g, "-");
+  s = s.replace(/\s+/g, "-");
+  return s;
+}
+function normalizeNameKey(name2) {
+  const stripped = name2.replace(/\s*·.*$/, "").replace(/免费/g, "").trim();
+  return normalizeModelKey(stripped);
+}
+var CANONICAL_OVERRIDES = Object.freeze({
+  lobsterai: Object.freeze({
+    // 远端专有 id；其兜底表里没有它。实测展示名为 DeepSeek-V4.1-Flash
+    // （tests/unit/lobsterai-adapter.spec.ts 的远端桩即此形态）。
+    "deepseek-flash": "deepseek-v4-1-flash"
+  }),
+  // ⚠️ qoder / qodercn 的 dfmodel 是否属于 V4.1 **尚未实测确认**
+  //（其展示名不带版本号）。在确认前**故意不登记** —— 它会经 name 通道归成
+  // `deepseek-flash`，单独成一个虚拟模型。登记它请先跑实发验证。
+  /**
+   * ⚠️⚠️ **accio**（用户要求它进聚合的轮换候选表，2026-10-13）。
+   *
+   * ## 为什么需要（实测的键形态差异）
+   *
+   * `accio` 走 `name` 通道（见 `PRIMARY_CHANNEL`），而它的展示名 `Qwen 3.8 Flash`
+   * 里**有空格** ⇒ `normalizeNameKey` 把空格转成连字符 ⇒ 得 `qwen-3-8-flash`。
+   * 而 loomy / trae / qoder 走 **id 通道**，id 形如 `qwen3.8-flash`（**无空格**）
+   * ⇒ `normalizeModelKey` 只转点号 ⇒ 得 `qwen3-8-flash`（**无连字符**）。
+   *
+   * ⇒ 两者是**同一个模型但键不同** ⇒ 被拆成两个虚拟模型
+   * ⇒ 用户在聚合的「Qwen3.8-Flash 轮换列表」里**看不到 accio**（症状静默：
+   * 它只是不在候选表里）。实测逐个跑 `canonicalKeyFor`：
+   *
+   * ```
+   * loomy / trae / qoder → qwen3-8-flash   ← 三家在用的既有键
+   * accio（不加补丁）    → qwen-3-8-flash  ← 多一个连字符，成了孤例
+   * ```
+   *
+   * ## ⚠️ 只登记**确知是同一模型**的那些
+   *
+   * 方向是**宁可拆开也不误并**（本文件铁律：猜错会让请求打到错的模型且无提示）。
+   * 逐条实测后的结论：
+   * - `Qwen 3.8 Flash`（`1Drift-F8hS3mK7pL2n`）→ `qwen3-8-flash` ✅ **登记**
+   *   —— 四家展示名逐字一致，确知同模型；
+   * - `Qwen 3.8 Max` → **不登记**：它经 name 通道得 `qwen-3-8-max`，而 loomy 的
+   *   id `qwen-3.8-max` 也得 `qwen-3-8-max`，**本来就一致**，加补丁是多此一举
+   *   （且有守卫锁着「连字符形态本来就一致」这件事）；
+   * - `Qwen 3.8 27B` / `Qwen 3.5 A3B` / `Standard` / `Professional` / `Ultimate`
+   *   → **不登记**：它们是 accio（或其上游）**独有的规格**，猜着并进别家 =
+   *   打错模型。⚠️ 27B 与 A3B 是**两个不同的模型**，绝不能并进 `qwen3-8-flash`。
+   *
+   * ## ⚠️⚠️ 索引键是 **accio 的对外 id（slug）**，不是上游 `modelCode`
+   *
+   * 补丁按 `realId` 查，而 `realId` 来自 `ctx.llm.listModels(provider)` 返回的
+   * **`id`**。自 2026-10-13 起 accio 的对外 id 改成了 slug
+   * （`accio-adapter.ts` 的 `accioModelIdOf`，为的是让模型能自报人话）⇒
+   * **本表必须跟着改用 slug 索引**。
+   *
+   * ⚠️ 这是一条**静默的连带失效**：若仍按 `1Drift-F8hS3mK7pL2n` 索引，
+   * 查表恒不命中 ⇒ accio 掉回 `qwen-3-8-flash` 孤例键 ⇒
+   * **聚合的轮换列表里又看不到它了**（正是加这条补丁要解决的症状），
+   * 且不会有任何报错。
+   */
+  accio: Object.freeze({
+    // 对外 id（`normalizeNameKey('Qwen 3.8 Flash')`）→ 三家在用的既有规范键。
+    "qwen-3-8-flash": "qwen3-8-flash"
+  })
+});
+var CANONICAL_NAMES = Object.freeze({
+  "deepseek-v4-1-flash": "DeepSeek V4.1 Flash",
+  "deepseek-v4-flash": "DeepSeek V4 Flash",
+  "deepseek-v4-flash-0731": "DeepSeek V4 Flash 0731",
+  "deepseek-v4-pro": "DeepSeek V4 Pro",
+  "deepseek-flash": "DeepSeek Flash",
+  "glm-5-3": "GLM-5.3",
+  "glm-5-3-flash": "GLM-5.3-Flash",
+  "glm-5-2": "GLM-5.2",
+  "glm-5-1": "GLM-5.1",
+  "glm-5": "GLM-5",
+  "glm-5v-turbo": "GLM-5V-Turbo",
+  "kimi-k3": "Kimi-K3",
+  "kimi-k3-1": "Kimi-K3-1",
+  "kimi-k2-8-preview": "Kimi-K2.8-Preview",
+  "kimi-k2-7": "Kimi-K2.7",
+  "kimi-k2-7-code": "Kimi-K2.7-Code",
+  "kimi-k2-7-code-highspeed": "Kimi-K2.7-Code-Highspeed",
+  "kimi-k2-6": "Kimi-K2.6",
+  "kimi-k2-5": "Kimi-K2.5",
+  "minimax-m3": "MiniMax-M3",
+  "minimax-m2-7": "MiniMax-M2.7",
+  "minimax-m2-7-highspeed": "MiniMax-M2.7-highspeed",
+  "minimax-m3-1-flash-preview": "MiniMax-M3.1-Flash-Preview",
+  "qwen3-8-max": "Qwen3.8-Max",
+  "qwen3-8-flash": "Qwen3.8-Flash",
+  "qwen3-7-max": "Qwen3.7-Max",
+  "qwen3-7-plus": "Qwen3.7-Plus",
+  "qwen3-7-flash": "Qwen3.7-Flash",
+  "qwen3-6-plus": "Qwen3.6-Plus",
+  "qwen-3-8-max": "Qwen 3.8 Max",
+  "qwen-3-7-plus": "Qwen 3.7 Plus",
+  "qwen3-5-plus-2026-04-20": "Qwen3.5-Plus-2026-04-20",
+  "gemini-3-8-flash": "Gemini 3.8 Flash",
+  "gemini-3-5-flash": "Gemini 3.5 Flash",
+  "hy4-preview": "Hy4 Preview",
+  "hy3": "Hy3",
+  "hy3-x": "Hy3 X",
+  "sensenova-6-8-flash": "SenseNova-6.8-Flash",
+  "sensenova-6-8-flash-lite": "SenseNova-6.8-Flash-Lite",
+  "doubao-seed-2-1-pro-260628": "Doubao Seed 2.1 Pro",
+  "doubao-seed-2-1-turbo-260628": "Doubao Seed 2.1 Turbo",
+  "doubao-seed-2-0-code-preview-260215": "Doubao Seed 2.0 Code Preview",
+  "deepseek-v4-flash-official": "DeepSeek V4 Flash Official"
+});
+
+// vendor/channel-pack/src/session-title.ts
+var SESSION_TITLE_PURPOSE = "session-title";
+function isSessionTitleCall(options) {
+  return options?.purpose === SESSION_TITLE_PURPOSE;
+}
+var SESSION_TITLE_MIN_MAX_TOKENS = 512;
+function thinkingOffEffortOf(declaredEfforts) {
+  return declaredEfforts.find((effort) => isThinkingOffEffort(effort));
+}
+function planSessionTitleThinking(input) {
+  if (!isSessionTitleCall({ purpose: input.purpose })) {
+    return {
+      isTitle: false,
+      effort: input.requestedEffort,
+      thinkingOff: false,
+      maxTokens: input.maxTokens
+    };
+  }
+  const offEffort = thinkingOffEffortOf(input.declaredEfforts);
+  if (offEffort !== void 0) {
+    return { isTitle: true, effort: offEffort, thinkingOff: true, maxTokens: input.maxTokens };
+  }
+  if (input.disableByOmission === true) {
+    return { isTitle: true, effort: void 0, thinkingOff: true, maxTokens: input.maxTokens };
+  }
+  return {
+    isTitle: true,
+    effort: input.requestedEffort,
+    thinkingOff: false,
+    // ⚠️ 抬预算前先确认原值是**正安全整数**：`Math.max(NaN, 512)` 仍是 `NaN`，
+    // 而 `NaN` 经 `JSON.stringify` 会变成 `null` 发给上游（DSH 只校验
+    // `defaultMaxTokens`，**不校验** `options.maxTokens`，故这道防线在我们这侧）。
+    // 非安全整数的原值原样返回（不编造、也不放大），与「未知不编造」一致。
+    maxTokens: input.maxTokens !== void 0 && Number.isSafeInteger(input.maxTokens) && input.maxTokens > 0 ? Math.max(input.maxTokens, SESSION_TITLE_MIN_MAX_TOKENS) : input.maxTokens
+  };
+}
+
+// vendor/channel-pack/src/accio-messages.ts
+import { LlmError as LlmError19 } from "@deepseek-ai/dsh-llm";
+var ACCIO_QUOTA_ERROR_CODE = "402";
+var ACCIO_QUOTA_EXCEEDED_CODE = "QUOTA_EXCEEDED";
+function isAccioErrorFrame(frame) {
+  if (frame === null || typeof frame !== "object" || Array.isArray(frame)) return false;
+  const f = frame;
+  const rawCode = f.error_code ?? f.errorCode;
+  const rawMessage = f.error_message ?? f.errorMessage;
+  const code = typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode) : "";
+  const message2 = typeof rawMessage === "string" ? rawMessage : "";
+  if (code === "" && message2 === "") return false;
+  return code !== "200";
+}
+function accioErrorFrame(frame) {
+  if (!isAccioErrorFrame(frame)) return void 0;
+  const f = frame;
+  const rawCode = f.error_code ?? f.errorCode;
+  const rawMessage = f.error_message ?? f.errorMessage;
+  const code = typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode) : "";
+  const message2 = typeof rawMessage === "string" ? rawMessage : "";
+  const detail = [code === "" ? "" : `error_code=${code}`, message2].filter((s) => s !== "").join(" ");
+  if (code === ACCIO_QUOTA_ERROR_CODE) {
+    return new LlmError19(`accio: \u989D\u5EA6\u6216\u8BA4\u8BC1\u5931\u8D25\uFF08${detail}\uFF09`, ACCIO_QUOTA_EXCEEDED_CODE);
+  }
+  return new LlmError19(`accio: \u4E0A\u6E38\u8FD4\u56DE\u9519\u8BEF\u5E27\uFF08${detail}\uFF09`, "SERVER");
+}
+var ACCIO_IMAGE_PIXEL_BUDGET = 115e4;
+function mapUsage(raw) {
+  if (raw === null || typeof raw !== "object") return void 0;
+  const u = raw;
+  const pick = (...keys) => {
+    for (const k of keys) {
+      const v = u[k];
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+    }
+    return void 0;
+  };
+  const out = {};
+  const prompt = pick("promptTokenCount", "prompt_token_count");
+  const candidates = pick("candidatesTokenCount", "candidates_token_count");
+  const total = pick("totalTokenCount", "total_token_count");
+  const cached3 = pick("cachedContentTokenCount", "cached_content_token_count");
+  const thoughts = pick("thoughtsTokenCount", "thoughts_token_count");
+  if (prompt !== void 0) out.promptTokenCount = prompt;
+  if (candidates !== void 0) out.candidatesTokenCount = candidates;
+  if (total !== void 0) out.totalTokenCount = total;
+  if (cached3 !== void 0) out.cachedContentTokenCount = cached3;
+  if (thoughts !== void 0) out.thoughtsTokenCount = thoughts;
+  return Object.keys(out).length > 0 ? out : void 0;
+}
+function parseArgsJson(raw) {
+  if (typeof raw !== "string" || raw.trim() === "") return void 0;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function normalizeAccioPart(part) {
+  if (part === null || typeof part !== "object") return void 0;
+  const raw = part;
+  const call = raw.functionCall ?? raw.function_call;
+  if (call === null || typeof call !== "object") return part;
+  const c = call;
+  const name2 = typeof c.name === "string" && c.name !== "" ? c.name : void 0;
+  if (name2 === void 0) return void 0;
+  const args = parseArgsJson(c.args_json ?? c.argsJson) ?? (typeof c.args === "object" && c.args !== null && !Array.isArray(c.args) ? c.args : {});
+  const out = { functionCall: { name: name2, args } };
+  if (typeof raw.thoughtSignature === "string" && raw.thoughtSignature !== "") {
+    out.thoughtSignature = raw.thoughtSignature;
+  }
+  return out;
+}
+function normalizeAccioFrame(frame) {
+  if (frame === null || typeof frame !== "object") return void 0;
+  const f = frame;
+  if (Array.isArray(f.candidates)) return frame;
+  const usage = mapUsage(f.usage_metadata ?? f.usageMetadata);
+  const finish = f.finish_reason ?? f.finishReason;
+  const finishText = typeof finish === "string" && finish !== "" ? finish : void 0;
+  const content = f.content;
+  if (content === null || typeof content !== "object") {
+    const topCall = f.function_call ?? f.functionCall;
+    if (topCall !== null && typeof topCall === "object") {
+      const part = normalizeAccioPart({ function_call: topCall });
+      if (part !== void 0) {
+        const candidate = { content: { role: "model", parts: [part] } };
+        if (finishText !== void 0) candidate.finishReason = finishText;
+        return { candidates: [candidate], ...usage !== void 0 ? { usageMetadata: usage } : {} };
+      }
+    }
+    if (usage === void 0 && finishText === void 0) return void 0;
+    if (finishText !== void 0) return { candidates: [{ finishReason: finishText }], ...usage !== void 0 ? { usageMetadata: usage } : {} };
+    return { candidates: [], usageMetadata: usage };
+  }
+  const normalizedContent = { ...content };
+  const rawParts = content.parts;
+  if (Array.isArray(rawParts)) {
+    const parts = [];
+    for (const part of rawParts) {
+      const normalized = normalizeAccioPart(part);
+      if (normalized !== void 0) parts.push(normalized);
+    }
+    normalizedContent.parts = parts;
+  }
+  const out = { candidates: [{ content: normalizedContent }] };
+  if (usage !== void 0) out.usageMetadata = usage;
+  if (finishText !== void 0) {
+    ;
+    out.candidates[0].finishReason = finishText;
+  }
+  return out;
+}
+function toAccioTools(tools) {
+  if (!Array.isArray(tools)) return void 0;
+  const out = [];
+  for (const tool of tools) {
+    const fn = tool?.function;
+    if (fn === void 0 || typeof fn.name !== "string" || fn.name === "") continue;
+    out.push({
+      name: fn.name,
+      description: typeof fn.description === "string" ? fn.description : "",
+      parametersJson: JSON.stringify(fn.parameters ?? { type: "object", properties: {} })
+    });
+  }
+  return out.length > 0 ? out : void 0;
+}
+function flattenText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.filter((b) => b?.type === "text").map((b) => String(b.text ?? "")).join("");
+}
+function accioUserParts(content, images) {
+  const parts = [];
+  let hasImage = false;
+  for (const raw of content) {
+    if (raw === null || typeof raw !== "object") continue;
+    const block = raw;
+    if (block.type === "text") {
+      const text = String(block.text ?? "");
+      if (text !== "") parts.push({ text });
+      continue;
+    }
+    if (block.type === "image") {
+      hasImage = true;
+      const attachmentId = block.attachment?.attachmentId;
+      const inline = typeof attachmentId === "string" ? images?.get(attachmentId) : void 0;
+      if (inline === void 0) {
+        throw new LlmError19(
+          "accio: \u56FE\u7247\u672A\u80FD\u5185\u8054\uFF08\u9644\u4EF6\u670D\u52A1\u4E0D\u53EF\u7528\u6216\u8BFB\u53D6\u5931\u8D25\uFF09\uFF0C\u62D2\u7EDD\u53D1\u51FA\u7F3A\u5C11\u56FE\u7247\u7684\u8BF7\u6C42",
+          "UNSUPPORTED_CONTENT"
+        );
+      }
+      parts.push({ inlineData: { mimeType: inline.mediaType, data: inline.data } });
+      continue;
+    }
+    if (block.type === "tool-result" && Array.isArray(block.content)) {
+      const inner = accioUserParts(block.content, images);
+      if (inner !== void 0) {
+        hasImage = true;
+        parts.push(...inner);
+      } else {
+        const text = flattenText(block.content);
+        if (text !== "") parts.push({ text });
+      }
+    }
+  }
+  return hasImage && parts.length > 0 ? parts : void 0;
+}
+function serializeAccioMessages(messages, images) {
+  const contents = [];
+  const system = [];
+  for (const raw of messages ?? []) {
+    const message2 = raw;
+    const role = message2?.role;
+    if (role === "system" || role === "developer") {
+      const text2 = flattenText(message2?.content);
+      if (text2 !== "") system.push(text2);
+      continue;
+    }
+    if (role === "tool") {
+      const content = message2?.content;
+      contents.push({
+        role: "user",
+        parts: [{
+          functionResponse: {
+            id: typeof message2?.tool_call_id === "string" ? message2.tool_call_id : "",
+            name: typeof message2?.name === "string" ? message2.name : "",
+            responseJson: typeof content === "string" ? content : JSON.stringify(content ?? {})
+          }
+        }]
+      });
+      continue;
+    }
+    if (role === "assistant") {
+      const parts2 = [];
+      const text2 = flattenText(message2?.content);
+      if (text2 !== "") parts2.push({ text: text2 });
+      const calls = Array.isArray(message2?.tool_calls) ? message2.tool_calls : [];
+      for (const call of calls) {
+        const c = call;
+        const fn = c.function;
+        parts2.push({
+          functionCall: {
+            id: typeof c.id === "string" ? c.id : "",
+            name: typeof fn?.name === "string" ? fn.name : "",
+            argsJson: typeof fn?.arguments === "string" ? fn.arguments : "{}"
+          }
+        });
+      }
+      if (parts2.length > 0) contents.push({ role: "model", parts: parts2 });
+      continue;
+    }
+    const outer = Array.isArray(message2?.content) ? message2.content : void 0;
+    const parts = outer === void 0 || images === void 0 ? void 0 : accioUserParts(outer, images);
+    if (parts !== void 0) {
+      contents.push({ role: "user", parts });
+      continue;
+    }
+    const text = flattenText(message2?.content);
+    if (text !== "") contents.push({ role: "user", parts: [{ text }] });
+  }
+  return { contents, systemInstruction: system.join("\n\n") };
+}
+function consumeAccioSse(options) {
+  const decoder2 = new TextDecoder();
+  const encoder2 = new TextEncoder();
+  let buffer = "";
+  let pendingError;
+  const processLine = (line2, out) => {
+    const trimmedEnd = line2.endsWith("\r") ? line2.slice(0, -1) : line2;
+    if (!trimmedEnd.startsWith("data:")) {
+      out.push(trimmedEnd);
+      return;
+    }
+    const payload = trimmedEnd.slice(5).trim();
+    if (payload === "" || payload === "[DONE]") {
+      out.push(trimmedEnd);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      return;
+    }
+    const error = accioErrorFrame(parsed);
+    if (error !== void 0) {
+      pendingError ??= error;
+      return;
+    }
+    const norm = normalizeAccioFrame(parsed);
+    if (norm === void 0) return;
+    out.push(`data: ${JSON.stringify(norm)}`);
+  };
+  const rewritten = options.body.pipeThrough(new TransformStream({
+    transform(chunk, controller) {
+      buffer += decoder2.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      const out = [];
+      for (const line2 of lines) processLine(line2, out);
+      if (out.length > 0) controller.enqueue(encoder2.encode(`${out.join("\n")}
+`));
+      if (pendingError !== void 0) throw pendingError;
+    },
+    flush(controller) {
+      buffer += decoder2.decode();
+      const out = [];
+      if (buffer !== "") processLine(buffer, out);
+      if (out.length > 0) controller.enqueue(encoder2.encode(`${out.join("\n")}
+`));
+      if (pendingError !== void 0) throw pendingError;
+    }
+  }));
+  return consumeGeminiSse({
+    body: rewritten,
+    ...options.signal === void 0 ? {} : { signal: options.signal },
+    ...options.idleTimeoutMs === void 0 ? {} : { idleTimeoutMs: options.idleTimeoutMs }
+  });
+}
+
+// vendor/channel-pack/src/accio-adapter.ts
+var ACCIO_SSE_IDLE_TIMEOUT_MS = 12e4;
+var FALLBACK_UTDID = `accio-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+var TOOL_RESULT_IMAGE_TEXT5 = "Attached image(s) from tool result:";
+function displayNameOfAccioModel(model) {
+  const multiple = model.multiple;
+  if (multiple === void 0 || !Number.isFinite(multiple)) return model.name;
+  return `${model.name} \xB7 x${multiple}`;
+}
+function accioReasoningOf(model) {
+  const declared = model.efforts ?? [];
+  const fallback = model.defaultEffort;
+  if (declared.length > 0) {
+    return {
+      efforts: declared.map((id) => ({ id: ReasoningEffortId15(id), name: id })),
+      // ⚠️ `defaultEffort` **必须落在 `efforts` 内**才带：DSH 会校验，
+      //    指到集合外会让整条记录的档位声明被丢弃（`model-catalog.ts` 里那段
+      //    `legal` 检查）—— 那不是崩溃，但会让「默认档」静默消失。
+      ...fallback !== void 0 && declared.includes(fallback) ? { defaultEffort: ReasoningEffortId15(fallback) } : {}
+    };
+  }
+  if (fallback !== void 0) {
+    return {
+      efforts: [{ id: ReasoningEffortId15(fallback), name: fallback }],
+      defaultEffort: ReasoningEffortId15(fallback)
+    };
+  }
+  return void 0;
+}
+function accioModelIdOf(model) {
+  const slug = normalizeNameKey(model.name);
+  return slug === "" ? model.id : slug;
+}
+function accioModelCodeOf(models, slug) {
+  const hit = models.find((model) => accioModelIdOf(model) === slug);
+  return hit === void 0 ? slug : hit.id;
+}
+function contentToText7(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.filter((block) => block?.type === "text").map((block) => String(block.text ?? "")).join("");
+}
+function toAccioWireMessages(messages) {
+  const normalized = normalizeHarnessMessages(messages);
+  const { keepCallIds, keepResultIds } = resolveToolPairing(normalized);
+  const toolNames = /* @__PURE__ */ new Map();
+  for (const message2 of normalized) {
+    if (!Array.isArray(message2.content)) continue;
+    for (const block of message2.content) {
+      const b = block;
+      if (b !== null && typeof b === "object" && b.type === "tool-call") {
+        toolNames.set(String(b.id), String(b.name ?? ""));
+      }
+    }
+  }
+  const wire = [];
+  for (const message2 of normalized) {
+    if (message2.role === "assistant") {
+      const content2 = Array.isArray(message2.content) ? message2.content : [];
+      const toolCalls = content2.filter((block) => typeof block === "object" && block !== null && block.type === "tool-call").filter((block) => keepCallIds.has(String(block.id))).map((block) => ({
+        id: String(block.id),
+        type: "function",
+        function: {
+          name: String(block.name),
+          // ⚠️ 必须是**原始参数串**（`serializeAccioMessages` 原样透传成 `argsJson`）。
+          arguments: typeof block.arguments === "string" ? block.arguments : "{}"
+        }
+      }));
+      wire.push({
+        role: "assistant",
+        content: contentToText7(message2.content),
+        ...toolCalls.length > 0 ? { tool_calls: toolCalls } : {}
+      });
+      continue;
+    }
+    if (message2.role === "system") {
+      wire.push({ role: "system", content: contentToText7(message2.content) });
+      continue;
+    }
+    const content = Array.isArray(message2.content) ? message2.content : [];
+    const toolResults = content.filter(
+      (block) => typeof block === "object" && block !== null && block.type === "tool-result"
+    );
+    const text = contentToText7(message2.content);
+    const ownBlocks = imageBlocksOf(
+      content.filter(
+        (block) => !(typeof block === "object" && block !== null && block.type === "tool-result")
+      )
+    );
+    const hasOwn = text.length > 0 || ownBlocks.length > 0;
+    const deferred = toolResults.length > 0;
+    const ownFrame = () => {
+      if (ownBlocks.length === 0) return { role: "user", content: text };
+      return {
+        role: "user",
+        content: text === "" ? ownBlocks : [...ownBlocks, { type: "text", text }]
+      };
+    };
+    if (hasOwn && !deferred) wire.push(ownFrame());
+    const pending2 = [];
+    for (const result of toolResults) {
+      const id = String(result.toolCallId);
+      if (!keepResultIds.has(id)) continue;
+      const embedded = imageBlocksOf(Array.isArray(result.content) ? result.content : []);
+      wire.push({
+        role: "tool",
+        tool_call_id: id,
+        // ⚠️ **name 必须回填**：Accio 的 `functionResponse` 按 name 配对。
+        name: toolNames.get(id) ?? "",
+        content: contentToText7(result.content) || (embedded.length > 0 ? TOOL_RESULT_IMAGE_TEXT5 : "(no output)")
+      });
+      pending2.push(...embedded);
+    }
+    if (deferred && hasOwn) wire.push(ownFrame());
+    if (pending2.length > 0) {
+      wire.push({ role: "user", content: [{ type: "text", text: TOOL_RESULT_IMAGE_TEXT5 }, ...pending2] });
+    }
+  }
+  return wire;
+}
+function imageBlocksOf(content) {
+  return content.filter(
+    (block) => typeof block === "object" && block !== null && block.type === "image"
+  );
+}
+function errorMessage6(error) {
+  if (error instanceof Error) return error.message;
+  try {
+    return String(error);
+  } catch {
+    return "unknown error";
+  }
+}
+function isTransportError6(error) {
+  if (!(error instanceof Error)) return false;
+  const message2 = error.message.toLowerCase();
+  if (error.name.startsWith("UND_ERR_")) return true;
+  if (message2.includes("fetch failed")) return true;
+  if (message2.includes("terminated") || message2.includes("econnreset")) return true;
+  if (message2.includes("epipe") || message2.includes("socket hang up")) return true;
+  return false;
+}
+function httpErrorCode6(status) {
+  if (status === 401 || status === 403) return "AUTH";
+  if (status === 402) return "QUOTA_EXCEEDED";
+  if (status === 429) return "RATE_LIMIT";
+  if (status === 400) return "INVALID_REQUEST";
+  if (status >= 500) return "SERVER";
+  return `HTTP_${status}`;
+}
+function errorDetail6(body) {
+  try {
+    const data = JSON.parse(body);
+    const parts = [
+      typeof data.error_code === "string" || typeof data.error_code === "number" ? `error_code=${String(data.error_code)}` : void 0,
+      typeof data.error_message === "string" ? data.error_message : void 0,
+      typeof data.code === "string" || typeof data.code === "number" ? `code=${String(data.code)}` : void 0,
+      typeof data.message === "string" ? data.message : void 0,
+      typeof data.error === "string" ? data.error : void 0,
+      // ⚠️ 上游代理的 `{"error":"…","detail":"<真实原因>"}` 形态（IKLBSH A1）。
+      // 判据只留一份实现（本文件已经在 import `openai-compat`）；必须是最后一条腿。
+      detailFieldText(data)
+    ].filter((value) => value !== void 0);
+    if (parts.length > 0) return parts.join(" ");
+  } catch {
+  }
+  return body;
+}
+function applyAccessToken(body, accessToken) {
+  body.token = accessToken;
+}
+function mergeAccioToolArgs(fragments) {
+  const nonEmpty = fragments.filter((fragment) => fragment !== "");
+  if (nonEmpty.length === 0) return "";
+  let cumulative = true;
+  for (let i = 1; i < nonEmpty.length; i++) {
+    if (!nonEmpty[i].startsWith(nonEmpty[i - 1])) {
+      cumulative = false;
+      break;
+    }
+  }
+  if (cumulative) return nonEmpty[nonEmpty.length - 1];
+  let merged = "";
+  for (const fragment of nonEmpty) {
+    merged = fragment.startsWith(merged) ? fragment : merged + fragment;
+  }
+  return merged;
+}
+function frameMetaOf(frame) {
+  if (frame === null || typeof frame !== "object") return void 0;
+  const f = frame;
+  const meta = {};
+  if (f.turn_complete !== void 0) meta.turn_complete = f.turn_complete;
+  if (f.usage_metadata !== void 0) meta.usage_metadata = f.usage_metadata;
+  if (f.usageMetadata !== void 0) meta.usageMetadata = f.usageMetadata;
+  if (f.finish_reason !== void 0) meta.finish_reason = f.finish_reason;
+  if (f.finishReason !== void 0) meta.finishReason = f.finishReason;
+  return Object.keys(meta).length > 0 ? meta : void 0;
+}
+function accioArgsTextOf(call) {
+  const raw = call.args_json ?? call.argsJson;
+  if (typeof raw === "string" && raw !== "") return raw;
+  const obj = call.args;
+  if (obj !== null && typeof obj === "object" && !Array.isArray(obj)) {
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+function usageTotalOf(u) {
+  if (u === null || typeof u !== "object" || Array.isArray(u)) return -1;
+  const r = u;
+  const raw = r.totalTokenCount ?? r.total_token_count;
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : -1;
+}
+function mergeFrameMeta(prev, next) {
+  const out = prev === void 0 ? {} : { ...prev };
+  for (const [key, value] of Object.entries(next)) {
+    if (key === "usage_metadata" || key === "usageMetadata") continue;
+    out[key] = value;
+  }
+  const candidates = [out.usage_metadata, out.usageMetadata, next.usage_metadata, next.usageMetadata];
+  delete out.usage_metadata;
+  delete out.usageMetadata;
+  let winner;
+  for (const c of candidates) {
+    if (c === void 0 || c === null) continue;
+    if (winner === void 0 || usageTotalOf(c) >= usageTotalOf(winner)) winner = c;
+  }
+  if (winner !== void 0) out.usage_metadata = winner;
+  return out;
+}
+function accioToolCallMergeTransform() {
+  const decoder2 = new TextDecoder();
+  const encoder2 = new TextEncoder();
+  let buffer = "";
+  const pending2 = /* @__PURE__ */ new Map();
+  let pendingMeta;
+  const flushPending = (out) => {
+    if (pending2.size === 0) {
+      if (pendingMeta !== void 0) {
+        out.push(`data: ${JSON.stringify(pendingMeta)}`);
+        pendingMeta = void 0;
+      }
+      return;
+    }
+    const parts = [];
+    for (const entry of pending2.values()) {
+      const args = mergeAccioToolArgs(entry.fragments);
+      parts.push({
+        function_call: {
+          id: entry.id,
+          name: entry.name,
+          // ⚠️ 参数为空时**省略**该键（与上游「首帧无参数」同形），
+          // 不写空串 —— 那会让消费侧解析出一个空参数对象。
+          ...args === "" ? {} : { args_json: args }
+        }
+      });
+    }
+    pending2.clear();
+    const frame = {
+      content: { role: "model", parts },
+      partial: true,
+      ...pendingMeta !== void 0 ? pendingMeta : {}
+    };
+    pendingMeta = void 0;
+    out.push(`data: ${JSON.stringify(frame)}`);
+  };
+  const anonKey = () => {
+    let n = pending2.size;
+    while (pending2.has(`anon-${n}`)) n++;
+    return `anon-${n}`;
+  };
+  const absorbCallParts = (callParts, meta) => {
+    for (const part of callParts) {
+      const call = part?.function_call;
+      if (call === null || typeof call !== "object" || Array.isArray(call)) continue;
+      const c = call;
+      const id = typeof c.id === "string" && c.id !== "" ? c.id : anonKey();
+      const name2 = typeof c.name === "string" ? c.name : "";
+      const args = accioArgsTextOf(c);
+      const entry = pending2.get(id);
+      if (entry === void 0) pending2.set(id, { id, name: name2, fragments: args === "" ? [] : [args] });
+      else {
+        if (name2 !== "") entry.name = name2;
+        if (args !== "") entry.fragments.push(args);
+      }
+    }
+    if (meta !== void 0) pendingMeta = mergeFrameMeta(pendingMeta, meta);
+  };
+  const handleLine = (line2, out) => {
+    if (!line2.startsWith("data:")) {
+      out.push(line2);
+      return;
+    }
+    const payload = line2.slice(5).trim();
+    if (payload === "" || payload === "[DONE]") {
+      flushPending(out);
+      out.push(line2);
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(payload);
+    } catch {
+      flushPending(out);
+      out.push(line2);
+      return;
+    }
+    const frame = parsed;
+    if (isAccioErrorFrame(frame)) {
+      flushPending(out);
+      out.push(line2);
+      return;
+    }
+    const parts = frame?.content?.parts;
+    const hasPartsArray = Array.isArray(parts);
+    const topCall = frame?.function_call ?? frame?.functionCall;
+    let effectiveLine = line2;
+    if (!hasPartsArray && frame !== null && typeof frame === "object" && topCall !== null && typeof topCall === "object" && !Array.isArray(topCall) && !Array.isArray(frame.candidates)) {
+      effectiveLine = `data: ${JSON.stringify({
+        ...frame,
+        content: { role: "model", parts: [{ function_call: topCall }] }
+      })}`;
+    }
+    const meta = frameMetaOf(frame);
+    if (effectiveLine !== line2) {
+      const rewritten = JSON.parse(effectiveLine.slice(5).trim());
+      const rewrittenParts = rewritten.content?.parts;
+      if (Array.isArray(rewrittenParts)) {
+        absorbCallParts(rewrittenParts, meta);
+        return;
+      }
+    }
+    if (!hasPartsArray) {
+      flushPending(out);
+      out.push(line2);
+      return;
+    }
+    const isCall = (part) => part !== null && typeof part === "object" && part.function_call !== void 0;
+    const callParts = parts.filter(isCall);
+    if (callParts.length === 0) {
+      flushPending(out);
+      out.push(line2);
+      return;
+    }
+    const otherParts = parts.filter((part) => !isCall(part));
+    if (otherParts.length > 0) {
+      out.push(`data: ${JSON.stringify({ ...frame, content: { ...frame.content, parts: otherParts } })}`);
+    }
+    absorbCallParts(callParts, meta);
+  };
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += decoder2.decode(chunk, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      const out = [];
+      for (const line2 of lines) {
+        const trimmedEnd = line2.endsWith("\r") ? line2.slice(0, -1) : line2;
+        handleLine(trimmedEnd, out);
+      }
+      if (out.length > 0) controller.enqueue(encoder2.encode(`${out.join("\n")}
+`));
+    },
+    flush(controller) {
+      buffer += decoder2.decode();
+      const out = [];
+      if (buffer !== "") handleLine(buffer, out);
+      flushPending(out);
+      if (out.length > 0) controller.enqueue(encoder2.encode(out.join("\n")));
+    }
+  });
+}
+var AccioAdapter = class extends LlmAdapter12 {
+  constructor(options) {
+    super();
+    this.options = options;
+    this.product = options.product ?? ACCIO;
+    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.utdid = options.utdid ?? FALLBACK_UTDID;
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === void 0 ? {} : { onLoaded: options.onCatalogLoaded }
+    );
+    this.catalog = createModelCatalog(
+      { accountPool: options.accountPool },
+      {
+        product: this.product,
+        loadCatalog: () => this.loadCatalogEntries(),
+        syncCatalog: () => this.syncCatalogEntries(),
+        /**
+         * ⚠️ **未知 id**（用户手填）：保守报 `['text']`。
+         *
+         * 本家目录条目的 `multimodal` 字段**从不缺失** ⇒ 已知模型没有「未知」态
+         * （见 `toCatalogEntry`）。而**未知 id** 的能力真的无从得知，故取保守侧：
+         * 报 `['text']` 让 DSH 在附件准入阶段就拒图，而不是把图放行到一个
+         * **可能静默忽略它**的服务端（实测 `multimodal: false` 的模型正是那种行为）。
+         *
+         * ⚠️ 与 `stream()` 的未知 id 判据**同向**（那里同样保守拒绝）——
+         * 两处必须一致，否则会出现「准入放行、适配器再拒」这种白撞一轮的形态。
+         */
+        unknownModelInputModalities: () => ["text"]
+      }
+    );
+  }
+  product;
+  fetchImpl;
+  utdid;
+  /** 远端目录缓存（成功拉取后永久保留）。 */
+  remoteModels;
+  /** 目录加载闸门：并发去重 + 失败/空结果冷却。 */
+  catalogGate;
+  /** 共享目录骨架（门控 → 读目录 → 黑名单 → 回填 → 三态）。 */
+  catalog;
+  /**
+   * 描述本适配器拥有的 provider 路由。
+   *
+   * 对入参做防御性归一化：DSH 会强制校验 `info.id === provider`，而模型设置页
+   * 会用该 id 计算 `deriveKeyRef(provider)`（内部调 `provider.toUpperCase()`）。
+   */
+  providerInfo(provider) {
+    const id = typeof provider === "string" && provider.length > 0 ? provider : this.product.id;
+    return { id, name: this.product.displayName };
+  }
+  /** 懒加载远端模型目录（仅拉取一次；失败/空结果走闸门冷却）。 */
+  async ensureRemoteModels() {
+    const fetchRemote = this.options.fetchRemoteModels;
+    if (this.remoteModels !== void 0 || fetchRemote === void 0) return;
+    await this.catalogGate.run(async () => {
+      const models = await fetchRemote();
+      if (models.length === 0) return false;
+      this.remoteModels = models;
+      return true;
+    });
+  }
+  /**
+   * 把本家条目转成共享骨架的中间结构。
+   *
+   * ## ⚠️⚠️ `inputModalities` 的三态决策（2026-10-14 真机实测后**已改**）
+   *
+   * ### 改之前的判据（已废弃，别再改回去）
+   *
+   * 原先**恒省略**，理由是「本 provider 的图片通路整体未实测」——那时确实没有
+   * 任何一次真实图片请求被验证过，故「未知」是唯一诚实的编码。
+   *
+   * ### 现在为什么可以写数组
+   *
+   * issue IKLR7V 的真机实测把那个前提消掉了：
+   *
+   * | 声明 | 实测（四象限色块图） |
+   * |---|---|
+   * | `multimodal: true`（3 个模型） | **3/3 四色全对**（红/绿/蓝/白）⇒ 真收图 |
+   * | `multimodal: false`（3 个模型） | **3/3 未认图**；GLM-5.3 / Qwen 3.5 A3B 明说「没看到图片」，**GLM 5.1 幻觉**出一份答案 |
+   *
+   * 且远端 15 条可见模型的 `multimodal` 字段**从不缺失**（38 条原始行里
+   * 可见的都有该键）、与兜底表 **100% 一致**。
+   *
+   * ### ⇒ 本家**不再有「未知」态**，与 loomy / raccoon / zcode / minimax / qoder 同形
+   *
+   * DSH 的三态语义在这里落成：
+   * - `supportsImage === true` ⇒ `['text','image']`；
+   * - `supportsImage === false` ⇒ **`['text']`（明确不支持）**。
+   *
+   * ⚠️⚠️ **`false` 必须写成 `['text']`，不能省略** —— 这是本次实测最重要的结论：
+   * 上游对 `multimodal: false` 的模型**不报错，而是静默忽略图片**（GLM 5.1 甚至
+   * 据此编造答案）。若省略（= 未知），DSH 会把图片一路放行到适配器，用户就会拿到
+   * 一份**基于幻觉的、看起来正常的回答** —— 这是最难排查的一类失败。
+   * 写 `['text']` 则让 DSH 在**附件准入阶段**就拒掉，用户当场得到「当前模型不支持图片」。
+   *
+   * ⚠️ 与 `model-catalog-parity.spec.ts` 的 `OMIT_UNKNOWN_MODALITIES` **必须同改**：
+   * 那条用例按「真实适配器」双向断言，只改一处会变红并点名 accio。
+   */
+  toCatalogEntry(model) {
+    const reasoning = accioReasoningOf(model);
+    return {
+      // ⚠️ **对外 id 是「人话」slug**（用户要求，2026-10-13）：上游 `modelCode`
+      //    形如 `1Drift-…` 是内部代号，而 DSH 会把它注入给模型当身份 ⇒
+      //    模型只能自报乱码。上行仍用 `modelCode`（见 `stream` 的 `accioModelCodeOf`）。
+      id: accioModelIdOf(model),
+      // 倍率写进 `name`（**不是** `description`）：composer 的模型切换菜单只渲染 name。
+      name: displayNameOfAccioModel(model),
+      // ⚠️ `resolveModel` 用**不带倍率**的裸名 ⇒ 显式提供 `bareName`。
+      bareName: model.name,
+      // ⚠️ 逐模型声明（判据见上）：`false` 是**明确不支持**，不是「未知」。
+      inputModalities: model.supportsImage ? ["text", "image"] : ["text"],
+      ...model.contextWindow > 0 ? { contextWindow: model.contextWindow } : {},
+      ...model.maxTokens !== void 0 && Number.isSafeInteger(model.maxTokens) && model.maxTokens > 0 ? { maxTokens: model.maxTokens } : {},
+      ...reasoning === void 0 ? {} : { reasoning }
+    };
+  }
+  /** 本家全部条目（远端优先，未落地时回退兜底表）。 */
+  catalogEntries() {
+    const source = this.remoteModels ?? this.product.fallbackModels;
+    return source.map((model) => this.toCatalogEntry(model));
+  }
+  async loadCatalogEntries() {
+    await this.ensureRemoteModels();
+    return this.catalogEntries();
+  }
+  /**
+   * 同步视图（`listAllModels` 用）。
+   *
+   * ⚠️ **不能** `await ensureRemoteModels()`（同步契约）—— 读缓存，
+   * 未落地时回退兜底表（否则冷缓存下返回空数组，设置页会把 provider
+   * 误显示成「已关闭」）。
+   */
+  syncCatalogEntries() {
+    return this.catalogEntries();
+  }
+  async listModels(provider) {
+    return this.catalog.listModels(provider);
+  }
+  async resolveModel(provider, model, signal) {
+    return this.catalog.resolveModel(provider, model, signal);
+  }
+  /**
+   * 全量目录（**不套用户黑名单**），带最终展示名（含倍率）。
+   *
+   * 设置页必须能渲染已关闭的模型（否则用户无法重新打开），而 `listModels`
+   * 会按黑名单过滤掉它们 ⇒ RPC 层只能凭裸 id 补回、展示名与倍率随之丢失
+   * （用户报障：「关闭的就没有显示倍率」）。
+   */
+  listAllModels() {
+    return this.catalog.listAllModels();
+  }
+  /**
+   * 兼容 0.1.1-rc.2+：`LlmRuntime.prepareCall()` 会调用
+   * `registration.adapter.prepareCall(...)`。**必须包它**（PR !66 的教训：
+   * 包装适配器时漏了 `prepareCall` 会让凭据续期 / 模型解析走偏，
+   * 且记账包装也会静默失效）。
+   */
+  async prepareCall(provider, model, signal) {
+    return {
+      model: await this.resolveModel(provider, model, signal),
+      stream: (options) => this.stream(options)
+    };
+  }
+  async *stream(options) {
+    const imageRefs = /* @__PURE__ */ new Map();
+    for (const message2 of options.messages) {
+      if (Array.isArray(message2.content)) collectImages3(message2.content, imageRefs);
+    }
+    let images;
+    if (imageRefs.size > 0) {
+      const sourceModels2 = this.remoteModels ?? this.product.fallbackModels;
+      const declared = sourceModels2.find((model) => accioModelIdOf(model) === options.model) ?? sourceModels2.find((model) => model.id === options.model);
+      if (declared?.supportsImage !== true) {
+        throw new LlmError20(
+          `accio: \u6A21\u578B "${options.model}" \u4E0D\u63A5\u53D7\u56FE\u7247\u8F93\u5165\uFF08\u4E0A\u6E38\u5BF9\u58F0\u660E multimodal:false \u7684\u6A21\u578B\u4F1A**\u9759\u9ED8\u5FFD\u7565\u56FE\u7247**\uFF0C\u6545\u8FD9\u91CC\u663E\u5F0F\u62D2\u7EDD\u800C\u4E0D\u662F\u7167\u53D1\uFF09\u3002`,
+          "UNSUPPORTED_CONTENT"
+        );
+      }
+      const readImage = this.options.readImage;
+      if (readImage === void 0 && this.options.readImageRequest === void 0) {
+        throw new LlmError20(
+          "accio: \u56FE\u7247\u8F93\u5165\u9700\u8981\u9644\u4EF6\u670D\u52A1\uFF08readImage / readImageRequest \u5747\u672A\u63D0\u4F9B\uFF09\uFF1B\u8BF7\u786E\u8BA4\u5F53\u524D profile \u5DF2\u88C5\u8F7D @deepseek-ai/dsh-attachment-local\u3002",
+          "UNSUPPORTED_CONTENT"
+        );
+      }
+      images = /* @__PURE__ */ new Map();
+      for (const [id, ref] of imageRefs) {
+        const projected = await projectRequestImage(ref, {
+          readImageRequest: this.options.readImageRequest,
+          pixelBudget: ACCIO_IMAGE_PIXEL_BUDGET
+        });
+        let inline = projected;
+        if (inline === void 0 && readImage !== void 0) {
+          try {
+            inline = await readImage(ref);
+          } catch (error) {
+            throw new LlmError20(
+              `accio: \u8BFB\u53D6\u56FE\u7247\u9644\u4EF6\u5931\u8D25\uFF08${id}\uFF09\uFF1A${errorMessage6(error)}`,
+              "UNSUPPORTED_CONTENT",
+              { cause: error }
+            );
+          }
+        }
+        if (inline === void 0 || inline.data.byteLength === 0) {
+          throw new LlmError20(
+            `accio: \u56FE\u7247\u9644\u4EF6\u8BFB\u53D6\u4E0D\u5230\u5185\u5BB9\uFF08${id}\uFF09\uFF1B\u9644\u4EF6\u670D\u52A1\u53EF\u80FD\u672A\u5C31\u7EEA\uFF0C\u6216\u8BE5\u5BF9\u8C61\u5DF2\u4E0D\u5B58\u5728\u3002`,
+            "UNSUPPORTED_CONTENT"
+          );
+        }
+        images.set(id, {
+          mediaType: inline.mediaType === "" ? "image/png" : inline.mediaType,
+          data: Buffer.from(inline.data).toString("base64")
+        });
+      }
+    }
+    const sourceModels = this.remoteModels ?? this.product.fallbackModels;
+    const wireModel = accioModelCodeOf(sourceModels, options.model);
+    let credential = await this.options.resolveCredential(options.model);
+    if (credential === void 0 || isAccioExpired(credential)) {
+      await this.options.refresh();
+      credential = await this.options.resolveCredential(options.model);
+    }
+    if (credential === void 0 || credential.access_token === "") {
+      throw new LlmError20("accio: no usable credential; log in first", "MISSING_CREDENTIAL");
+    }
+    if (this.options.accountPool !== void 0) {
+      try {
+        const accountId = await this.options.accountPool.findAccountIdByCredential(
+          this.product.id,
+          credential.access_token
+        );
+        if (accountId !== "") reportLedgerAccount(this.product.id, accountId);
+      } catch {
+      }
+    }
+    const titlePlan = planSessionTitleThinking({
+      purpose: options.purpose,
+      requestedEffort: options.reasoningEffort === void 0 ? void 0 : String(options.reasoningEffort),
+      declaredEfforts: [],
+      maxTokens: options.maxTokens
+    });
+    const requestId = accioRequestId();
+    const wireMessages = toAccioWireMessages(
+      options.messages
+    );
+    if (options.system !== void 0 && options.system !== "") {
+      wireMessages.unshift({ role: "system", content: options.system });
+    }
+    const { contents, systemInstruction } = serializeAccioMessages(wireMessages, images);
+    const body = buildAccioBody({
+      // ⚠️ **上行用 `wireModel`（= 上游 `modelCode`），不是 `options.model`（slug）** ——
+      //    见上面 1b 的说明。这是本次改动最容易漏、且后果最隐蔽的一处。
+      model: wireModel,
+      accessToken: credential.access_token,
+      contents,
+      systemInstruction,
+      // ⚠️ `toAccioTools` 同样吃 **OpenAI 形状**（`{type:'function',function:{…}}`），
+      // 而 DSH 给的是**扁平** `ToolSchema`（`{name,description,parameters}`）——
+      // 不包一层会得到 `undefined`（工具一个都不下发）。
+      tools: toAccioTools((options.tools ?? []).map((tool) => ({
+        type: "function",
+        function: { name: tool.name, description: tool.description, parameters: tool.parameters }
+      }))),
+      ...options.temperature === void 0 ? {} : { temperature: options.temperature },
+      // ⚠️ `maxOutputTokens` **必须下发**（不能只用来过滤）。
+      ...titlePlan.maxTokens === void 0 ? {} : { maxOutputTokens: titlePlan.maxTokens },
+      utdid: this.utdid,
+      requestId
+    });
+    if (systemInstruction !== "") body.system_instruction = systemInstruction;
+    else delete body.system_instruction;
+    if (options.stop !== void 0 && options.stop.length > 0) body.stop_sequences = options.stop;
+    applyAccessToken(body, credential.access_token);
+    let response = await this.send(credential, body, options);
+    if (!response.ok && (response.status === 401 || response.status === 403)) {
+      await this.options.refresh();
+      const refreshed = await this.options.resolveCredential(options.model);
+      if (refreshed === void 0 || refreshed.access_token === "") {
+        throw new LlmError20("accio: credential expired and refresh failed", "AUTH", {
+          status: response.status
+        });
+      }
+      credential = refreshed;
+      applyAccessToken(body, credential.access_token);
+      response = await this.send(credential, body, options);
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new LlmError20(`accio: ${errorDetail6(text)}`, httpErrorCode6(response.status), {
+        status: response.status
+      });
+    }
+    if (response.body === null) {
+      throw new LlmError20("accio: empty model response body", "EMPTY_RESPONSE");
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("text/event-stream")) {
+      const peek = await response.text().catch(() => "");
+      throw new LlmError20(
+        `accio: \u4E0A\u6E38\u672A\u8FD4\u56DE\u4E8B\u4EF6\u6D41\uFF08content-type: ${contentType || "(\u7A7A)"}\uFF09\u2014\u2014\u901A\u5E38\u662F\u88AB\u98CE\u63A7\u62E6\u622A\uFF08\u7F51\u5173\u8FD4\u56DE 200 + HTML \u62E6\u622A\u9875\uFF09\u3002${peek === "" ? "" : ` \u670D\u52A1\u7AEF\u539F\u6587\uFF1A${peek.slice(0, 200)}`}`,
+        "SERVER",
+        { status: response.status }
+      );
+    }
+    const merged = response.body.pipeThrough(accioToolCallMergeTransform());
+    yield* consumeAccioSse({
+      body: merged,
+      ...options.signal === void 0 ? {} : { signal: options.signal },
+      idleTimeoutMs: ACCIO_SSE_IDLE_TIMEOUT_MS
+    });
+  }
+  /** 发起一次推理请求；网络失败映射为可重试的 `TRANSPORT`。 */
+  async send(credential, body, options) {
+    const requestId = String(body.request_id);
+    const url = `${this.product.gatewayBaseUrl}${ACCIO_LLM_PATH}?sg_k=${accioSgK(requestId)}`;
+    const headers = accioHeaders({
+      utdid: this.utdid,
+      ...credential.sgcookie === void 0 ? {} : { sgcookie: credential.sgcookie }
+    });
+    try {
+      return await this.fetchImpl(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: options.signal ?? AbortSignal.timeout(ACCIO_REQUEST_TIMEOUT_MS)
+      });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      if (isTransportError6(error)) {
+        throw new LlmError20(`accio: transport error: ${errorMessage6(error)}`, "TRANSPORT", {
+          cause: error
+        });
+      }
+      throw error;
+    }
+  }
+};
+function registerAccioLlm(ctx, options) {
+  const product = options.product ?? ACCIO;
+  const adapter = new AccioAdapter({
+    ...options,
+    // ⚠️ 注入**唯一**的广播实现（`src/catalog-broadcast.ts`），不要在这里
+    // 另写一份 emit —— 两份实现必然漂移。
+    onCatalogLoaded: () => broadcastCatalogChanged(ctx)
+  });
+  registerAdapterIdempotent(ctx.llm, [product.id], adapter);
+  return adapter;
+}
+
 // vendor/channel-pack/src/gemini-sigstore.ts
-import { createHash as createHash9 } from "node:crypto";
-import { existsSync as existsSync11, mkdirSync as mkdirSync9, readFileSync as readFileSync11, renameSync as renameSync9, writeFileSync as writeFileSync10 } from "node:fs";
+import { createHash as createHash11 } from "node:crypto";
+import { existsSync as existsSync12, mkdirSync as mkdirSync9, readFileSync as readFileSync11, renameSync as renameSync9, writeFileSync as writeFileSync10 } from "node:fs";
 import { dirname as dirname2, join as join11 } from "node:path";
 var GEMINI_SIG_FILE = "gemini-sigs.json";
 var GEMINI_SIG_MAX_ENTRIES = 2e3;
 var SIG_KEY_BODY_LIMIT = 512;
 function geminiSigKey(role, text) {
   const body = text.length > SIG_KEY_BODY_LIMIT ? text.slice(0, SIG_KEY_BODY_LIMIT) : text;
-  return createHash9("sha256").update(`${role}\0${body}`, "utf8").digest("hex").slice(0, 16);
+  return createHash11("sha256").update(`${role}\0${body}`, "utf8").digest("hex").slice(0, 16);
 }
 function geminiToolSigKey(name2, argsJson) {
   return geminiSigKey(`tool:${name2}`, argsJson);
@@ -66793,8 +69827,8 @@ function trimGeminiSignature(signature) {
   return signature.trim();
 }
 var GeminiSigStore = class {
-  constructor(path2, logger2) {
-    this.path = path2;
+  constructor(path3, logger2) {
+    this.path = path3;
     this.logger = logger2;
     this.entries = this.load();
   }
@@ -66900,7 +69934,7 @@ var GeminiSigStore = class {
     const out = /* @__PURE__ */ new Map();
     if (this.path === void 0) return out;
     try {
-      if (!existsSync11(this.path)) return out;
+      if (!existsSync12(this.path)) return out;
       const parsed = JSON.parse(readFileSync11(this.path, "utf-8"));
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return out;
       for (const [key, value] of Object.entries(parsed)) {
@@ -66928,8 +69962,1405 @@ function createGeminiSigStore(ctx) {
   return new GeminiSigStore(join11(home, "channel-pack", GEMINI_SIG_FILE), ctx.logger);
 }
 
+// vendor/channel-pack/src/officeace-adapter.ts
+import { LlmAdapter as LlmAdapter13 } from "@deepseek-ai/dsh-llm";
+
+// vendor/channel-pack/src/officeace-auth.ts
+var officeace_auth_exports = {};
+__export(officeace_auth_exports, {
+  OFFICEACE: () => OFFICEACE,
+  REDIS_CRED_TARGET: () => REDIS_CRED_TARGET,
+  basicAuthorization: () => basicAuthorization,
+  claimDailyBonus: () => claimDailyBonus,
+  clearStoredCredential: () => clearStoredCredential,
+  completeLogin: () => completeLogin,
+  fetchModelTokenRates: () => fetchModelTokenRates,
+  fetchSubscriptionSummary: () => fetchSubscriptionSummary,
+  isExpiring: () => isExpiring,
+  persistLogin: () => persistLogin,
+  pollLoginCode: () => pollLoginCode,
+  probeOfficeAce: () => probeOfficeAce,
+  readCredential: () => readCredential,
+  readOfficeAceCredential: () => readOfficeAceCredential,
+  readSessionCookie: () => readSessionCookie,
+  readStoredCredential: () => readStoredCredential,
+  refreshAccountCredential: () => refreshAccountCredential,
+  refreshAccountList: () => refreshAccountList,
+  refreshAll: () => refreshAll,
+  refreshStoredCredential: () => refreshStoredCredential,
+  startLogin: () => startLogin
+});
+import { createHash as createHash12, createHmac as createHmac2, randomBytes as randomBytes16, webcrypto } from "node:crypto";
+import { execFile as execFile3, execFileSync as execFileSync3 } from "node:child_process";
+import * as fs from "node:fs";
+import * as https from "node:https";
+import * as net from "node:net";
+import * as os from "node:os";
+import * as path2 from "node:path";
+import { credentialRef as credentialRef17 } from "@deepseek-ai/dsh-credentials";
+var CLAW_BASE = "https://agentarts.cn-southwest-2.myhuaweicloud.com";
+var TOKEN_URL = "https://sts.cn-north-4.myhuaweicloud.com/v1/oauth2/tokens";
+var CLIENT_ID2 = "pdp5_for_agentarts";
+var REDIRECT_URI = `${CLAW_BASE}/v1/claw/auth/callback`;
+function officeaceHome() {
+  const override = process.env.DSH_OFFICEACE_HOME;
+  if (override !== void 0 && override.trim().length > 0) return override.trim();
+  return path2.join(os.homedir(), ".dsh-officeace");
+}
+function officeAceClientHome() {
+  const override = process.env.DSH_OFFICEACE_HOME;
+  if (override !== void 0 && override.trim().length > 0) {
+    return path2.join(override.trim(), ".office-claw");
+  }
+  return path2.join(os.homedir(), ".office-claw");
+}
+function storeFile() {
+  return path2.join(officeaceHome(), "session.json");
+}
+function storeFileFor(ref) {
+  if (ref === void 0 || ref.length === 0) return storeFile();
+  const safe = ref.replace(/[^A-Za-z0-9._-]/g, "_");
+  return path2.join(officeaceHome(), `session-${safe}.json`);
+}
+function readStoredCredential(ref) {
+  try {
+    const raw = fs.readFileSync(storeFileFor(ref), "utf8").replace(/^\uFEFF/, "");
+    const j = JSON.parse(raw);
+    if (typeof j.modelAppKey !== "string" || j.modelAppKey.length === 0) return void 0;
+    return j;
+  } catch {
+    return void 0;
+  }
+}
+function writeStoredCredential(credential, ref) {
+  const target = storeFileFor(ref);
+  fs.mkdirSync(officeaceHome(), { recursive: true });
+  const payload = { ...credential, savedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const tmp = `${target}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), "utf8");
+  fs.renameSync(tmp, target);
+}
+function clearStoredCredential(ref) {
+  try {
+    fs.rmSync(storeFileFor(ref), { force: true });
+  } catch {
+  }
+}
+function b64(buf) {
+  return Buffer.from(buf).toString("base64url");
+}
+async function generateDpopKeyPair2() {
+  const kp = await webcrypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  return {
+    privateJwk: await webcrypto.subtle.exportKey("jwk", kp.privateKey),
+    publicJwk: await webcrypto.subtle.exportKey("jwk", kp.publicKey)
+  };
+}
+async function importDpopPrivateKey(jwk) {
+  return webcrypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+}
+async function generateDpopJwt(privateKey, publicJwk, htm, htu, nowMs = Date.now()) {
+  const header = { typ: "dpop+jwt", alg: "ES256", jwk: { kty: publicJwk.kty, x: publicJwk.x, y: publicJwk.y, crv: publicJwk.crv } };
+  const payload = { htm, htu, iat: Math.floor(nowMs / 1e3), jti: randomBytes16(16).toString("hex") };
+  const input = `${b64(Buffer.from(JSON.stringify(header)))}.${b64(Buffer.from(JSON.stringify(payload)))}`;
+  const sig2 = await webcrypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, Buffer.from(input));
+  return `${input}.${b64(new Uint8Array(sig2))}`;
+}
+async function startLogin() {
+  const stateRes = await fetch(`${CLAW_BASE}/v1/claw/auth/state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+    signal: AbortSignal.timeout(15e3)
+  });
+  if (!stateRes.ok) {
+    throw new Error(`\u534E\u4E3A\u4E91 state \u6CE8\u518C\u5931\u8D25\uFF1AHTTP ${stateRes.status}`);
+  }
+  const state = (await stateRes.json()).state;
+  if (typeof state !== "string" || state.length === 0) {
+    throw new Error("\u534E\u4E3A\u4E91\u672A\u8FD4\u56DE state");
+  }
+  const codeVerifier = b64(randomBytes16(32));
+  const codeChallenge = createHash12("sha256").update(codeVerifier).digest("base64url");
+  const { privateJwk, publicJwk } = await generateDpopKeyPair2();
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID2,
+    code_challenge: codeChallenge,
+    code_challenge_method: "SHA-256",
+    state,
+    scope: "openid",
+    redirect_uri: REDIRECT_URI,
+    response_type: "code"
+  });
+  const authorizeUrl = `https://auth.huaweicloud.com/authui/login.html?service=${encodeURIComponent(
+    `https://auth.huaweicloud.com/authui/v1/oauth2/authorize?${params.toString()}`
+  )}`;
+  return { authorizeUrl, state, _internal: { codeVerifier, dpopPrivateJwk: privateJwk } };
+}
+async function pollLoginCode(state) {
+  const r = await fetch(`${CLAW_BASE}/v1/claw/auth/code?state=${encodeURIComponent(state)}`, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(15e3)
+  });
+  if (!r.ok) return void 0;
+  try {
+    const j = await r.json();
+    const code = j.code ?? j.data?.code;
+    return typeof code === "string" && code.length > 0 ? code : void 0;
+  } catch {
+    return void 0;
+  }
+}
+function signHuaweiRequest(method, url, headers, bodyText, accessKey, secretKey) {
+  const u = new URL(url);
+  const now = /* @__PURE__ */ new Date();
+  const pad = (n) => n >= 10 ? String(n) : `0${n}`;
+  const xdate = String(now.getUTCFullYear()) + pad(now.getUTCMonth() + 1) + pad(now.getUTCDate()) + "T" + pad(now.getUTCHours()) + pad(now.getUTCMinutes()) + pad(now.getUTCSeconds()) + "Z";
+  const urlEncode = (s) => encodeURIComponent(s);
+  const canonicalUri0 = u.pathname.split("/").map((seg) => urlEncode(seg)).join("/");
+  const canonicalUri = canonicalUri0.endsWith("/") ? canonicalUri0 : `${canonicalUri0}/`;
+  const queryPairs = [];
+  for (const key of [...u.searchParams.keys()].sort()) {
+    queryPairs.push(`${urlEncode(key)}=${urlEncode(u.searchParams.get(key) ?? "")}`);
+  }
+  const canonicalQuery = queryPairs.join("&");
+  const lower = {};
+  for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v.trim();
+  lower.host = u.host;
+  lower["x-sdk-date"] = xdate;
+  const signedHeaders = Object.keys(lower).sort();
+  let canonicalHeaders = "";
+  for (const h of signedHeaders) canonicalHeaders += `${h}:${lower[h]}
+`;
+  const bodyHash = method === "PUT" || method === "PATCH" || method === "POST" ? createHash12("sha256").update(bodyText).digest("hex") : createHash12("sha256").update("").digest("hex");
+  const canonicalRequest = [method, canonicalUri, canonicalQuery, canonicalHeaders, signedHeaders.join(";"), bodyHash].join("\n");
+  const stringToSign = ["SDK-HMAC-SHA256", xdate, createHash12("sha256").update(canonicalRequest).digest("hex")].join("\n");
+  const sig2 = createHmac2("sha256", secretKey).update(stringToSign).digest("hex");
+  return {
+    ...headers,
+    "X-Sdk-Date": xdate,
+    Authorization: `SDK-HMAC-SHA256 Access=${accessKey}, SignedHeaders=${signedHeaders.join(";")}, Signature=${sig2}`
+  };
+}
+async function exchangeToken(code, codeVerifier, dpopPrivateJwk) {
+  const privateKey = await importDpopPrivateKey(dpopPrivateJwk);
+  const publicJwk = { kty: "EC", crv: "P-256", x: dpopPrivateJwk.x, y: dpopPrivateJwk.y };
+  const dpopJwt = await generateDpopJwt(privateKey, publicJwk, "POST", TOKEN_URL);
+  const body = new URLSearchParams({
+    client_id: CLIENT_ID2,
+    code,
+    code_verifier: codeVerifier,
+    grant_type: "authorization_code",
+    redirect_uri: REDIRECT_URI
+  });
+  const r = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", DPoP: dpopJwt },
+    body: body.toString(),
+    signal: AbortSignal.timeout(3e4)
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(`\u534E\u4E3A\u4E91 token \u4EA4\u6362\u5931\u8D25\uFF1AHTTP ${r.status} ${text.slice(0, 200)}`);
+  }
+  return JSON.parse(text);
+}
+async function fetchModelInfo(credential) {
+  const url = `${CLAW_BASE}/v1/claw/client-permission-validate`;
+  const headers = {
+    "content-type": "application/json",
+    "x-security-token": credential.securityToken
+  };
+  if (credential.projectId) headers["x-project-id"] = credential.projectId;
+  const signed = signHuaweiRequest("GET", url, headers, "", credential.access, credential.secret);
+  const r = await fetch(url, { method: "GET", headers: signed, signal: AbortSignal.timeout(3e4) });
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(`\u534E\u4E3A\u4E91\u6743\u9650\u6821\u9A8C\u5931\u8D25\uFF1AHTTP ${r.status} ${text.slice(0, 200)}`);
+  }
+  const j = JSON.parse(text);
+  const modelInfo = j.subscription?.model_info;
+  const auth = modelInfo?.model_auth_info;
+  if (typeof auth?.model_app_key !== "string" || typeof auth?.model_app_secret !== "string") {
+    throw new Error("\u534E\u4E3A\u4E91\u672A\u8FD4\u56DE MaaS \u51ED\u636E\uFF08\u8D26\u53F7\u53EF\u80FD\u672A\u8BA2\u9605 ModelArts MaaS\uFF09");
+  }
+  credential.modelAppKey = auth.model_app_key;
+  credential.modelAppSecret = auth.model_app_secret;
+  const baseUrl = modelInfo?.model_api_url_base;
+  credential.maasBaseUrl = typeof baseUrl === "string" && baseUrl.length > 0 ? `https://${baseUrl.replace(/^https?:\/\//, "")}` : OFFICEACE.defaultBaseUrl;
+  credential.accountId = j.account_id ?? credential.accountId;
+}
+async function fetchModelTokenRates() {
+  const out = /* @__PURE__ */ new Map();
+  try {
+    const credential = readStoredCredential();
+    if (credential === void 0 || credential.access.length === 0 || credential.securityToken.length === 0) {
+      return out;
+    }
+    const raw = await signAndGet(
+      `${OFFICEACE.defaultBaseUrl.replace(/\/+$/, "")}/v1/model-token-rates`,
+      credential
+    );
+    if (raw.length === 0) return out;
+    const j = JSON.parse(raw);
+    for (const m of j.models ?? []) {
+      const name2 = typeof m.model_name === "string" ? m.model_name : typeof m.modelName === "string" ? m.modelName : void 0;
+      const coeff = typeof m.cost_coefficient === "number" ? m.cost_coefficient : typeof m.costCoefficient === "number" ? m.costCoefficient : void 0;
+      if (name2 !== void 0 && coeff !== void 0) out.set(name2, coeff);
+    }
+  } catch {
+  }
+  return out;
+}
+function readSessionCookie() {
+  try {
+    const file = path2.join(officeAceClientHome(), "session.cookie");
+    const raw = fs.readFileSync(file, "utf8").trim();
+    if (!raw.startsWith("OC-DPAPI-1")) return void 0;
+    const bare = raw.replace(/^OC-DPAPI-1\s*/, "");
+    const script = `(Add-Type -AssemblyName System.Security);[Text.Encoding]::UTF8.GetString([Security.Cryptography.ProtectedData]::Unprotect([Convert]::FromBase64String("${bare}"),$null,"CurrentUser"))`;
+    const clear = execFileSync3("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      timeout: 15e3,
+      encoding: "utf8"
+    }).trim();
+    const parsed = JSON.parse(clear);
+    return typeof parsed.value === "string" && parsed.value.length > 0 ? parsed.value : void 0;
+  } catch {
+    return void 0;
+  }
+}
+async function completeLogin(code, codeVerifier, dpopPrivateJwk) {
+  const token = await exchangeToken(code, codeVerifier, dpopPrivateJwk);
+  const c = token.credentials;
+  const credential = {
+    modelAppKey: "",
+    modelAppSecret: "",
+    maasBaseUrl: OFFICEACE.defaultBaseUrl,
+    access: c.access_key_id,
+    secret: c.secret_access_key,
+    securityToken: c.security_token,
+    projectId: c.project_id ?? "",
+    expiresAt: c.expiration,
+    refreshToken: token.refresh_token ?? "",
+    dpopPrivateJwk
+  };
+  await fetchModelInfo(credential);
+  return credential;
+}
+async function persistLogin(credential, options) {
+  await options.credentials.set(credentialRef17(options.refName), JSON.stringify(credential));
+  try {
+    writeStoredCredential(credential);
+  } catch {
+  }
+  return credential.accountId === void 0 ? {} : { accountId: credential.accountId };
+}
+async function readCredential(ref, credentials) {
+  if (credentials !== void 0) {
+    try {
+      const resolved = await credentials.resolve(credentialRef17(ref));
+      if (resolved !== void 0 && resolved.value.length > 0) {
+        const parsed = JSON.parse(resolved.value);
+        if (typeof parsed.modelAppKey === "string" && parsed.modelAppKey.length > 0) return parsed;
+      }
+    } catch {
+    }
+  }
+  return readStoredCredential();
+}
+var refreshInFlight = /* @__PURE__ */ new Map();
+function refreshStoredCredential(ref) {
+  const key = ref ?? "";
+  const pending2 = refreshInFlight.get(key);
+  if (pending2 !== void 0) return pending2;
+  const task = doRefreshStoredCredential(ref).finally(() => {
+    refreshInFlight.delete(key);
+  });
+  refreshInFlight.set(key, task);
+  return task;
+}
+async function doRefreshStoredCredential(ref) {
+  const current = readStoredCredential(ref);
+  if (current === void 0 || current.refreshToken.length === 0) return void 0;
+  const next = await doRefreshCredential(current);
+  if (next === void 0) return void 0;
+  writeStoredCredential(next, ref);
+  return next;
+}
+async function doRefreshCredential(current) {
+  if (current.refreshToken.length === 0) return void 0;
+  const privateKey = await importDpopPrivateKey(current.dpopPrivateJwk);
+  const publicJwk = { kty: "EC", crv: "P-256", x: current.dpopPrivateJwk.x, y: current.dpopPrivateJwk.y };
+  const dpopJwt = await generateDpopJwt(privateKey, publicJwk, "POST", TOKEN_URL);
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: current.refreshToken,
+    client_id: CLIENT_ID2
+  });
+  const r = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", DPoP: dpopJwt },
+    body: body.toString(),
+    signal: AbortSignal.timeout(3e4)
+  });
+  if (!r.ok) {
+    const detail = await r.text().catch(() => "");
+    console.warn(
+      `[officeace] STS \u7EED\u671F\u5931\u8D25 HTTP ${r.status}\uFF1A${detail.slice(0, 200)}\uFF08refresh_token \u662F\u4E00\u6B21\u6027\u7684\uFF1A\u82E5\u62A5 STS5.1806 \u5DF2\u88AB\u6D88\u8D39\uFF0C\u5FC5\u987B\u91CD\u65B0\u767B\u5F55\u624D\u80FD\u6062\u590D\u4E91\u7AEF API\uFF09`
+    );
+    return void 0;
+  }
+  const token = await r.json();
+  const c = token.credentials;
+  const next = {
+    ...current,
+    access: c.access_key_id,
+    secret: c.secret_access_key,
+    securityToken: c.security_token,
+    projectId: c.project_id ?? current.projectId,
+    expiresAt: c.expiration,
+    refreshToken: token.refresh_token ?? current.refreshToken
+  };
+  try {
+    await fetchModelInfo(next);
+  } catch {
+  }
+  return next;
+}
+async function refreshAccountCredential(refName, pool, accountId, credentials) {
+  await queueFor(refName).run(async () => {
+    const current = await readCredential(refName, credentials);
+    if (current === void 0) {
+      const legacy = await refreshStoredCredential(refName).catch(() => void 0);
+      await writebackExpiry(legacy, pool, accountId);
+      return;
+    }
+    if (!shouldRefreshNow(officeaceExpiresAtMs(current))) {
+      await writebackExpiry(current, pool, accountId);
+      return;
+    }
+    const next = await doRefreshCredential(current);
+    if (next === void 0) {
+      const elsewhere = await latestAfterFailedRefresh(refName, credentials, current);
+      await writebackExpiry(elsewhere, pool, accountId);
+      return;
+    }
+    if (credentials !== void 0) {
+      try {
+        await credentials.set(credentialRef17(refName), JSON.stringify(next));
+      } catch {
+      }
+    } else {
+      writeStoredCredential(next, refName);
+    }
+    await writebackExpiry(next, pool, accountId);
+  });
+}
+var refreshQueues = /* @__PURE__ */ new Map();
+function queueFor(refName) {
+  const existing = refreshQueues.get(refName);
+  if (existing !== void 0) return existing;
+  const created = new SerialQueue();
+  if (refreshQueues.size >= 64) {
+    const oldest = refreshQueues.keys().next();
+    if (!oldest.done) refreshQueues.delete(oldest.value);
+  }
+  refreshQueues.set(refName, created);
+  return created;
+}
+function officeaceExpiresAtMs(credential) {
+  const parsed = Date.parse(credential.expiresAt);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : void 0;
+}
+async function latestAfterFailedRefresh(refName, credentials, attempted) {
+  const latest = await readCredential(refName, credentials).catch(() => void 0);
+  if (latest === void 0) return void 0;
+  if (latest.refreshToken === attempted.refreshToken) return void 0;
+  const exp = officeaceExpiresAtMs(latest);
+  if (exp === void 0 || Date.now() >= exp) return void 0;
+  return latest;
+}
+async function writebackExpiry(next, pool, accountId) {
+  if (next === void 0) return;
+  const p = pool;
+  try {
+    await p?.updateAccount?.(accountId, { expiresAt: new Date(next.expiresAt).getTime() });
+  } catch {
+  }
+}
+async function refreshAccountList(pool, refreshOne, fallbackRefresh = refreshStoredCredential) {
+  let accounts;
+  try {
+    const listed = pool?.listAccountsByProvider?.("officeace");
+    const resolved = await listed;
+    accounts = Array.isArray(resolved) ? resolved : [];
+  } catch {
+    accounts = [];
+  }
+  if (accounts.length === 0) {
+    await fallbackRefresh().catch(() => void 0);
+    return;
+  }
+  for (const account of accounts) {
+    await refreshOne(account);
+  }
+}
+async function refreshAll(pool) {
+  await refreshAccountList(pool, (account) => refreshAccountCredential(account.credentialRef, pool, account.id));
+}
+function subscriptionCacheFile(ref) {
+  if (ref === void 0 || ref.length === 0) {
+    return path2.join(officeaceHome(), "subscription-cache.json");
+  }
+  return path2.join(officeaceHome(), `subscription-cache-${ref.replace(/[^A-Za-z0-9._-]/g, "_")}.json`);
+}
+function readSubscriptionCache(ref) {
+  try {
+    const j = JSON.parse(fs.readFileSync(subscriptionCacheFile(ref), "utf8").replace(/^\uFEFF/, ""));
+    if (typeof j.totalCredits !== "number") return void 0;
+    return j;
+  } catch {
+    return void 0;
+  }
+}
+function writeSubscriptionCache(summary, ref) {
+  try {
+    fs.mkdirSync(officeaceHome(), { recursive: true });
+    const payload = { ...summary, cachedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    const target = subscriptionCacheFile(ref);
+    const tmp = `${target}.tmp-${process.pid}`;
+    fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), "utf8");
+    fs.renameSync(tmp, target);
+  } catch {
+  }
+}
+async function fetchSubscriptionSummary(staleHours = 48, ref, credential, credentials) {
+  if (ref !== void 0 && ref.length > 0) {
+    try {
+      const own2 = credential ?? await readCredential(ref, credentials);
+      if (own2 !== void 0) {
+        await maybeClaimBonus(own2, ref);
+        const cloud = await fetchCloudSubscriptionFor(own2);
+        if (cloud !== void 0) {
+          writeSubscriptionCache(cloud, ref);
+          return cloud;
+        }
+      }
+    } catch {
+    }
+    const own = readSubscriptionCache(ref);
+    if (own !== void 0) return { ...own, stale: true };
+    return void 0;
+  }
+  try {
+    const sidValue = readSessionCookie();
+    if (sidValue !== void 0) {
+      const caCandidates = [
+        // ⚠️ 同上：受 `DSH_OFFICEACE_HOME` 覆盖，避免单测读用户真实证书目录。
+        path2.join(officeAceClientHome(), "certs", "root-ca.pem"),
+        "D:\\Users\\Z\\AppData\\Local\\Programs\\OfficeAce\\.office-claw\\certs\\root-ca.pem"
+      ];
+      let ca;
+      for (const p of caCandidates) {
+        try {
+          ca = fs.readFileSync(p);
+          break;
+        } catch {
+        }
+      }
+      if (ca !== void 0) {
+        const body = await new Promise((resolve2) => {
+          const req = https.request(
+            { host: "127.0.0.1", port: 3004, path: "/api/subscription/current", method: "GET", headers: { cookie: `oc_sid=${sidValue}`, accept: "application/json" }, ca },
+            (x) => {
+              let d = "";
+              x.on("data", (c) => d += c);
+              x.on("end", () => resolve2(d));
+            }
+          );
+          req.on("error", () => resolve2(""));
+          req.setTimeout(15e3, () => {
+            req.destroy();
+            resolve2("");
+          });
+          req.end();
+        });
+        if (body.length > 0) {
+          const j = JSON.parse(body);
+          if (typeof j.totalCredits === "number") {
+            const summary = {
+              planName: j.planName,
+              totalCredits: j.totalCredits,
+              usedCredits: j.usedCredits ?? 0,
+              creditGroups: Array.isArray(j.creditGroups) ? j.creditGroups : []
+            };
+            writeSubscriptionCache(summary);
+            return summary;
+          }
+        }
+      }
+    }
+  } catch {
+  }
+  try {
+    const cloud = await fetchCloudSubscription();
+    if (cloud !== void 0) {
+      writeSubscriptionCache(cloud);
+      return cloud;
+    }
+  } catch {
+  }
+  const cached3 = readSubscriptionCache();
+  if (cached3 === void 0) return void 0;
+  return { ...cached3, stale: true };
+}
+async function signAndRequest(url, credential, method, body) {
+  const region = "cn-southwest-2";
+  const service = "apic";
+  const pad = (n) => n >= 10 ? String(n) : `0${n}`;
+  const now = /* @__PURE__ */ new Date();
+  const xdate = String(now.getUTCFullYear()) + pad(now.getUTCMonth() + 1) + pad(now.getUTCDate()) + "T" + pad(now.getUTCHours()) + pad(now.getUTCMinutes()) + pad(now.getUTCSeconds()) + "Z";
+  const urlEncode = (s) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const u = new URL(url);
+  const canonicalUri0 = u.pathname.split("/").map((s) => urlEncode(decodeURIComponent(s))).join("/");
+  const canonicalUri = canonicalUri0.endsWith("/") ? canonicalUri0 : `${canonicalUri0}/`;
+  const queryPairs = [];
+  u.searchParams.forEach((v, n) => queryPairs.push([n, v]));
+  queryPairs.sort(([a, b], [c, d]) => a === c ? b.localeCompare(d) : a.localeCompare(c));
+  const canonicalQuery = queryPairs.map(([k, v]) => `${urlEncode(k)}=${urlEncode(v)}`).join("&");
+  const contentType = "application/json;charset=utf8";
+  const original = {
+    "x-subscription-type": "v2",
+    "X-Sdk-Date": xdate,
+    "X-Security-Token": credential.securityToken.trim(),
+    Host: u.host
+  };
+  if (method === "POST") original["Content-Type"] = contentType;
+  if (credential.projectId) original["X-Project-ID"] = credential.projectId;
+  const lower = {};
+  for (const [k, v] of Object.entries(original)) lower[k.toLowerCase()] = v.trim().replace(/\s+/g, " ");
+  const signedHeaders = Object.keys(lower).sort();
+  let canonicalHeaders = "";
+  for (const h of signedHeaders) canonicalHeaders += `${h}:${lower[h]}
+`;
+  const payloadHash = createHash12("sha256").update(body ?? "", "utf8").digest("hex");
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders.join(";"),
+    payloadHash
+  ].join("\n");
+  const scope = `${xdate.slice(0, 8)}/${region}/${service}`;
+  const stringToSign = ["V11-HMAC-SHA256", xdate, scope, createHash12("sha256").update(canonicalRequest).digest("hex")].join("\n");
+  const u1 = createHmac2("sha256", credential.access).update(credential.secret).digest();
+  const derivedKey = createHmac2("sha256", u1).update(Buffer.concat([Buffer.from(scope, "utf8"), Buffer.from([1])])).digest().subarray(0, 32).toString("hex");
+  const signature = createHmac2("sha256", Buffer.from(derivedKey, "utf8")).update(stringToSign).digest("hex");
+  const r = await fetch(url, {
+    method,
+    headers: {
+      ...original,
+      Authorization: `V11-HMAC-SHA256 Credential=${credential.access}/${scope}, SignedHeaders=${signedHeaders.join(";")}, Signature=${signature}`
+    },
+    ...body === void 0 ? {} : { body },
+    signal: AbortSignal.timeout(3e4)
+  });
+  return r.ok ? await r.text() : "";
+}
+async function signAndGet(url, credential) {
+  return signAndRequest(url, credential, "GET");
+}
+async function fetchCloudSubscription(ref) {
+  const credential = readStoredCredential(ref);
+  if (credential === void 0) return void 0;
+  await maybeClaimBonus(credential, ref ?? "__default__");
+  return fetchCloudSubscriptionFor(credential);
+}
+async function fetchCloudSubscriptionFor(credential) {
+  if (credential === void 0 || credential.access.length === 0 || credential.securityToken.length === 0) {
+    return void 0;
+  }
+  const body = await signAndGet(
+    `${OFFICEACE.defaultBaseUrl.replace(/\/+$/, "")}/v1/subscription`,
+    credential
+  );
+  if (body.length === 0) return void 0;
+  const j = JSON.parse(body);
+  const now2 = Date.now();
+  const creditGroups = [];
+  for (const sku of j.skus ?? []) {
+    for (const q of sku.quotas ?? []) {
+      if (q.sku_attr_code !== "officeace_points") continue;
+      const total = Number(q.sku_value);
+      const used = Number(q.current_value);
+      const expiredAt = typeof q.expired_time === "string" && q.expired_time.length > 0 ? q.expired_time : null;
+      const isTrial = String(sku.sku_code ?? "").endsWith(".trial");
+      creditGroups.push({
+        key: `plan-${String(sku.sku_code ?? "")}`,
+        name: typeof sku.sku_name === "string" ? sku.sku_name : "\u5957\u9910",
+        kind: "plan",
+        remaining: Math.max(0, total - used),
+        total,
+        used,
+        expiresAt: isTrial ? void 0 : expiredAt ?? void 0,
+        expired: !isTrial && expiredAt !== null && new Date(expiredAt).getTime() <= now2
+      });
+    }
+  }
+  for (const bonus of j.bonus_skus ?? []) {
+    const points = Number(bonus.points);
+    const used = Number(bonus.current_value);
+    if (!Number.isFinite(points)) continue;
+    creditGroups.push({
+      key: `bonus-${String(bonus.activity_id ?? "")}`,
+      name: typeof bonus.activity_name === "string" ? bonus.activity_name : "\u6D3B\u52A8\u5956\u52B1",
+      kind: "bonus",
+      remaining: Math.max(0, points - used),
+      total: points,
+      used,
+      expiresAt: typeof bonus.expired_time === "string" ? bonus.expired_time : void 0,
+      expired: typeof bonus.expired_time === "string" && new Date(bonus.expired_time).getTime() <= now2
+    });
+  }
+  if (creditGroups.length === 0) return void 0;
+  const totalCredits = creditGroups.filter((g) => !g.expired).reduce((sum, g) => sum + g.remaining, 0);
+  return {
+    planName: creditGroups.find((g) => g.kind === "plan")?.name,
+    totalCredits,
+    usedCredits: creditGroups.reduce((sum, g) => sum + (g.used ?? 0), 0),
+    creditGroups
+  };
+}
+async function claimDailyBonus(credential) {
+  if (credential === void 0 || credential.access.length === 0 || credential.securityToken.length === 0) {
+    return [];
+  }
+  try {
+    const body = await signAndRequest(
+      `${OFFICEACE.defaultBaseUrl.replace(/\/+$/, "")}/v1/subscription/bonus/claim`,
+      credential,
+      "POST"
+    );
+    if (body.length === 0) return [];
+    const j = JSON.parse(body);
+    return (j.bonus_skus ?? []).map((s) => ({
+      activityId: String(s.activity_id ?? ""),
+      activityName: typeof s.activity_name === "string" ? s.activity_name : "\u6D3B\u52A8\u5956\u52B1",
+      points: Number(s.points) || 0
+    }));
+  } catch {
+    return [];
+  }
+}
+var lastClaimAt = /* @__PURE__ */ new Map();
+function maybeClaimBonus(credential, ref) {
+  const now = /* @__PURE__ */ new Date();
+  const hourKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+  if (lastClaimAt.get(ref) === hourKey) return Promise.resolve([]);
+  lastClaimAt.set(ref, hourKey);
+  return claimDailyBonus(credential).catch(() => []);
+}
+function basicAuthorization(credential) {
+  return "Basic " + Buffer.from(`${credential.modelAppKey}:${credential.modelAppSecret}`).toString("base64");
+}
+function isExpiring(credential, leadMs = 10 * 60 * 1e3) {
+  const exp = Date.parse(credential.expiresAt);
+  if (!Number.isFinite(exp)) return true;
+  return exp - Date.now() < leadMs;
+}
+async function probeOfficeAce() {
+  try {
+    return readStoredCredential() !== void 0;
+  } catch {
+    return false;
+  }
+}
+async function readOfficeAceCredential() {
+  const own = readStoredCredential();
+  if (own !== void 0) return own;
+  return readFromOfficeAceRedis();
+}
+function credRead(target) {
+  const script = `
+$ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class OC_CM {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public struct CREDENTIAL {
+    public int Flags; public int Type; public string TargetName; public string Comment;
+    public System.Runtime.InteropServices.ComTypes.FILETIME LastWritten;
+    public int CredentialBlobSize; public IntPtr CredentialBlob; public int Persist;
+    public int AttributeCount; public IntPtr Attributes; public string TargetAlias; public string UserName;
+  }
+  [DllImport("advapi32.dll", EntryPoint="CredReadW", CharSet=CharSet.Unicode, SetLastError=true)]
+  public static extern bool CredRead(string t, int ty, int f, out IntPtr p);
+  [DllImport("advapi32.dll")] public static extern void CredFree(IntPtr c);
+}
+'@
+$ptr=[IntPtr]::Zero
+if(-not [OC_CM]::CredRead('${target.replace(/'/g, "''")}',1,0,[ref]$ptr)){ Write-Output 'OC_NX'; exit }
+$c=[Runtime.InteropServices.Marshal]::PtrToStructure($ptr,[type][OC_CM+CREDENTIAL])
+$b=New-Object byte[] $c.CredentialBlobSize
+[Runtime.InteropServices.Marshal]::Copy($c.CredentialBlob,$b,0,$c.CredentialBlobSize)
+[OC_CM]::CredFree($ptr)|Out-Null
+Write-Output ('OC_U16[' + [Text.Encoding]::Unicode.GetString($b) + ']OC_ASC[x]')
+`;
+  return new Promise((resolve2) => {
+    execFile3("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { timeout: 15e3 }, (err, stdout) => {
+      if (err) {
+        resolve2(void 0);
+        return;
+      }
+      const text = String(stdout);
+      if (!text.includes("OC_U16[")) {
+        resolve2(void 0);
+        return;
+      }
+      resolve2({ utf16: text.slice(text.indexOf("OC_U16[") + 7, text.indexOf("]OC_ASC[")), ascii: "" });
+    });
+  });
+}
+function enc(args) {
+  let out = `*${args.length}\r
+`;
+  for (const a of args) out += `$${Buffer.byteLength(a)}\r
+${a}\r
+`;
+  return out;
+}
+function redisExec(port, commands, timeoutMs) {
+  return new Promise((resolve2) => {
+    const sock = net.connect(port, "127.0.0.1");
+    let buf = "";
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        sock.destroy();
+      } catch {
+      }
+      resolve2(buf);
+    };
+    const expect = commands.length;
+    const countTopLevel = () => {
+      let count2 = 0;
+      for (const line2 of buf.split("\r\n")) {
+        if (/^[+\-:$*]/.test(line2)) count2++;
+      }
+      return count2;
+    };
+    sock.on("data", (c) => {
+      buf += c.toString("utf8");
+      if (countTopLevel() >= expect) done();
+    });
+    sock.setTimeout(timeoutMs, done);
+    sock.on("error", done);
+    let payload = "";
+    for (const cmd of commands) payload += enc(cmd);
+    sock.write(payload);
+  });
+}
+function respFirst(reply2) {
+  for (const line2 of reply2.split("\r\n")) {
+    if (line2.startsWith("$") && line2 !== "$-1") {
+      const idx = reply2.split("\r\n").indexOf(line2);
+      return reply2.split("\r\n")[idx + 1];
+    }
+  }
+  return void 0;
+}
+async function readFromOfficeAceRedis() {
+  try {
+    const pw = await credRead("OfficeClaw/redis/password");
+    if (pw === void 0) return void 0;
+    const password = pw.utf16.trim();
+    if (password.length === 0) return void 0;
+    const keysReply = await redisExec(6399, [["AUTH", password], ["KEYS", "office-claw:oc:session:user:*"]], 8e3);
+    if (!keysReply.includes("+OK")) return void 0;
+    const lines = keysReply.split("\r\n");
+    const keyLines = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].startsWith("$") && lines[i] !== "$-1") keyLines.push(lines[i + 1]);
+    }
+    const sessionKey = keyLines.find((k) => k && !k.startsWith("+"));
+    if (sessionKey === void 0) return void 0;
+    const valueReply = await redisExec(6399, [["AUTH", password], ["GET", sessionKey]], 8e3);
+    const json = respFirst(valueReply);
+    if (json === void 0) return void 0;
+    const parsed = JSON.parse(json);
+    const auth = parsed?.providerState?.modelInfo?.model_auth_info;
+    const appKey = auth?.model_app_key;
+    const appSecret = auth?.model_app_secret;
+    if (typeof appKey !== "string" || typeof appSecret !== "string" || appKey.length === 0) return void 0;
+    const baseUrl = parsed?.providerState?.modelInfo?.model_api_url_base;
+    return {
+      modelAppKey: appKey,
+      modelAppSecret: appSecret,
+      maasBaseUrl: typeof baseUrl === "string" && baseUrl.length > 0 ? `https://${baseUrl}` : OFFICEACE.defaultBaseUrl,
+      access: "",
+      secret: "",
+      securityToken: "",
+      projectId: "",
+      expiresAt: "",
+      refreshToken: "",
+      dpopPrivateJwk: { kty: "EC", crv: "P-256", x: "", y: "" },
+      displayName: typeof parsed.displayName === "string" ? parsed.displayName : void 0
+    };
+  } catch {
+    return void 0;
+  }
+}
+var REDIS_CRED_TARGET = "OfficeClaw/redis/password";
+
+// vendor/channel-pack/src/dsml.ts
+var DSML_TOOL_CALLS_OPEN2 = "<\uFF5CDSML\uFF5Ctool_calls>";
+var DSML_TOOL_CALLS_CLOSE2 = "</\uFF5CDSML\uFF5Ctool_calls>";
+function isDeepseekV4Model2(model) {
+  return /^deepseek-v4-(flash|pro)$/i.test(model);
+}
+function needsDsmlToolMode2(model, _toolNames) {
+  return isDeepseekV4Model2(model) || /^deepseek-v4\.\d+-(flash|pro)$/i.test(model);
+}
+function buildDsmlSystemPrompt2(tools) {
+  const toolJson = JSON.stringify(tools.map((tool) => ({
+    name: tool.function.name,
+    description: tool.function.description,
+    parameters: tool.function.parameters
+  })), null, 2);
+  return [
+    "\u4EE5\u4E0B\u662F\u4F60\u53EF\u7528\u7684\u5DE5\u5177\u53CA\u5176 JSON Schema\u3002\u5F53\u9700\u8981\u8C03\u7528\u5DE5\u5177\u5B8C\u6210\u4EFB\u52A1\u65F6\uFF0C",
+    "\u5FC5\u987B\u4F7F\u7528\u539F\u751F DSML \u5DE5\u5177\u8C03\u7528\u8BED\u6CD5\u8F93\u51FA\uFF0C\u683C\u5F0F\u5982\u4E0B\uFF1A",
+    `${DSML_TOOL_CALLS_OPEN2}<\uFF5CDSML\uFF5Cinvoke name="\u5DE5\u5177\u540D"><\uFF5CDSML\uFF5Cparameter name="\u53C2\u6570\u540D" string="true">\u53C2\u6570\u503C</\uFF5CDSML\uFF5Cparameter></\uFF5CDSML\uFF5Cinvoke>${DSML_TOOL_CALLS_CLOSE2}`,
+    "",
+    "\u89C4\u5219\uFF1A",
+    "- \u5DE5\u5177\u540D\u5FC5\u987B\u662F\u4E0B\u9762\u5217\u8868\u4E2D\u7684 name\u3002",
+    "- \u6BCF\u4E2A\u53C2\u6570\u7528\u4E00\u4E2A <\uFF5CDSML\uFF5Cparameter> \u6807\u7B7E\u5305\u88F9\uFF0C\u53C2\u6570\u503C\u653E\u5728\u6807\u7B7E\u4E4B\u95F4\u3002",
+    '- \u5B57\u7B26\u4E32\u53C2\u6570\u52A0 string="true" \u5C5E\u6027\uFF1B\u5BF9\u8C61/\u6570\u7EC4/\u6570\u5B57/\u5E03\u5C14\u53C2\u6570\u4E0D\u8981\u52A0\u8BE5\u5C5E\u6027\u3002',
+    "- \u4E00\u6B21\u53EF\u4EE5\u8F93\u51FA\u591A\u4E2A <\uFF5CDSML\uFF5Cinvoke> \u8C03\u7528\uFF08\u5DE5\u5177\u53EF\u4EE5\u5E76\u884C\uFF09\u3002",
+    "- \u6587\u4EF6\u5185\u5BB9\u8BF7\u4E00\u6B21\u6027\u5B8C\u6574\u5199\u5165\u5355\u4E2A write \u8C03\u7528\u7684 content \u53C2\u6570\uFF0C\u4E0D\u8981\u62C6\u5206\u6216\u7701\u7565\u3002",
+    "",
+    "\u5DE5\u5177\u5217\u8868\uFF08JSON Schema\uFF09\uFF1A",
+    toolJson
+  ].join("\n");
+}
+
+// vendor/channel-pack/src/officeace-credential-health.ts
+import { createHash as createHash13 } from "node:crypto";
+var DSH_OFFICEACE_BREAKER_MINUTES = "DSH_OFFICEACE_BREAKER_MINUTES";
+var OFFICEACE_BREAKER_DEFAULT_MINUTES = 10;
+var OFFICEACE_BREAKER_THRESHOLD = 2;
+function officeaceBreakerMinutes(env = process.env) {
+  const raw = env[DSH_OFFICEACE_BREAKER_MINUTES];
+  if (typeof raw !== "string" || raw.trim().length === 0) return OFFICEACE_BREAKER_DEFAULT_MINUTES;
+  const parsed = Number(raw.trim());
+  if (!Number.isFinite(parsed) || parsed < 0) return OFFICEACE_BREAKER_DEFAULT_MINUTES;
+  return parsed;
+}
+function officeaceBreakerMs(env = process.env) {
+  return officeaceBreakerMinutes(env) * 60 * 1e3;
+}
+function officeaceCredentialFingerprint(credential) {
+  const key = typeof credential?.modelAppKey === "string" ? credential.modelAppKey : "";
+  const secret = typeof credential?.modelAppSecret === "string" ? credential.modelAppSecret : "";
+  if (key.length === 0 || secret.length === 0) return "";
+  return createHash13("sha256").update(`${key}\0${secret}`).digest("hex").slice(0, 16);
+}
+var rejections = /* @__PURE__ */ new Map();
+function noteOfficeaceRejection(credential, body = "", now = Date.now(), env = process.env) {
+  const fingerprint = officeaceCredentialFingerprint(credential);
+  if (fingerprint.length === 0) return { open: false, consecutive: 0 };
+  const previous = rejections.get(fingerprint);
+  const consecutive = (previous?.consecutive ?? 0) + 1;
+  const minutes = officeaceBreakerMinutes(env);
+  const shouldOpen = minutes > 0 && consecutive >= OFFICEACE_BREAKER_THRESHOLD;
+  const record = {
+    consecutive,
+    // ⚠️ **半开语义**：到期后若又失败，计数仍在阈值上 ⇒ 立刻重新熔断（见模块头第 3 条）。
+    until: shouldOpen ? now + minutes * 60 * 1e3 : 0,
+    lastReason: body.slice(0, 200)
+  };
+  rejections.set(fingerprint, record);
+  return { open: shouldOpen, consecutive };
+}
+function noteOfficeaceSuccess(credential) {
+  const fingerprint = officeaceCredentialFingerprint(credential);
+  if (fingerprint.length === 0) return;
+  rejections.delete(fingerprint);
+}
+function officeaceBreakerState(credential, now = Date.now(), env = process.env) {
+  const closed = { open: false, remainingMs: 0, consecutive: 0, lastReason: "" };
+  const fingerprint = officeaceCredentialFingerprint(credential);
+  if (fingerprint.length === 0) return closed;
+  const record = rejections.get(fingerprint);
+  if (record === void 0) return closed;
+  if (officeaceBreakerMs(env) <= 0) return { ...closed, consecutive: record.consecutive, lastReason: record.lastReason };
+  if (record.until <= now) return { ...closed, consecutive: record.consecutive, lastReason: record.lastReason };
+  return {
+    open: true,
+    remainingMs: record.until - now,
+    consecutive: record.consecutive,
+    lastReason: record.lastReason
+  };
+}
+function isBasicCredentialRejection(status, body) {
+  if (!(status >= 400 && status < 500)) return false;
+  return /APIG\.1009/i.test(body) || /AppKey or AppSecret/i.test(body);
+}
+
+// vendor/channel-pack/src/officeace-adapter.ts
+function basicAuthFingerprint(credential) {
+  return `${credential.modelAppKey}\0${credential.modelAppSecret}\0${maasBaseUrlOf(credential)}`;
+}
+function maasBaseUrlOf(credential) {
+  const raw = typeof credential.maasBaseUrl === "string" ? credential.maasBaseUrl.trim() : "";
+  const base = raw.length > 0 ? raw : OFFICEACE.defaultBaseUrl;
+  return base.replace(/\/+$/, "");
+}
+function isMultimodalModel(model) {
+  return OFFICEACE_MODELS.some((m) => m.id === model && m.multimodal === true);
+}
+var OfficeAceAdapter = class extends LlmAdapter13 {
+  constructor(options = {}) {
+    super();
+    this.options = options;
+  }
+  /** 目录是否已广播过（只广播一次）。 */
+  announced = false;
+  /** 倍率缓存（listModels 时填充，resolveModel 复用——保持两处名字一致）。 */
+  rateCache = /* @__PURE__ */ new Map();
+  /**
+   * 取当前可用凭据；STS 临期（10 分钟内）先静默刷新。
+   *
+   * ⚠️ 刷新失败（refresh_token 已消费）返回旧凭据 —— 推理可能仍可用
+   *（MaaS Basic 凭据与 STS 生命周期不同步）；真正失效由 stream 的 401 报错兜底。
+   */
+  async resolveCredential() {
+    if (this.options.credentialProvider) return this.options.credentialProvider();
+    let credential = await readOfficeAceCredential();
+    if (credential !== void 0 && isExpiring(credential)) {
+      credential = await refreshStoredCredential().catch(() => void 0) ?? credential;
+    }
+    return credential;
+  }
+  /**
+   * 目录专用凭据：**锁定永久积分也必须能读目录**（见 `probeCredential` 的注释）。
+   *
+   * ⚠️ 未注入 `probeCredential` 时回落 `resolveCredential()`：既有嵌入方与单测
+   *    的行为逐字不变（只有宿主装配层会注入它）。
+   */
+  async probeCredential() {
+    return this.options.probeCredential !== void 0 ? this.options.probeCredential() : this.resolveCredential();
+  }
+  providerInfo(provider) {
+    const id = typeof provider === "string" && provider.length > 0 ? provider : OFFICEACE.id;
+    return { id, name: OFFICEACE.displayName };
+  }
+  /** ⚠️ 必须同步（Jet Hub `ModelCatalogSource` 不 await，同 minimax 教训）。 */
+  listAllModels() {
+    return OFFICEACE_MODELS.map((m) => ({ id: m.id, name: m.name }));
+  }
+  /**
+   * 目录：凭据可读 + `/v2/models` 可达才暴露（隐藏不可恢复的分组，
+   * 与 AutoClaw 同一约定：空目录 = 隐藏，而不是报错）。
+   */
+  async listModels(_provider) {
+    const disabled = this.options.disabledModels?.() ?? /* @__PURE__ */ new Set();
+    const credential = await this.probeCredential();
+    if (credential === void 0) return [];
+    try {
+      const probe = await this.probe(credential);
+      if (!probe) return [];
+    } catch {
+      return [];
+    }
+    this.announceLater();
+    const rates = await fetchModelTokenRates();
+    this.rateCache = rates;
+    return OFFICEACE_MODELS.filter((m) => !disabled.has(m.id)).map((m) => {
+      const coeff = rates.get(m.id);
+      return {
+        provider: OFFICEACE.id,
+        id: m.id,
+        name: coeff !== void 0 ? `${m.name} \xB7 x${coeff}` : m.name,
+        // ⚠️ **图片准入闸门**（实测表见 `OFFICEACE_MODELS` 的 `multimodal` 注）：
+        //    不声明 `image` 时附件在入库阶段就被拒（用户看到「当前模型不支持
+        //    图片」）—— 这是对 6 个纯文本模型的**诚实**行为。
+        inputModalities: isMultimodalModel(m.id) ? ["text", "image"] : ["text"]
+      };
+    });
+  }
+  announceLater() {
+    if (this.announced) return;
+    this.announced = true;
+    setTimeout(() => {
+      try {
+        this.options.onCatalogLoaded?.();
+      } catch {
+      }
+    }, 0);
+  }
+  async resolveModel(provider, model, _signal) {
+    const known = OFFICEACE_MODELS.find((m) => m.id === model);
+    const coeff = this.rateCache.get(model);
+    const baseName = known?.name ?? model;
+    return {
+      provider,
+      id: model,
+      name: coeff !== void 0 ? `${baseName} \xB7 x${coeff}` : baseName,
+      // 与 listModels 同源：准入闸门两处都要说真话（实测表见 OFFICEACE_MODELS）。
+      inputModalities: isMultimodalModel(model) ? ["text", "image"] : ["text"],
+      // ⚠️ **未知 id 不编造 `context`**：目录外的模型我们不知道它的上下文窗口，
+      //    拿一个猜测值（131072）会让自动压缩按错误阈值决策 —— 如实 `undefined`
+      //    比编一个数诚实（`model-catalog-parity.spec.ts` 会红并点名这种编造）。
+      ...known === void 0 ? {} : { context: { contextWindow: known.contextWindow } }
+    };
+  }
+  /** 探测：模型端点 200 且 JSON（凭据有效即通过）。 */
+  async probe(credential) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8e3);
+    try {
+      const f = this.options.fetchImpl ?? fetch;
+      const r = await f(`${maasBaseUrlOf(credential)}${OFFICEACE.modelsPath}`, {
+        headers: { Authorization: basicAuthorization(credential) },
+        signal: ctrl.signal
+      });
+      const ct = r.headers.get("content-type") ?? "";
+      return r.ok && ct.includes("application/json");
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  async prepareCall(provider, model, signal) {
+    return {
+      model: await this.resolveModel(provider, model, signal),
+      stream: (options) => this.stream(options)
+    };
+  }
+  /** ⚠️ 单参数 `stream(options)`（`LlmAdapter` 基类契约）。 */
+  async *stream(options) {
+    const model = options.model;
+    const credential = await this.resolveCredential();
+    if (credential === void 0) {
+      throw new Error(
+        "\u672A\u627E\u5230 OfficeAce \u51ED\u636E\uFF1A\u8BF7\u542F\u52A8 OfficeAce \u5E76\u767B\u5F55\u534E\u4E3A\u4E91\u8D26\u53F7\uFF08\u51ED\u636E\u7F13\u5B58\u4E8E\u672C\u673A Redis\uFF09\uFF0C\u6216\u786E\u8BA4 Redis 6399 \u4E0E Windows \u51ED\u636E\u7BA1\u7406\u5668\u6761\u76EE\u53EF\u8BFB"
+      );
+    }
+    const f = this.options.fetchImpl ?? fetch;
+    const breaker = officeaceBreakerState(credential);
+    if (breaker.open) {
+      const minutes = Math.max(1, Math.ceil(breaker.remainingMs / 6e4));
+      throw new Error(
+        `OfficeAce\uFF1A\u8BE5\u8D26\u53F7\u7684 Basic \u51ED\u636E\u5DF2\u88AB\u534E\u4E3A MaaS \u8FDE\u7EED\u62D2\u7EDD ${breaker.consecutive} \u6B21\uFF08\u6700\u8FD1\u4E00\u6B21\uFF1A${breaker.lastReason.slice(0, 120)}\uFF09\uFF0C\u5DF2\u4E34\u65F6\u8DF3\u8FC7\u672C\u6E20\u9053\uFF0C\u7EA6 ${minutes} \u5206\u949F\u540E\u81EA\u52A8\u91CD\u8BD5\u3002\u26A0\uFE0F \u8FD9\u4E0E\u989D\u5EA6\u65E0\u5173\uFF0C**\u4E0D\u8981**\u53BB\u89E3\u9501\u6C38\u4E45\u79EF\u5206\uFF1B\u91CD\u65B0\u767B\u5F55\u4E5F\u6539\u53D8\u4E0D\u4E86\uFF08\u4E91\u4FA7\u4E0B\u53D1\u7684 \`modelAppKey\`/\`modelAppSecret\` \u4E0D\u4F1A\u53D8\uFF09\u3002`
+      );
+    }
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    options.signal?.addEventListener("abort", onAbort);
+    const MAX_TOKENS_FLOOR = 4096;
+    const maxTokens = options.maxTokens !== void 0 && options.maxTokens >= MAX_TOKENS_FLOOR ? options.maxTokens : void 0;
+    const imageRefs = /* @__PURE__ */ new Map();
+    for (const message2 of options.messages) {
+      const content = Array.isArray(message2.content) ? message2.content : [];
+      collectImages3(content, imageRefs);
+    }
+    let imageUrls;
+    if (imageRefs.size > 0) {
+      if (!isMultimodalModel(model)) {
+        throw new Error(
+          `OfficeAce: \u6A21\u578B "${model}" \u4E0D\u652F\u6301\u56FE\u7247\u8F93\u5165\u3002\u5DF2\u5B9E\u6D4B\u652F\u6301\uFF1ADeepSeek-V4.1-Flash\u3001Kimi-K2.6\uFF08\u89C1 OFFICEACE_MODELS \u7684 multimodal \u6CE8\uFF09`
+        );
+      }
+      if (this.options.readImage === void 0) {
+        throw new Error(
+          "OfficeAce: \u56FE\u7247\u8F93\u5165\u9700\u8981\u9644\u4EF6\u670D\u52A1\u6865\u63A5\uFF08readImage\uFF09\uFF1B\u8BF7\u786E\u8BA4\u5F53\u524D profile \u5DF2\u88C5\u8F7D @deepseek-ai/dsh-attachment-local"
+        );
+      }
+      imageUrls = /* @__PURE__ */ new Map();
+      for (const [id, ref] of imageRefs) {
+        const image = await this.options.readImage(ref);
+        if (image === void 0) continue;
+        imageUrls.set(id, `data:${image.mediaType};base64,${Buffer.from(image.data).toString("base64")}`);
+      }
+    }
+    const wireMessages = serializeMessages4(options.messages, imageUrls);
+    const wireTools = options.tools?.map((tool) => ({
+      type: "function",
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters
+      }
+    }));
+    let toolsPayload = wireTools;
+    let dsmlMode = false;
+    if (process.env.OFFICEACE_DSML === "1" && wireTools !== void 0 && wireTools.length > 0 && needsDsmlToolMode2(model, wireTools.map((tool) => tool.function.name))) {
+      dsmlMode = true;
+      wireMessages.splice(
+        wireMessages.findIndex((m) => m.role === "system") + 1,
+        0,
+        { role: "system", content: buildDsmlSystemPrompt2(wireTools) }
+      );
+      toolsPayload = void 0;
+    }
+    const payload = JSON.stringify({
+      model,
+      messages: wireMessages,
+      stream: true,
+      ...toolsPayload !== void 0 && toolsPayload.length > 0 ? { tools: toolsPayload } : {},
+      ...maxTokens === void 0 ? {} : { max_tokens: maxTokens },
+      ...options.temperature === void 0 ? {} : { temperature: options.temperature }
+    });
+    try {
+      const response = await f(`${maasBaseUrlOf(credential)}${OFFICEACE.chatPath}`, {
+        method: "POST",
+        headers: {
+          Authorization: basicAuthorization(credential),
+          "Content-Type": "application/json",
+          Accept: "text/event-stream"
+        },
+        body: payload,
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        let finalStatus = response.status;
+        let finalText2 = text;
+        const credentialRejected = isBasicCredentialRejection(response.status, text);
+        let rejected = credential;
+        let renewal = "not-attempted";
+        if ((response.status === 401 || credentialRejected) && this.options.refresh !== void 0) {
+          const before = basicAuthFingerprint(credential);
+          await this.options.refresh().catch(() => void 0);
+          const renewed = await this.resolveCredential();
+          if (renewed === void 0) {
+            renewal = "unreadable";
+          } else if (basicAuthFingerprint(renewed) !== before) {
+            renewal = "changed";
+            rejected = renewed;
+            const retry = await f(`${maasBaseUrlOf(renewed)}${OFFICEACE.chatPath}`, {
+              method: "POST",
+              headers: {
+                Authorization: basicAuthorization(renewed),
+                "Content-Type": "application/json",
+                Accept: "text/event-stream"
+              },
+              body: payload,
+              signal: controller.signal
+            });
+            if (retry.ok) {
+              noteOfficeaceSuccess(renewed);
+              yield* consumeOpenAiSse(
+                retry,
+                { signal: controller.signal },
+                {
+                  label: OFFICEACE.id,
+                  firstTokenTimeoutMs: OFFICEACE.headerTimeoutMs,
+                  chunkTimeoutMs: OFFICEACE.chunkTimeoutMs,
+                  ...maxTokens === void 0 ? {} : { maxTokens },
+                  ...dsmlMode ? { dsmlToolMode: true } : {}
+                }
+              );
+              return;
+            }
+            finalStatus = retry.status;
+            finalText2 = await retry.text().catch(() => "");
+          } else {
+            renewal = "unchanged";
+          }
+        }
+        if (isBasicCredentialRejection(finalStatus, finalText2)) {
+          noteOfficeaceRejection(rejected, finalText2);
+        }
+        throw new Error(
+          `OfficeAce (\u534E\u4E3AMaaS) \u8FD4\u56DE HTTP ${finalStatus}\uFF1A${finalText2.slice(0, 200)}\uFF08${this.diagnose(finalStatus, finalText2, renewal)}\uFF09`
+        );
+      }
+      noteOfficeaceSuccess(credential);
+      yield* consumeOpenAiSse(
+        response,
+        { signal: controller.signal },
+        {
+          label: OFFICEACE.id,
+          firstTokenTimeoutMs: OFFICEACE.headerTimeoutMs,
+          chunkTimeoutMs: OFFICEACE.chunkTimeoutMs,
+          ...maxTokens === void 0 ? {} : { maxTokens },
+          ...dsmlMode ? { dsmlToolMode: true } : {}
+        }
+      );
+    } finally {
+      options.signal?.removeEventListener("abort", onAbort);
+      controller.abort();
+    }
+  }
+  /**
+   * 把 HTTP 失败翻译成「用户下一步该做什么」。
+   *
+   * ## ⚠️ 401 那一格曾经**写死了被证伪的指引**（Gitee issue IKLTHB 第 ② 条）
+   *
+   * 改前的实现是一句无条件的断言：
+   *
+   * > `Basic 凭据失效：OfficeAce 会话已过期，请重新登录 OfficeAce 客户端`
+   *
+   * 那句在真实报障里**是错的**，而且**有反证**：用户按它去重新登录，
+   * 结果 `modelAppKey`/`modelAppSecret` **逐字节不变**（取证见 `stream()` 里
+   * `basicAuthFingerprint` 的注释）⇒ 重新登录在结构上就不可能修好这个 401，
+   * 却被指引去做了一遍又一遍（264+ 次失败里有相当一部分是这么来的）。
+   *
+   * 现在改为**按报文与续期结果分派**：
+   *
+   * | 情形 | 文案指向 |
+   * |---|---|
+   * | 报文是 `APIG.1009` 且**续期没换掉 Basic 三元组** | 华为侧认定的 key 与本地不一致，**重新登录改变不了**；去华为云控制台/订阅处核对 |
+   * | 报文是 `APIG.1009` 且**刚换过**凭据 | 新凭据也被拒 ⇒ 权限/订阅面 |
+   * | 其它 401 形状 | 形状未知 ⇒ 如实说「不是已知的凭据失效形状」，提示核对 endpoint 与出口 |
+   *
+   * ⚠️ **分派必须先判形状、再判状态码**：`APIG.1009` 那几行的条件里**不得**出现
+   *    `status === 401` —— 华为官方文档把它定义为 **400**、真机回 **401**，
+   *    钉死 401 会让「文档那一侧」的报障彻底拿不到归因（第二轮审计实测缺口）。
+   *    状态码只用于**兜底文案**（403 未订阅 / 404 / 429 / 5xx）。
+   *
+   * ⚠️ 与 `diagnose` 的调用方约定：本方法的返回值会被**拼进错误 message**，
+   *    故错误本身**不得**带 `AUTH` / `QUOTA` / `ACCOUNT_QUOTA` 这类会被 DSH 客户端
+   *    整段替换的码（`stream()` 抛的是**裸 `Error`**，无 `code`）。
+   *
+   * @param status - 终态 HTTP 状态（重发过的话是重发的那个）。
+   * @param body - 终态响应正文。
+   * @param refreshedUnchanged - 本次已续期，但 Basic 三元组**一个字节都没变**。
+   */
+  diagnose(status, body = "", renewal = "not-attempted") {
+    if (isBasicCredentialRejection(status, body)) {
+      if (renewal === "unreadable") {
+        return "\u534E\u4E3A APIG.1009\uFF1AMaaS \u4FA7\u4E0D\u8BA4\u8FD9\u5BF9 AppKey/AppSecret\u3002\u672C\u6B21\u5DF2\u53D1\u8D77\u7EED\u671F\uFF0C\u4F46**\u7EED\u671F\u540E\u8BFB\u4E0D\u5230\u65B0\u51ED\u636E**\uFF08\u51ED\u636E\u5E93/\u767B\u5F55\u6001\u5F02\u5E38\uFF09\u21D2 \u8BF7\u5148\u786E\u8BA4\u8D26\u53F7\u7684\u51ED\u636E\u80FD\u6B63\u5E38\u8BFB\u51FA\uFF08Jet Hub \u7684 OfficeAce \u8D26\u53F7\u5361\u7247\uFF09\uFF0C\u518D\u5224\u65AD\u662F\u5426\u9700\u8981\u91CD\u65B0\u767B\u5F55\u3002";
+      }
+      if (renewal === "changed") {
+        return "\u534E\u4E3A APIG.1009\uFF1AMaaS \u4FA7\u4E0D\u8BA4\u8FD9\u5BF9 AppKey/AppSecret\uFF08\u672C\u6B21\u51ED\u636E\u521A\u7EED\u671F\u4E14\u5DF2\u53D8\u5316\uFF0C\u4ECD\u88AB\u62D2\uFF09\u21D2 \u66F4\u53EF\u80FD\u662F\u8BE5\u8D26\u53F7\u7684 MaaS \u5E94\u7528\u51ED\u636E\u6216\u6A21\u578B\u8BA2\u9605\u5728\u534E\u4E3A\u4E91\u4FA7\u88AB\u64A4\u9500\uFF0C\u8BF7\u5728\u534E\u4E3A\u4E91\u63A7\u5236\u53F0\u6838\u5BF9\u3002";
+      }
+      if (renewal === "unchanged") {
+        return "\u534E\u4E3A APIG.1009\uFF1AMaaS \u4FA7\u4E0D\u8BA4\u8FD9\u5BF9 AppKey/AppSecret\u3002\u672C\u6B21**\u5DF2\u7ECF\u53D1\u8D77\u8FC7\u7EED\u671F**\uFF0C\u4F46\u51ED\u636E\u91CC\u7684 `modelAppKey`/`modelAppSecret`/\u63A8\u7406\u7F51\u5173**\u4E00\u4E2A\u90FD\u6CA1\u53D8** \u2014\u2014 \u6240\u4EE5**\u91CD\u65B0\u767B\u5F55 OfficeAce \u6539\u4E0D\u4E86\u8FD9\u4E2A\u7ED3\u679C**\uFF08\u91CD\u65B0\u767B\u5F55\u53EA\u4F1A\u6362\u6389\u8D26\u53F7\u4E0E STS\uFF0CBasic \u8FD9\u5BF9 key \u7531\u4E91\u4FA7\u6309\u8D26\u53F7\u4E0B\u53D1\uFF09\u3002\u8BF7\u5230\u534E\u4E3A\u4E91\u63A7\u5236\u53F0\u6838\u5BF9\u8FD9\u4E2A\u8D26\u53F7\u7684 MaaS \u5E94\u7528\u51ED\u636E/\u6A21\u578B\u8BA2\u9605\uFF0C\u6216\u5728 Jet Hub \u91CC\u5220\u9664\u8BE5\u8D26\u53F7\u540E\u7528\u53E6\u4E00\u4E2A\u534E\u4E3A\u4E91\u8D26\u53F7\u91CD\u65B0\u767B\u5F55\u3002";
+      }
+      return `\u534E\u4E3A APIG.1009\uFF1AMaaS \u4FA7\u4E0D\u8BA4\u8FD9\u5BF9 AppKey/AppSecret\u3002\u672C\u6B21**\u6CA1\u6709\u7EED\u671F**\uFF08\u672A\u63A5\u5165\u7EED\u671F\uFF0C\u6216 ${status} \u4E0D\u662F\u7EED\u671F\u91CD\u8BD5\u8DEF\u5F84\uFF09\u21D2 \u53EF\u5148\u5728 Jet Hub \u7684OfficeAce \u8D26\u53F7\u5361\u7247\u70B9\u4E00\u6B21\u300C\u5237\u65B0\u300D\u770B\u51ED\u636E\u662F\u5426\u4F1A\u53D8\uFF1B\u82E5\u4E0D\u53D8\uFF0C\u91CD\u65B0\u767B\u5F55\u540C\u6837\u65E0\u6548\uFF08Basic \u8FD9\u5BF9 key \u7531\u4E91\u4FA7\u6309\u8D26\u53F7\u4E0B\u53D1\uFF09\u3002`;
+    }
+    if (status === 401) {
+      return "HTTP 401\uFF0C\u4F46\u62A5\u6587\u4E0D\u662F\u5DF2\u77E5\u7684\u300CAppKey/AppSecret \u65E0\u6548\u300D\u5F62\u72B6 \u2014\u2014 \u53EF\u80FD\u662F\u7F51\u5173/\u4EE3\u7406\u5C42\u7684\u9274\u6743\u6216\u767B\u5F55\u6001\u95EE\u9898\uFF1A\u8BF7\u6838\u5BF9\u51ED\u636E\u91CC\u7684\u63A8\u7406\u7F51\u5173\u5730\u5740\uFF08`maasBaseUrl`\uFF09\u4E0E\u7F51\u7EDC\u51FA\u53E3\uFF0C\u800C\u4E0D\u662F\u76F4\u63A5\u91CD\u65B0\u767B\u5F55\u3002";
+    }
+    if (status === 403) return "\u8BE5\u8D26\u53F7\u672A\u8BA2\u9605\u6B64\u6A21\u578B\uFF08ModelArts.81004\uFF09\uFF1A\u8BF7\u5728 OfficeAce \u6216\u534E\u4E3A\u4E91\u63A7\u5236\u53F0\u8BA2\u9605";
+    if (status === 404) return "\u6A21\u578B\u4E0D\u5B58\u5728\uFF1A\u68C0\u67E5\u6A21\u578B id \u662F\u5426\u5728\u76EE\u5F55\u4E2D";
+    if (status === 429) return "\u9650\u6D41\uFF1A\u7A0D\u540E\u91CD\u8BD5";
+    if (status >= 500) return "\u534E\u4E3A\u4E91\u670D\u52A1\u7AEF\u9519\u8BEF\uFF1A\u7A0D\u540E\u91CD\u8BD5";
+    return "\u8BF7\u786E\u8BA4 OfficeAce \u5DF2\u767B\u5F55\u4E14\u8D26\u53F7\u6709\u53EF\u7528\u989D\u5EA6";
+  }
+};
+function registerOfficeAceLlm(ctx, options = {}) {
+  const adapter = new OfficeAceAdapter(options);
+  registerAdapterIdempotent(
+    ctx.llm,
+    [OFFICEACE.id],
+    adapter,
+    (message2) => ctx.logger?.warn?.(message2)
+  );
+  return adapter;
+}
+
+// vendor/channel-pack/src/officeace-lock.ts
+function splitOfficeAceCreditsByExpiry(summary, now, windowMs) {
+  let expiring = 0;
+  let permanent = 0;
+  for (const group of summary.creditGroups) {
+    if (group.expired === true) continue;
+    const remaining = Number(group.remaining);
+    if (!Number.isFinite(remaining) || remaining <= 0) continue;
+    const end = typeof group.expiresAt === "string" ? Date.parse(group.expiresAt) : Number.NaN;
+    const known = Number.isFinite(end) && end > 0;
+    if (known && end - now < windowMs) expiring += remaining;
+    else permanent += remaining;
+  }
+  return { expiring, permanent };
+}
+var OFFICEACE_LOCK_UNKNOWN_TTL_MS = 5e3;
+var OFFICEACE_LOCK_PERMANENT_TTL_MS = 6e4;
+function createOfficeAceCredentialProvider(deps) {
+  const now = () => deps.now?.() ?? Date.now();
+  const windowMs = () => deps.windowMs?.() ?? buddyExpiringWindowMs();
+  const cache5 = /* @__PURE__ */ new Map();
+  const classify = async (ref, credential) => {
+    const key = ref ?? "__stored__";
+    const at = now();
+    const cached3 = cache5.get(key);
+    if (cached3 !== void 0) {
+      const ttl = cached3.verdict.kind === "unknown" ? OFFICEACE_LOCK_UNKNOWN_TTL_MS : OFFICEACE_LOCK_PERMANENT_TTL_MS;
+      if (at - cached3.at < ttl) return cached3.verdict;
+      cache5.delete(key);
+    }
+    let verdict;
+    let read;
+    try {
+      read = await deps.summaryOf(credential, ref);
+    } catch (error) {
+      read = { ok: false, error: String(error) };
+    }
+    if (!read.ok) {
+      verdict = { kind: "unknown", errors: [read.error] };
+    } else {
+      const split = splitOfficeAceCreditsByExpiry(read.summary, at, windowMs());
+      if (split.expiring > 0) {
+        cache5.delete(key);
+        return { kind: "credential", credential };
+      }
+      verdict = { kind: "permanent" };
+    }
+    cache5.set(key, { at, verdict });
+    return verdict;
+  };
+  return async () => {
+    if (!deps.permanentLocked()) return deps.resolveUnlocked();
+    const accounts = deps.accounts();
+    const errors = [];
+    for (const account of accounts) {
+      const credential = await deps.readCredential(account.credentialRef);
+      if (credential === void 0) {
+        errors.push(`${account.id}: \u51ED\u636E\u8BFB\u4E0D\u51FA\u6765`);
+        continue;
+      }
+      const verdict = await classify(account.credentialRef, credential);
+      if (verdict.kind === "credential") return verdict.credential;
+      if (verdict.kind === "unknown") errors.push(`${account.id}: ${verdict.errors.join("\uFF1B")}`);
+    }
+    if (accounts.length === 0) {
+      const credential = deps.readStoredCredential();
+      if (credential === void 0) return void 0;
+      const verdict = await classify(void 0, credential);
+      if (verdict.kind === "credential") return verdict.credential;
+      if (verdict.kind === "unknown") errors.push(`\u672C\u673A\u51ED\u636E: ${verdict.errors.join("\uFF1B")}`);
+    }
+    throw officeaceLockedError(
+      errors.length > 0 ? { kind: "unknown", errors } : { kind: "exhausted" },
+      // ⚠️ 与上面筛号用的是**同一个**取值（本仓库红线：同一条判据不得有第二份取值）。
+      windowMs()
+    );
+  };
+}
+function officeaceLockedError(reason, windowMs) {
+  const effective = Number.isFinite(windowMs) && windowMs > 0 ? windowMs : buddyExpiringWindowMs();
+  const days = Math.round(effective / (24 * 60 * 60 * 1e3));
+  if (reason.kind === "unknown") {
+    return new Error(
+      `OfficeAce\uFF1A\u65E0\u6CD5\u786E\u8BA4\u662F\u5426\u6709\u53EF\u7528\u8D26\u53F7\u3002\u5DF2\u9501\u5B9A\u6C38\u4E45\u79EF\u5206\uFF0C\u800C\u90E8\u5206\u8D26\u53F7\u7684\u4F59\u989D\u6216\u51ED\u636E\u8BFB\u4E0D\u5230\uFF08${reason.errors.slice(0, 2).join("\uFF1B")}\uFF09\u3002\u8FD9\u4E9B\u8D26\u53F7**\u53EF\u80FD\u4ECD\u6709**\u300C${days} \u5929\u5185\u5230\u671F\u300D\u7684\u79EF\u5206 \u2014\u2014 \u8BF7\u91CD\u8BD5\uFF1B\u82E5\u53CD\u590D\u5982\u6B64\uFF0C\u8BF7\u5728 Jet Hub \u7684 OfficeAce \u9762\u677F\u70B9\u300C\u5237\u65B0\u79EF\u5206\u300D\u786E\u8BA4\u4E91\u4FA7\u4F59\u989D\u80FD\u5426\u8BFB\u5230\uFF08\u672C\u673A\u767B\u5F55\u6001\u53EA\u5F71\u54CD\u4F59\u989D\u8BFB\u53D6\uFF0C\u4E0D\u5F71\u54CD\u63A8\u7406\u7528\u7684 Basic \u51ED\u636E\uFF09\u3002`
+    );
+  }
+  return new Error(
+    `OfficeAce\uFF1A\u6CA1\u6709\u53EF\u7528\u8D26\u53F7\u3002\u5DF2\u9501\u5B9A\u6C38\u4E45\u79EF\u5206\uFF0C\u800C\u6240\u6709\u8D26\u53F7\u7684\u79EF\u5206\u6876\u90FD**\u4E0D\u4F1A\u5728${days} \u5929\u5185\u5230\u671F**\uFF08\u53EA\u5269\u5957\u9910\u5305/\u957F\u671F\u6D3B\u52A8\u5305\u4E00\u7C7B\u4E0D\u4F1A\u5F88\u5FEB\u4F5C\u5E9F\u7684\u989D\u5EA6\uFF0C\u6216\u79EF\u5206\u6876\u5DF2\u7A7A\uFF09\u3002\u26A0\uFE0F \u6263\u51CF\u987A\u5E8F\u7531\u670D\u52A1\u7AEF\u51B3\u5B9A\uFF0C\u63D2\u4EF6\u65E0\u6CD5\u5E72\u9884 \u2014\u2014 \u9501\u5B9A\u53EA\u80FD**\u62D2\u7EDD**\u8FD9\u7C7B\u8D26\u53F7\uFF0C\u6545\u8FD9\u662F\u8BE5\u5F00\u5173\u7684\u9884\u671F\u6548\u679C\uFF0C\u4E0D\u662F\u6545\u969C\u3002\u8BF7\u5728 Jet Hub \u7684 OfficeAce \u9762\u677F\u89E3\u9501\u6C38\u4E45\u79EF\u5206\uFF0C\u6216\u7B49\u6709\u4E34\u671F\u989D\u5EA6\u7684\u79EF\u5206\u5305\u53D1\u653E\uFF08\u6BCF\u65E5\u7B7E\u5230\u8D60\u9001\u7684\u989D\u5EA6\u5F53\u65E5\u4F5C\u5E9F\uFF09\u3002`
+  );
+}
+
 // vendor/channel-pack/src/opencode-adapter.ts
-import { LlmAdapter as LlmAdapter12, LlmError as LlmError19, ReasoningEffortId as ReasoningEffortId15 } from "@deepseek-ai/dsh-llm";
+import { LlmAdapter as LlmAdapter14, LlmError as LlmError21, ReasoningEffortId as ReasoningEffortId16 } from "@deepseek-ai/dsh-llm";
 
 // vendor/channel-pack/src/opencode-messages.ts
 var FREE_LANE_GATE_TOOLS = ["bash", "read"];
@@ -66999,9 +71430,9 @@ function buildOpencodePayload(input) {
 
 // vendor/channel-pack/src/opencode-capability.ts
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { readFileSync as readFileSync12 } from "node:fs";
-import { homedir as homedir5 } from "node:os";
-import { join as join12 } from "node:path";
+import { readFileSync as readFileSync13 } from "node:fs";
+import { homedir as homedir6 } from "node:os";
+import { join as join13 } from "node:path";
 var MEASURED_IMAGE_OVERRIDES = {
   // 实测 2026-10-02：models.dev 标 `modalities.input: ["text"]`，
   // 但 1×1 PNG 的多模态请求真实返回 200（big-pickle 是最常用的免费模型）。
@@ -67063,8 +71494,8 @@ function normalizeEntry(id, raw) {
   };
 }
 function cacheFilePath() {
-  const home = process.env.DSH_HOME?.trim() || join12(homedir5(), ".dsh");
-  return join12(home, "cache", "opencode-capabilities.json");
+  const home = process.env.DSH_HOME?.trim() || join13(homedir6(), ".dsh");
+  return join13(home, "cache", "opencode-capabilities.json");
 }
 var memory = [];
 var cacheFileAt = 0;
@@ -67087,7 +71518,7 @@ function loadDiskCacheSync() {
   if (diskLoaded) return;
   diskLoaded = true;
   try {
-    const raw = readFileSync12(cacheFilePath(), "utf8");
+    const raw = readFileSync13(cacheFilePath(), "utf8");
     const parsed = JSON.parse(raw);
     if (parsed?.version === 2 && Array.isArray(parsed.entries) && parsed.entries.length > 0) {
       memory = parsed.entries;
@@ -67098,10 +71529,10 @@ function loadDiskCacheSync() {
 }
 async function writeDiskCache(entries) {
   try {
-    const path2 = cacheFilePath();
-    await mkdir(join12(path2, ".."), { recursive: true });
+    const path3 = cacheFilePath();
+    await mkdir(join13(path3, ".."), { recursive: true });
     const payload = { version: 2, at: Date.now(), entries };
-    await writeFile(path2, JSON.stringify(payload), "utf8");
+    await writeFile(path3, JSON.stringify(payload), "utf8");
   } catch {
   }
 }
@@ -67217,7 +71648,7 @@ function opencodeRetryAfterMs(kind, retryAfterMs, attempt) {
   if (kind === "auth") return RATE_LIMIT_BASE_MS;
   return Math.min(RATE_LIMIT_BASE_MS * 2 ** Math.max(0, attempt - 1), RETRY_AFTER_CAP_MS);
 }
-var OpencodeAdapter = class extends LlmAdapter12 {
+var OpencodeAdapter = class extends LlmAdapter14 {
   constructor(options) {
     super();
     this.options = options;
@@ -67285,7 +71716,7 @@ var OpencodeAdapter = class extends LlmAdapter12 {
         efforts: capability.efforts.map((effort) => ({
           // ⚠️ `id` 是**品牌类型**（`ReasoningEffortId`），必须经它的构造函数 ——
           // 与 Qoder 同款（`src/qoder-adapter.ts:581`）。
-          id: ReasoningEffortId15(effort),
+          id: ReasoningEffortId16(effort),
           // ⚠️ 没有官方中文的档位（models.dev 会下发 `minimal` / `xhigh` 等
           // Qoder 那份表里没有的值）**回退到 id 本身** —— 宁可显示英文原值，
           // 也不猜一个可能错译的中文。
@@ -67311,10 +71742,10 @@ var OpencodeAdapter = class extends LlmAdapter12 {
   async *stream(options) {
     const slots = await this.options.identitySlots();
     if (slots.length === 0) {
-      throw new LlmError19("opencode: \u6CA1\u6709\u53EF\u7528\u901A\u9053", "MISSING_CREDENTIAL");
+      throw new LlmError21("opencode: \u6CA1\u6709\u53EF\u7528\u901A\u9053", "MISSING_CREDENTIAL");
     }
     if (pickSlot(slots, options.model, /* @__PURE__ */ new Set()) === void 0) {
-      throw new LlmError19(
+      throw new LlmError21(
         `opencode: \u6A21\u578B "${options.model}" \u9700\u8981 API key \u8D26\u53F7\u901A\u9053\uFF08\u533F\u540D\u901A\u9053\u53EA\u652F\u6301\u514D\u8D39\u6A21\u578B\uFF09\uFF0C\u8BF7\u5148\u5728 Channel Pack \u7684 OpenCode \u9762\u677F\u6DFB\u52A0\u4E00\u4E2A\u8D26\u53F7`,
         "MISSING_CREDENTIAL"
       );
@@ -67324,7 +71755,7 @@ var OpencodeAdapter = class extends LlmAdapter12 {
     for (; ; ) {
       const slot2 = pickSlot(slots, options.model, tried);
       if (slot2 === void 0) {
-        throw new LlmError19(
+        throw new LlmError21(
           `opencode: \u6240\u6709\u901A\u9053\u5BF9\u8BE5\u6A21\u578B\u5747\u53D7\u9650${limited.length > 0 ? `\uFF08${limited.join("\u3001")}\uFF09` : ""}`,
           "QUOTA_EXCEEDED"
         );
@@ -67340,13 +71771,13 @@ var OpencodeAdapter = class extends LlmAdapter12 {
         return;
       } catch (error) {
         if (delivered) throw error;
-        if (error instanceof LlmError19 && error.code === "QUOTA_EXCEEDED") throw error;
+        if (error instanceof LlmError21 && error.code === "QUOTA_EXCEEDED") throw error;
         const info = classifyOpencodeFailure(error);
         if (info.kind === "free_tier") {
           this.options.warn?.(
             `opencode: \u514D\u8D39\u901A\u9053\u88AB FreeTierError \u62D2\u7EDD \u2014\u2014 \u68C0\u67E5 session id \u5F62\u72B6\uFF08\u5E94\u4E3A ses_ + 12hex + 14base62\uFF09\uFF1A${info.detail}`
           );
-          throw new LlmError19(
+          throw new LlmError21(
             `opencode: \u514D\u8D39\u901A\u9053\u88AB\u4E0A\u6E38\u62D2\u7EDD\uFF08FreeTierError\uFF09\u3002\u8BE5\u9519\u8BEF\u7531\u8BF7\u6C42\u5F62\u72B6\u89E6\u53D1\uFF08session id \u5F62\u72B6\u4E0D\u5BF9\u65F6\u51FA\u73B0\uFF09\uFF0C\u6362 API key \u6216\u6362\u51FA\u53E3\u90FD\u65E0\u6548\u3002`,
             "AUTH",
             { status: 403 }
@@ -67390,13 +71821,13 @@ var OpencodeAdapter = class extends LlmAdapter12 {
     if (refs.size === 0) return void 0;
     const capabilities = getOpencodeCapabilitiesSync();
     if (!supportsOpencodeImage(capabilities.find((c) => c.id === model))) {
-      throw new LlmError19(
+      throw new LlmError21(
         `opencode: \u6A21\u578B "${model}" \u4E0D\u652F\u6301\u56FE\u7247\u8F93\u5165\uFF08\u80FD\u529B\u4EE5\u8FDC\u7AEF models.dev \u4E3A\u51C6\uFF09`,
         "UNSUPPORTED_CONTENT"
       );
     }
     if (this.options.readImage === void 0) {
-      throw new LlmError19("opencode: \u56FE\u7247\u8F93\u5165\u9700\u8981\u9644\u4EF6\u670D\u52A1", "UNSUPPORTED_CONTENT");
+      throw new LlmError21("opencode: \u56FE\u7247\u8F93\u5165\u9700\u8981\u9644\u4EF6\u670D\u52A1", "UNSUPPORTED_CONTENT");
     }
     const readImage = this.options.readImage;
     const out = /* @__PURE__ */ new Map();
@@ -67441,7 +71872,7 @@ var OpencodeAdapter = class extends LlmAdapter12 {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       const retryAfterMs = retryAfterMsFromResponse(response.headers);
-      throw new LlmError19(
+      throw new LlmError21(
         `opencode: HTTP ${response.status} \u2014 ${text.slice(0, 300)}`,
         httpErrorCode4(response.status),
         {
@@ -67485,12 +71916,12 @@ function registerOpencodeLlm(ctx, options) {
 }
 
 // vendor/channel-pack/src/index.ts
-import { execFile as execFile2 } from "node:child_process";
+import { execFile as execFile4 } from "node:child_process";
 function lazyOpencodeUserAgent() {
-  let pending;
+  let pending2;
   return () => {
-    pending ??= new Promise((resolve2) => {
-      execFile2("opencode", ["--version"], { timeout: 2e3, windowsHide: true }, (_err, stdout) => {
+    pending2 ??= new Promise((resolve2) => {
+      execFile4("opencode", ["--version"], { timeout: 2e3, windowsHide: true }, (_err, stdout) => {
         resolve2(typeof stdout === "string" ? stdout : "");
       });
     }).then((out) => {
@@ -67498,7 +71929,7 @@ function lazyOpencodeUserAgent() {
       return version === void 0 ? OPENCODE.defaultUserAgent : `opencode/${version}`;
     }).catch(() => OPENCODE.defaultUserAgent);
     let cached3 = OPENCODE.defaultUserAgent;
-    void pending.then((ua) => {
+    void pending2.then((ua) => {
       cached3 = ua;
     });
     return cached3;
@@ -67586,6 +72017,7 @@ function apply(ctx, config = {}) {
     "llm-gemini"
   );
   const service = new CodeArtsAuth(ctx);
+  service.lastCatalogOutcome = { gatewayOk: false, builtinOk: false };
   const pool = new AccountPool(ctx);
   configureDeadModelStore(ctx);
   const tokenLedgerStore = createTokenLedgerStore(ctx);
@@ -67607,7 +72039,7 @@ function apply(ctx, config = {}) {
     ctx.logger.warn(`[channel-pack] \u6E05\u7406 WorkBuddy \u65E7\u7248\u8D26\u53F7\u5931\u8D25\uFF1A${String(error)}`);
   });
   const codearts = registerCodeArtsLlm(ctx, {
-    credentialRef: credentialRef16(CODEARTS_CREDENTIAL_REF),
+    credentialRef: credentialRef18(CODEARTS_CREDENTIAL_REF),
     resolveCredential: async () => {
       const available2 = await pool.getAvailableAccount("codearts", "");
       return available2?.credential;
@@ -67620,10 +72052,24 @@ function apply(ctx, config = {}) {
       if (available2) await service.refreshAccountCredential(available2.entry.credentialRef, pool, available2.entry.id);
     },
     fetchRemoteModels: () => service.refreshModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器
+    //    可能一直停在兜底表上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
+    // ⚠️ 完整性由 `service.refreshModels` 每轮**原地写入**该对象（两来源各自的
+    //    成败）。适配器据此判「这次目录完不完整」，决定要不要永久缓存 ——
+    //    只看「列表非空」会让残缺目录固化，只能重启 DSH。
+    catalogComplete: () => {
+      const outcome = service.lastCatalogOutcome;
+      return outcome === void 0 ? void 0 : isRemoteCatalogComplete(outcome);
+    },
     accountPool: pool
   });
   const resolveBuddyCredentialByRef = async (refName) => {
-    const resolved = await ctx.credentials.resolve(credentialRef16(refName));
+    const resolved = await ctx.credentials.resolve(credentialRef18(refName));
     if (!resolved) return void 0;
     try {
       return JSON.parse(resolved.value);
@@ -67685,14 +72131,15 @@ function apply(ctx, config = {}) {
       modelId ?? ""
     );
     if (limited === void 0) return;
-    throw new LlmError20(
+    throw new LlmError22(
       `${product.displayName}\uFF1A\u6A21\u578B ${modelId} \u7684\u53EF\u7528\u8D26\u53F7\u5747\u5728\u9650\u6D41\u4E2D\uFF0C\u6700\u8FD1\u4E00\u4E2A\u5C06\u4E8E ${new Date(limited.resetAtMs).toLocaleString("zh-CN")} \u89E3\u7981\u3002\u53EF\u6539\u7528\u5176\u5B83 provider / \u6A21\u578B\uFF0C\u6216\u7B49\u5F85\u89E3\u7981\u540E\u518D\u8BD5\uFF08\u65E0\u9700\u91CD\u65B0\u767B\u5F55\uFF09\u3002`,
       "QUOTA_EXCEEDED"
     );
   };
   const buddy = new BuddyAuth(ctx);
+  buddy.lastCatalogOutcome = { scopedOk: false, configOk: false };
   const buddyAdapter = registerBuddyLlm(ctx, {
-    credentialRef: credentialRef16(BUDDY_CREDENTIAL_REF),
+    credentialRef: credentialRef18(BUDDY_CREDENTIAL_REF),
     resolveCredential: async (modelId) => {
       const picked = await pickBuddyCredential({
         product: CODEBUDDY,
@@ -67710,7 +72157,7 @@ function apply(ctx, config = {}) {
         return available2.credential;
       }
       throwIfAllAccountsRateLimited(CODEBUDDY, modelId);
-      const resolved = await ctx.credentials.resolve(credentialRef16(BUDDY_CREDENTIAL_REF));
+      const resolved = await ctx.credentials.resolve(credentialRef18(BUDDY_CREDENTIAL_REF));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67723,6 +72170,20 @@ function apply(ctx, config = {}) {
     // 并自锁。详见 createPoolRefresh 的注释。
     refresh: createPoolRefresh(pool, "buddy", buddy),
     fetchRemoteModels: () => buddy.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器
+    //    可能一直停在兜底表上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
+    // ⚠️ 完整性由 `buddy.fetchModels` 每轮**原地写入**该对象（scoped 与
+    //    `/v3/config` 各自的成败）。只看「列表非空」会让残缺目录固化 ——
+    //    用户症状就是「hy4 preview 在 IDE 免费、我们这儿还是 0.29」。
+    catalogComplete: () => {
+      const outcome = buddy.lastCatalogOutcome;
+      return outcome === void 0 ? void 0 : isBuddyCatalogComplete(outcome);
+    },
     readImage: makeReadImage(ctx),
     // 图片请求版本（缩放）桥接：issue !IKITT9。不可用时适配器自动回退原图。
     readImageRequest: makeReadImageRequest(ctx),
@@ -67730,8 +72191,9 @@ function apply(ctx, config = {}) {
     product: CODEBUDDY
   });
   const workbuddy = new BuddyAuth(ctx, { product: WORKBUDDY });
+  workbuddy.lastCatalogOutcome = { scopedOk: false, configOk: false };
   const workbuddyAdapter = registerBuddyLlm(ctx, {
-    credentialRef: credentialRef16(WORKBUDDY.defaultCredentialRef),
+    credentialRef: credentialRef18(WORKBUDDY.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const picked = await pickBuddyCredential({
         product: WORKBUDDY,
@@ -67750,7 +72212,7 @@ function apply(ctx, config = {}) {
         return available2.credential;
       }
       throwIfAllAccountsRateLimited(WORKBUDDY, modelId);
-      const resolved = await ctx.credentials.resolve(credentialRef16(WORKBUDDY.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(WORKBUDDY.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67762,6 +72224,14 @@ function apply(ctx, config = {}) {
     // 这条正是「workbuddy + deepseek-v4.1-flash 一直报未配置凭据」的根因。
     refresh: createPoolRefresh(pool, "workbuddy", workbuddy),
     fetchRemoteModels: () => workbuddy.fetchModels(pool),
+    // 同 buddy：广播 + 完整性桥接（两个端点各自成败）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
+    catalogComplete: () => {
+      const outcome = workbuddy.lastCatalogOutcome;
+      return outcome === void 0 ? void 0 : isBuddyCatalogComplete(outcome);
+    },
     readImage: makeReadImage(ctx),
     readImageRequest: makeReadImageRequest(ctx),
     accountPool: pool,
@@ -67769,14 +72239,14 @@ function apply(ctx, config = {}) {
   });
   const lobsterai = new LobsteraiAuth(ctx);
   const lobsteraiAdapter = registerLobsteraiLlm(ctx, {
-    credentialRef: credentialRef16(LOBSTERAI.defaultCredentialRef),
+    credentialRef: credentialRef18(LOBSTERAI.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(LOBSTERAI.id, modelId ?? "");
       if (available2) {
         reportLedgerAccount(LOBSTERAI.id, available2.entry.id);
         return available2.credential;
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(LOBSTERAI.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(LOBSTERAI.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67790,6 +72260,13 @@ function apply(ctx, config = {}) {
       else await lobsterai.refresh();
     },
     fetchRemoteModels: () => lobsterai.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     resolveClientVersion: () => lobsterai.resolveClientVersion(),
     readImage: makeReadImage(ctx),
     // 图片请求版本（缩放）桥接：issue !IKITT9。该家实测 13 张原图（≈50 MiB）
@@ -67801,7 +72278,7 @@ function apply(ctx, config = {}) {
   const qoder = new QoderAuth(ctx);
   const activeQoderAccountId = /* @__PURE__ */ new Map();
   const qoderAdapter = registerQoderLlm(ctx, {
-    credentialRef: credentialRef16(QODER.defaultCredentialRef),
+    credentialRef: credentialRef18(QODER.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(QODER.id, modelId ?? "");
       if (available2) {
@@ -67810,7 +72287,7 @@ function apply(ctx, config = {}) {
         return available2.credential;
       }
       activeQoderAccountId.set(QODER.id, void 0);
-      const resolved = await ctx.credentials.resolve(credentialRef16(QODER.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(QODER.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67836,7 +72313,7 @@ function apply(ctx, config = {}) {
   });
   const qoderCn = new QoderAuth(ctx, { product: QODER_CN });
   const qoderCnAdapter = registerQoderLlm(ctx, {
-    credentialRef: credentialRef16(QODER_CN.defaultCredentialRef),
+    credentialRef: credentialRef18(QODER_CN.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(QODER_CN.id, modelId ?? "");
       if (available2) {
@@ -67845,7 +72322,7 @@ function apply(ctx, config = {}) {
         return available2.credential;
       }
       activeQoderAccountId.set(QODER_CN.id, void 0);
-      const resolved = await ctx.credentials.resolve(credentialRef16(QODER_CN.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(QODER_CN.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67871,14 +72348,14 @@ function apply(ctx, config = {}) {
   });
   const trae = new TraeAuth(ctx);
   const traeAdapter = registerTraeLlm(ctx, {
-    credentialRef: credentialRef16(TRAE.defaultCredentialRef),
+    credentialRef: credentialRef18(TRAE.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(TRAE.id, modelId ?? "");
       if (available2) {
         reportLedgerAccount(TRAE.id, available2.entry.id);
         return available2.credential;
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(TRAE.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(TRAE.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67892,6 +72369,13 @@ function apply(ctx, config = {}) {
       else await trae.refresh();
     },
     fetchRemoteModels: () => trae.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     // 图片字节桥接：TRAE 上游**支持图片**（见 Issue #IKHDKC 的实测记录），
     // 但模态按模型判定（远端 `display_config.multimodal`），故这里只负责读字节。
     readImage: makeReadImage(ctx),
@@ -67902,14 +72386,14 @@ function apply(ctx, config = {}) {
   let activeClineAccountId = "";
   const clineAdapter = registerClineLlm(ctx, {
     fetchImpl: network.fetch,
-    credentialRef: credentialRef16(CLINE.defaultCredentialRef),
+    credentialRef: credentialRef18(CLINE.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(CLINE.id, modelId ?? "");
       activeClineAccountId = available2?.entry.id ?? "";
       if (activeClineAccountId.length > 0) reportLedgerAccount(CLINE.id, activeClineAccountId);
       if (available2) return available2.credential;
       throwIfAllAccountsRateLimited(CLINE, modelId);
-      const resolved = await ctx.credentials.resolve(credentialRef16(CLINE.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(CLINE.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -67935,7 +72419,7 @@ function apply(ctx, config = {}) {
   });
   const loomy = new LoomyAuth(ctx);
   const resolveLoomyCredentialByRef = async (refName) => {
-    const resolved = await ctx.credentials.resolve(credentialRef16(refName));
+    const resolved = await ctx.credentials.resolve(credentialRef18(refName));
     if (!resolved) return void 0;
     try {
       return JSON.parse(resolved.value);
@@ -67948,7 +72432,7 @@ function apply(ctx, config = {}) {
     resolveCredential: resolveLoomyCredentialByRef
   });
   const loomyAdapter = registerLoomyLlm(ctx, {
-    credentialRef: credentialRef16(LOOMY.defaultCredentialRef),
+    credentialRef: credentialRef18(LOOMY.defaultCredentialRef),
     /**
      * 解析本轮该用哪个账号的凭据。
      *
@@ -67985,7 +72469,7 @@ function apply(ctx, config = {}) {
           );
         }
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(LOOMY.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(LOOMY.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -68004,7 +72488,7 @@ function apply(ctx, config = {}) {
     // 失败时返回空数组，由适配器回退兜底表。
     fetchRemoteModels: async () => {
       const available2 = await pool.getAvailableAccount(LOOMY.id, "");
-      const resolved = available2 !== null && available2 !== void 0 ? { value: JSON.stringify(available2.credential) } : await ctx.credentials.resolve(credentialRef16(LOOMY.defaultCredentialRef));
+      const resolved = available2 !== null && available2 !== void 0 ? { value: JSON.stringify(available2.credential) } : await ctx.credentials.resolve(credentialRef18(LOOMY.defaultCredentialRef));
       if (resolved === void 0) return [];
       let credential;
       try {
@@ -68019,6 +72503,13 @@ function apply(ctx, config = {}) {
       if (!response.ok) return [];
       return parseLoomyRemoteModels(await response.json());
     },
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     // 图片字节桥接：按模型能力判定（远端 capabilities.input_modalities 含 image）。
     readImage: makeReadImage(ctx),
     accountPool: pool,
@@ -68026,14 +72517,14 @@ function apply(ctx, config = {}) {
   });
   const raccoon = new RaccoonAuth(ctx);
   const raccoonAdapter = registerRaccoonLlm(ctx, {
-    credentialRef: credentialRef16(RACCOON.defaultCredentialRef),
+    credentialRef: credentialRef18(RACCOON.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(RACCOON.id, modelId ?? "");
       if (available2) {
         reportLedgerAccount(RACCOON.id, available2.entry.id);
         return available2.credential;
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(RACCOON.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(RACCOON.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -68057,6 +72548,13 @@ function apply(ctx, config = {}) {
     // visible 过滤 + raccoonDisplayName 生成含倍率的展示名）。
     // 失败时返回空数组，由适配器回退兜底表。
     fetchRemoteModels: () => raccoon.fetchModels(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     // 图片字节桥接：按模型能力判定（远端 tags 含 vision）。
     readImage: makeReadImage(ctx),
     // ⚠️ raccoon 尤其需要请求版本：该网关按**请求体字节**设限
@@ -68067,14 +72565,14 @@ function apply(ctx, config = {}) {
   });
   const minimax = new MinimaxAuth(ctx);
   const minimaxAdapter = registerMinimaxLlm(ctx, {
-    credentialRef: credentialRef16(MINIMAX.defaultCredentialRef),
+    credentialRef: credentialRef18(MINIMAX.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(MINIMAX.id, modelId ?? "");
       if (available2) {
         reportLedgerAccount(MINIMAX.id, available2.entry.id);
         return available2.credential;
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(MINIMAX.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(MINIMAX.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -68099,6 +72597,13 @@ function apply(ctx, config = {}) {
     // 照抄内置表会漏掉 `MiniMax-M3.1-Flash-Preview`（用户截图里选中的那个）。
     // 失败时返回兜底表（适配器侧也有兜底）。
     fetchRemoteModels: () => minimax.fetchRemoteModelsOnly(pool),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     // 图片字节桥接：模态按模型判定（远端 `modalities.input` 含 image，
     // 只有 M3.1-Flash-Preview 与 M3 是）。适配器声明不支持时会**报错**，
     // 不会把图片发出去让服务端 400。
@@ -68117,14 +72622,14 @@ function apply(ctx, config = {}) {
   const geminiAdapter = registerGeminiLlm(ctx, {
     fetchImpl: network.fetch,
     projectFetcher: network.fetch,
-    credentialRef: credentialRef16(GEMINI.defaultCredentialRef),
+    credentialRef: credentialRef18(GEMINI.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(GEMINI.id, modelId ?? "");
       if (available2) {
         reportLedgerAccount(GEMINI.id, available2.entry.id);
         return available2.credential;
       }
-      const resolved = await ctx.credentials.resolve(credentialRef16(GEMINI.defaultCredentialRef));
+      const resolved = await ctx.credentials.resolve(credentialRef18(GEMINI.defaultCredentialRef));
       if (!resolved) return void 0;
       try {
         return JSON.parse(resolved.value);
@@ -68157,8 +72662,8 @@ function apply(ctx, config = {}) {
     projectCache: geminiProjectCache,
     persistProject: async (value) => {
       const available2 = await pool.getAvailableAccount(GEMINI.id, "");
-      const ref = available2 ? available2.entry.credentialRef : credentialRef16(GEMINI.defaultCredentialRef);
-      await ctx.credentials.set(credentialRef16(ref), value);
+      const ref = available2 ? available2.entry.credentialRef : credentialRef18(GEMINI.defaultCredentialRef);
+      await ctx.credentials.set(credentialRef18(ref), value);
     },
     ...ctx.logger === void 0 ? {} : { logger: ctx.logger }
   });
@@ -68196,7 +72701,7 @@ function apply(ctx, config = {}) {
   };
   const activeZcodeAccountId = /* @__PURE__ */ new Map();
   const zcodeAdapter = registerZcodeLlm(ctx, {
-    credentialRef: credentialRef16(ZCODE.defaultCredentialRef),
+    credentialRef: credentialRef18(ZCODE.defaultCredentialRef),
     resolveCredential: async (modelId) => {
       const available2 = await pool.getAvailableAccount(ZCODE.id, modelId ?? "");
       if (available2) {
@@ -68289,6 +72794,13 @@ function apply(ctx, config = {}) {
     // 模型目录用静态白名单（实测可用的两个）—— 上游模型池含
     // 实测返回空响应的两条（GLM-5-Turbo / GLM-5.2），故不枚举远端。
     fetchRemoteModels: () => zcode.fetchRemoteModelsOnly(),
+    // ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+    //    `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+    //    等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型
+    //    选择器里可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    },
     accountPool: pool,
     product: ZCODE,
     // 就绪判据 = 有可用凭据（插件自存的）。
@@ -68352,12 +72864,19 @@ function apply(ctx, config = {}) {
     // ⚠️ Gemini **可续期**（Google OAuth 的 refresh_token，且会轮换）。
     // ⚠️ 漏了这一行定时器不武装：凭据到期后**不会自动续期**，
     // 用户会看到「每隔一小时就要重新登录」，且日志里一个字都没有。
-    ["gemini", (p) => gemini.refreshAll(p)]
+    ["gemini", (p) => gemini.refreshAll(p)],
+    // ⚠️ OfficeAce **可续期**（华为云 STS 的 refresh_token grant，STS 凭据约 2 小时）。
+    // 与 gemini 同一课教训：**漏这一行 = 定时器不武装它**，凭据到期后不会自动续期，
+    // 用户看到「每隔约两小时要重新登录」，且日志里一个字都没有。
+    // 它是模块级函数（无 Service 实例），签名收 `pool`。
+    ["officeace", (p) => refreshAll(p)],
+    // Accio **可续期**（标准 OAuth refresh_token grant）。同款教训见上两行。
+    ["accio", (p) => accio.refreshAll(p)]
   ];
   async function refreshAllCredentials() {
-    for (const [tag2, refreshAll] of refreshTargets) {
+    for (const [tag2, refreshAll2] of refreshTargets) {
       try {
-        await refreshAll(pool);
+        await refreshAll2(pool);
       } catch (error) {
         ctx.logger?.warn?.(
           `[channel-pack] ${tag2} \u6279\u91CF\u7EED\u671F\u5931\u8D25\uFF1A${error instanceof Error ? error.message : String(error)}`
@@ -68408,7 +72927,7 @@ function apply(ctx, config = {}) {
     opencodeAdapter = registerOpencodeLlm(ctx, {
       identitySlots: async () => listIdentitySlots(
         await Promise.all(pool.listAccountsByProvider(OPENCODE.id).map(async (entry) => {
-          const resolved = await ctx.credentials.resolve(credentialRef16(entry.credentialRef)).catch(() => void 0);
+          const resolved = await ctx.credentials.resolve(credentialRef18(entry.credentialRef)).catch(() => void 0);
           let parsed = {};
           if (resolved !== void 0) {
             try {
@@ -68461,7 +72980,7 @@ function apply(ctx, config = {}) {
     });
     void ensureDefaultAnonymousSlot(
       (entry) => pool.addAccount(entry),
-      (refName, value) => ctx.credentials.set(credentialRef16(refName), value),
+      (refName, value) => ctx.credentials.set(credentialRef18(refName), value),
       () => pool.listAccountsByProvider(OPENCODE.id),
       // ⚠️ 判据是「池里有没有匿名条目」而不是「有没有账号」：用户若主动
       // 删光了匿名通道，那是明确选择，不该每次启动又塞回来（删除会像失灵）。
@@ -68491,6 +73010,98 @@ function apply(ctx, config = {}) {
       return adapter;
     }
   };
+  const accio = new AccioAuth(ctx, { fetcher: network.fetch });
+  const accioAdapter = registerAccioLlm(ctx, {
+    // ⚠️ provider 实参用 ACCIO.id 而非字面量（同 minimax / gemini 的既有约定）。
+    // ⚠️ `modelId` 必须透传：否则模型级限流标记被忽略（见 buddy 处说明）。
+    resolveCredential: async (modelId) => {
+      const available2 = await pool.getAvailableAccount(ACCIO.id, modelId ?? "");
+      if (available2) {
+        reportLedgerAccount(ACCIO.id, available2.entry.id);
+        return available2.credential;
+      }
+      const resolved = await ctx.credentials.resolve(credentialRef18(ACCIO.defaultCredentialRef));
+      if (!resolved) return void 0;
+      try {
+        return JSON.parse(resolved.value);
+      } catch {
+        return void 0;
+      }
+    },
+    refresh: async () => {
+      const available2 = await pool.getAvailableAccount(ACCIO.id, "");
+      if (available2) {
+        await accio.refreshAccountCredential(
+          available2.entry.credentialRef,
+          pool,
+          available2.entry.id
+        );
+      } else {
+        await accio.refreshAccountCredential(ACCIO.defaultCredentialRef);
+      }
+    },
+    // 远端模型目录：`POST /api/llm/config/v2`（token 在 body）。
+    // 失败或未登录一律返回空数组，由适配器回退 `ACCIO.fallbackModels`。
+    fetchRemoteModels: () => accio.fetchModels(pool),
+    accountPool: pool,
+    product: ACCIO,
+    // ⚠️ 图片通路：上游原生收图（Gemini 风格 `parts[].inline_data`），
+    // `multimodal: true` 的模型实测四色全对、`false` 的**静默忽略图片**
+    // ⇒ `inputModalities` 必须按**逐模型**的 `supportsImage` 如实声明。
+    readImage: makeReadImage(ctx),
+    readImageRequest: makeReadImageRequest(ctx),
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    }
+  });
+  const enabledOfficeAceAccounts = () => pool.listAccountsByProvider(OFFICEACE.id).filter((entry) => entry.enabled !== false);
+  const resolveOfficeAceCredential = async () => {
+    const available2 = await pool.getAvailableAccount(OFFICEACE.id, "");
+    const ref = available2?.entry?.credentialRef ?? enabledOfficeAceAccounts()[0]?.credentialRef;
+    if (ref === void 0) return readStoredCredential();
+    return readCredential(ref, ctx.credentials);
+  };
+  const officeAceAdapter = registerOfficeAceLlm(ctx, {
+    disabledModels: () => pool.disabledModelsFor(OFFICEACE.id),
+    // ⚠️ 锁定态必须在这里分道：`permanentLocked()` 若无人读就是**哑锁**
+    //（上游 IKLTHB 第 ① 条）。判定逻辑全在 `officeace-lock.ts`，这里只装配。
+    credentialProvider: createOfficeAceCredentialProvider({
+      permanentLocked: () => pool.permanentLocked(OFFICEACE.id),
+      accounts: () => enabledOfficeAceAccounts().map((entry) => ({ id: entry.id, credentialRef: entry.credentialRef })),
+      resolveUnlocked: resolveOfficeAceCredential,
+      readCredential: (ref) => readCredential(ref, ctx.credentials),
+      readStoredCredential: () => readStoredCredential(),
+      // ⚠️ 必须带 ref（云侧按 ref 直读；缺了会让多账号判成同一份余额）。
+      summaryOf: async (credential, ref) => {
+        try {
+          const summary = await fetchSubscriptionSummary(48, ref, credential);
+          return summary === void 0 ? { ok: false, error: "\u8BFB\u4E0D\u5230\u8BA2\u9605\u6458\u8981\uFF08\u672A\u767B\u5F55 / \u4E91\u4FA7\u67E5\u8BE2\u5931\u8D25\uFF09" } : { ok: true, summary };
+        } catch (error) {
+          return { ok: false, error: `\u8BA2\u9605\u6458\u8981\u67E5\u8BE2\u5931\u8D25\uFF1A${String(error)}` };
+        }
+      }
+    }),
+    probeCredential: resolveOfficeAceCredential,
+    readImage: makeReadImage(ctx),
+    // ⚠️ 必须注入：漏接的症状是该渠道账号永不过期（重新登录后旧凭据仍被用），
+    // 且日志里一个字都没有。**必须走账号池**，与其余渠道同款。
+    refresh: async () => {
+      const available2 = await pool.getAvailableAccount(OFFICEACE.id, "");
+      if (available2) {
+        await refreshAccountCredential(
+          available2.entry.credentialRef,
+          pool,
+          available2.entry.id
+        );
+        return;
+      }
+      await refreshStoredCredential();
+    },
+    accountPool: pool,
+    onCatalogLoaded: () => {
+      broadcastCatalogChanged(ctx);
+    }
+  });
   const modelAdapters = {
     // `codearts` 是 registerCodeArtsLlm 返回的**适配器实例**（与 CodeArtsAuth
     // 服务实例 `service` 不同名，故这里可以简写）。
@@ -68506,6 +73117,8 @@ function apply(ctx, config = {}) {
     raccoon: pruned(RACCOON.id, raccoonAdapter),
     minimax: pruned(MINIMAX.id, minimaxAdapter),
     gemini: pruned(GEMINI.id, geminiAdapter),
+    officeace: pruned(OFFICEACE.id, officeAceAdapter),
+    accio: pruned(ACCIO.id, accioAdapter),
     zcode: pruned(ZCODE.id, zcodeAdapter),
     ...opencodeAdapter === void 0 ? {} : { opencode: pruned(OPENCODE.id, opencodeAdapter) }
   };
@@ -68513,8 +73126,17 @@ function apply(ctx, config = {}) {
     void geminiSigStore.flush().catch(() => {
     });
   });
-  registerChannelPackRpc(ctx, pool, service, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, modelAdapters, config);
+  registerChannelPackRpc(ctx, pool, service, buddy, workbuddy, lobsterai, qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, officeace_auth_exports, accio, modelAdapters, config);
   mountOpenAiGateway(ctx, pool);
+  if (isPrewarmSpacingValid()) {
+    ctx.effect(() => startCatalogPrewarm({
+      providers: Object.keys(modelAdapters),
+      warm: (provider) => ctx.llm.listModels(provider),
+      logger: { warn: (message2) => ctx.logger?.warn?.(message2) }
+    }));
+  } else {
+    ctx.logger?.warn?.("[channel-pack] \u76EE\u5F55\u9884\u70ED\u95F4\u9694\u4E0D\u5927\u4E8E\u95F8\u95E8\u51B7\u5374\uFF0C\u5DF2\u8DF3\u8FC7\u9884\u70ED\uFF08\u8BE5\u914D\u7F6E\u65E0\u6548\uFF09");
+  }
   installLoopResume(ctx);
   ctx.provide("accountPool", pool);
 }

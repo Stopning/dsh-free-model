@@ -130,12 +130,14 @@ export function minimaxReasoningInfo(
   if ((options === undefined || options.length === 0) && !switchable) return undefined
   const ids = [...(options ?? [])]
   if (switchable) {
-    // ⚠️ 顺序：**先 `on` 后 `none`** —— DSH 按数组顺序渲染，
-    // 「开启」应排在「关闭」之前（默认档也由 `defaultEffort` 表达，
-    // 但 M3 远端没给 `default_effort`，故把 `on` 放前面更符合直觉）。
+    // ⚠️ 顺序：**先 `none` 后 `on`**（弱 → 强，上游 issue IKLIDV）—— DSH 按
+    // 数组顺序渲染（`adapter-preferred display order`，客户端 `map` 不排序），
+    // 把默认档 `on` 排在前面会让「开启」落在横向档位轴的最左（左强右弱）。
+    // 默认档**不靠位置**表达：M3 远端没给 `default_effort` 时保持服务端默认
+    //（见下方 `defaultEffort`），故顺序调整不改变任何默认行为。
     // 幂等：远端若哪天自己下了这几个名字，不重复追加。
-    if (!ids.includes('on')) ids.push('on')
     if (!ids.includes('none')) ids.push('none')
+    if (!ids.includes('on')) ids.push('on')
   }
   const efforts = ids.map((id) => {
     if (id === 'none') return { id: ReasoningEffortId(id), name: '关闭思考' }
@@ -172,6 +174,15 @@ export interface MinimaxAdapterOptions {
   readImage?: (attachment: unknown) => Promise<{ data: Uint8Array; mediaType: string } | undefined>
   /** 产品配置；默认 {@link MINIMAX}。 */
   product?: MinimaxProduct
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
 }
 
 /** MiniMax Code 模型适配器。 */
@@ -179,10 +190,13 @@ export class MinimaxAdapter extends LlmAdapter {
   private readonly product: MinimaxProduct
   private remoteModels: readonly MinimaxModelEntry[] | undefined
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
 
   constructor(private readonly options: MinimaxAdapterOptions) {
     super()
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    )
     this.product = options.product ?? MINIMAX
   }
 

@@ -72,7 +72,10 @@
  */
 
 import { withDeadModelPruning } from './dead-model-store.js'
-import { FALLBACK_IMAGE_PRICING } from '../../../src/image-pricing.js'
+// ⚠️ 必须走**本目录内**的相对路径：`../../../src/image-pricing.js`（宿主半身）
+// 在本 fork 里已随「只留渠道车道」的裁剪被删除，且渠道包按 NOTICE.md 只允许
+// 依赖 `@deepseek-ai/*` 与自身目录 —— 用旧路径会让**再构建**直接失败。
+import { FALLBACK_IMAGE_PRICING } from './image-pricing.js'
 
 /** dsh-llm 对「configurable provider 已存在」抛的 code。**当前仅作防御**保留。 */
 const DUPLICATE_DIRECTORY = 'DUPLICATE_DIRECTORY'

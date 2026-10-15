@@ -61,6 +61,19 @@ import {
 import { GEMINI, geminiAccountLabel, geminiCredentialExpiresAtMs, isGeminiRefreshable } from './gemini.js'
 import type { GeminiCredential } from './gemini.js'
 import type { GeminiAuth, StartedGeminiLoginFlow } from './gemini-auth.js'
+// OfficeAce（华为 ModelArts MaaS 云端直连）：登录 / 余额所需的鉴权模块与产品配置。
+// ⚠️ 值是 **auth 模块命名空间**（`import * as`），不是 Service 实例 —— 这个渠道的
+//    API 全是模块级函数（见 `officeace-auth.ts` 模块头）。
+import * as officeaceAuth from './officeace-auth.js'
+import type { DpopPrivateJwk } from './officeace-auth.js'
+import { OFFICEACE } from './officeace-product.js'
+// Accio（阿里 Accio Work）：登录 / 余额所需的产品配置与鉴权服务。
+// ⚠️ 与 officeace 不同：Accio 是**Service 实例**（`AccioAuth`），不是模块命名空间。
+import { AccioAuth } from './accio-auth.js'
+import { ACCIO } from './accio-product.js'
+import { fetchAccioBalanceDetailed } from './accio-credits.js'
+import type { AccioCredential } from './accio.js'
+import { openIncognitoWindow } from './login.js'
 import { fetchGeminiCreditBalance } from './gemini-credits.js'
 import { LOOMY_TASK_POINTS, LOOMY_TASK_TITLES } from './loomy-onboarding.js'
 import { LOBSTERAI } from './lobsterai-product.js'
@@ -409,17 +422,29 @@ export function buildRaccoonNickname(
  * 前端拿它决定要不要渲染按钮、要不要发读取请求；后端拿它拒绝越权写入。
  * 两边不一致的后果是「按钮出现但点了报错」或「功能存在却点不出来」。
  *
- * 只有这三家有两个可分的积分池：
+ * 只有这四家有两个可分的积分池：
  * - Loomy：服务端直接给 `dailyBalance`（当日到期）与 `balance`（永久）；
  * - CodeBuddy / WorkBuddy：要从资源包列表按**扣费截止距今是否满 15 天**现算
  *   （判据见 `buddy-balance-rank.ts`，实测两站形状不同但都成立）。
+ * - OfficeAce（2026-10-15 移植）：订阅响应的每个积分桶都带 `expiresAt`
+ *   （套餐包无到期 = 永久桶，签到/活动包有明确到期），判据与 buddy 系同构
+ *   （`splitOfficeAceCreditsByExpiry`）。
+ *   ⚠️ **漏登记这一条 = 把上游的「哑锁」原样搬过来**：`index.ts` 已经给
+ *   officeace 装了锁定分道的**执行**代码，但本白名单会先一步拒掉写入
+ *   ⇒ 那段分支永远读不到 `true`，成为**死代码**，症状与上游那个
+ *   「按钮有、执行没有」完全同形（且同样静默）。
  * 其余渠道（CodeArts / LobsterAI / Qoder / TRAE / Cline / Raccoon）的积分
  * 模型里没有「会不会作废」这一层区分，登记进来只会多一个无效开关。
+ *
+ * ⚠️ **本 fork 的浏览器半身并不渲染这个开关**（`client.js` 全文零命中
+ * `permanentLock`，三家同样只能经 RPC 调用）。所以登记的意义是让**执行路径
+ * 在 API 层可达**、并与上游该渠道的设计意图一致，而不是「界面上有个按钮」。
  */
 export const PERMANENT_LOCK_PROVIDERS: ReadonlySet<string> = new Set([
   LOOMY.id,
   CODEBUDDY.id,
   WORKBUDDY.id,
+  OFFICEACE.id,
 ])
 
 /**
@@ -874,6 +899,23 @@ export function registerChannelPackRpc(
    */
   gemini: GeminiAuth,
   /**
+   * OfficeAce（华为 ModelArts MaaS 云端直连）。
+   *
+   * ⚠️ **追加在 `gemini` 之后**（本仓库全部调用点都是位置传参，历史上已因
+   * 少传/插队错位复发 6 次）—— 新 provider 一律追加在 `gemini` 与
+   * `modelAdapters` 之间，既有调用点才不用逐个补占位。
+   *
+   * ⚠️ 值是 **auth 模块命名空间**（`typeof officeaceAuth`），不是 Service 实例。
+   */
+  officeace: typeof officeaceAuth,
+  /**
+   * Accio（阿里 Accio Work）实例。
+   *
+   * ⚠️ **追加在 `officeace` 之后**（本仓库全部调用点都是位置传参，历史上已因
+   * 少传/插队错位复发 6 次）。与 officeace 不同：这里是 **Service 实例**。
+   */
+  accio: AccioAuth,
+  /**
    * provider → 适配器实例（可选）。
    *
    * 用于「显示列表」拿到**不受用户黑名单影响**的全量目录（`listAllModels`），
@@ -886,7 +928,7 @@ export function registerChannelPackRpc(
   ctx.inject(['connection'], (connectionCtx) => {
     registerChannelPackEndpoints(
       connectionCtx as Context, pool, codearts, buddy, workbuddy, lobsterai,
-      qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, modelAdapters, config,
+      qoder, qoderCn, trae, cline, loomy, raccoon, minimax, zcode, gemini, officeace, accio, modelAdapters, config,
     )
   })
 }
@@ -980,6 +1022,8 @@ function registerChannelPackEndpoints(
   minimax: MinimaxAuth,
   zcode: ZcodeAuth,
   gemini: GeminiAuth,
+  officeace: typeof officeaceAuth,
+  accio: AccioAuth,
   modelAdapters?: Readonly<Record<string, ModelCatalogSource>>,
   config: { disableOpencode?: boolean } = {},
 ): void {
@@ -1039,6 +1083,29 @@ function registerChannelPackEndpoints(
    * 而不是继续等待十分钟直到超时。
    */
   const pendingLoginFailures = new Map<string, string>()
+
+  /**
+   * OfficeAce 登录的中间状态（accountId → `{ state, codeVerifier, dpopPrivateJwk }`）。
+   *
+   * ⚠️ `state` **必须**用云侧签发的那一个（`startLogin` 内部 `POST /v1/claw/auth/state`）：
+   * 自制 state 会在轮询时 404（上游实测踩过）。`codeVerifier` 与 `dpopPrivateJwk`
+   * 与 state 同批生成，必须一起暂存供 `login.poll` 使用。
+   */
+  const pendingOfficeAceState = new Map<string, {
+    state: string
+    codeVerifier: string
+    dpopPrivateJwk: DpopPrivateJwk
+    credentialRef: string
+  }>()
+
+  /**
+   * OfficeAce 交换的**单飞表**（accountId → 正在进行的交换结果）。
+   *
+   * ⚠️ 客户端 `setInterval` 没有 in-flight 闸门，而一次交换含多次网络往返
+   *（通常 > 1 秒）⇒ 两拍重叠几乎必然。同一个 `code` 只能换一次，让后一拍
+   * **复用**前一拍的 promise，而不是各自去换、后失败者把成功者删掉。
+   */
+  const officeAceExchangeInFlight = new Map<string, Promise<{ done: boolean; success?: boolean; error?: string }>>()
 
   /**
    * 用量徽标的显示偏好（`$DSH_HOME/channel-pack/ui-preferences.json`）。
@@ -1374,6 +1441,73 @@ function registerChannelPackEndpoints(
       const handled = await handleOpencodeRpc(ctx, pool, method, payload)
       if (handled !== undefined) return handled
     }
+
+
+      /**
+       * 跑完一次 OfficeAce 交换：取 code → 换 token → 落库 → 回填账号条目。
+       *
+       * ⚠️⚠️ **三段式：交换 / 落库 / 回填各有自己的失败语义**（上游 2026-10-14
+       * 独立审计查出的**净回归**，别退回单 `try`）：一个 try 罩住三步时，
+       * 「回填」抛错会把**已经写好凭据**的账号连凭据一起删掉；两拍重叠时后一拍
+       * 换失败（同一 code 只能用一次）却把前一拍刚登好的账号删掉。
+       *
+       * ⇒ 判据：**凭据在 ⇒ 这次登录就是成了**，此后任何一步失败都不许再删号/删凭据。
+       */
+      const exchangeOfficeAceLogin = async (
+        accountId: string,
+        entry: { credentialRef: string },
+        pending: { state: string; codeVerifier: string; dpopPrivateJwk: DpopPrivateJwk; credentialRef: string },
+      ): Promise<{ done: boolean; success?: boolean; error?: string }> => {
+        const code = await officeace.pollLoginCode(pending.state).catch(() => undefined)
+        // 未就绪（用户还没完成授权）：继续轮询。
+        if (code === undefined) return { done: false }
+        const exchanged = await officeace
+          .completeLogin(code, pending.codeVerifier, pending.dpopPrivateJwk)
+          .then(
+            (credential) => ({ ok: true as const, credential }),
+            (error: unknown) => ({ ok: false as const, error }),
+          )
+        if (!exchanged.ok) {
+          // ⚠️ 并发的另一拍可能**已经用同一个 code 换成功**（本拍拿到的错误恰恰是
+          // 「code 已被使用」）⇒ 那种情况下凭据其实已落库，必须按成功回。
+          const persisted = await ctx.credentials.resolve(credentialRef(entry.credentialRef)).catch(() => undefined)
+          pendingOfficeAceState.delete(accountId)
+          if (persisted !== undefined) {
+            pendingLoginFailures.delete(accountId)
+            return { done: true, success: true }
+          }
+          const reason = exchanged.error instanceof Error ? exchanged.error.message : String(exchanged.error)
+          void pool.removeAccount(accountId).catch(() => {})
+          // ⚠️ 失败是**业务终态**：必须 `done:true` + `success:false`
+          //（上游 issue IKLI7J 根因 1 —— `done:false` 会被前端直接 return 掉）。
+          return { done: true, success: false, error: `OfficeAce 授权码交换失败：${reason}` }
+        }
+        // 换到了凭据：先落库（按 ref 分文件），再回填账号条目。
+        try {
+          // ⚠️ 签名是 `{ refName, credentials }`（模块级函数，第 2 参带 `CredentialStore`），
+          // 与其余渠道 Service 实例的 `persistLogin(credential, { refName })` **不同**。
+          await officeace.persistLogin(exchanged.credential, {
+            refName: pending.credentialRef,
+            credentials: ctx.credentials as never,
+          })
+        } catch (error) {
+          // 落库失败 = 真的没成（凭据不在），删占位条目才正确。
+          void pool.removeAccount(accountId).catch(() => {})
+          pendingOfficeAceState.delete(accountId)
+          const reason = error instanceof Error ? error.message : String(error)
+          return { done: true, success: false, error: `OfficeAce 凭据保存失败：${reason}` }
+        }
+        pendingOfficeAceState.delete(accountId)
+        pendingLoginFailures.delete(accountId)
+        // ⚠️ 回填失败**不影响登录已成功**（凭据已落库）—— 只记日志，不删号。
+        try {
+          await pool.updateAccount(accountId, { refreshable: true })
+        } catch (error) {
+          ctx.logger.warn(`[channel-pack] OfficeAce 账号回填失败（凭据已落库，登录仍算成功）：${String(error)}`)
+        }
+        return { done: true, success: true }
+      }
+
     switch (method) {
       case 'account.list': {
         const req = payload as RpcListAccountsRequest
@@ -1953,6 +2087,96 @@ function registerChannelPackEndpoints(
           })
 
           return { ok: true, value: { accountId: id, loginUrl: geminiStarted.loginUrl } }
+        } else if (provider === OFFICEACE.id) {
+          /**
+           * OfficeAce（华为 ModelArts MaaS）走**华为云 OAuth（PKCE + DPoP）**，
+           * 全程**不依赖 OfficeAce 客户端**（协议见 `officeace-auth.ts` 模块头）。
+           *
+           * ⚠️ 两步式（同 zcode / gemini）：`window.open` 只在用户手势窗口内有效，
+           * 等授权完成才返回 URL 会被浏览器拦截。这里先返回 authorizeUrl，
+           * 后台轮询 `code` 再换 token（在 `login.poll` 里做）。
+           *
+           * ⚠️ 华为 SSO 通常**自动重定向**（无需扫码/输密码），用户开页即完成。
+           *
+           * ⚠️ `state` 必须用云侧签发的那一个（自制 state 轮询会 404）。
+           */
+          await pool.addAccount({
+            id,
+            provider: OFFICEACE.id,
+            nickname: id,
+            enabled: true,
+            credentialRef: refName,
+            refreshable: false,
+            createdAt: Date.now(),
+          })
+          pendingLoginFailures.delete(id)
+
+          let started: Awaited<ReturnType<typeof officeace.startLogin>>
+          try {
+            started = await officeace.startLogin()
+          } catch (error) {
+            void pool.removeAccount(id).catch(() => {})
+            const reason = error instanceof Error ? error.message : String(error)
+            throw new Error(`无法启动 OfficeAce 登录（华为云授权状态获取失败）：${reason}`)
+          }
+          pendingOfficeAceState.set(id, {
+            state: started.state,
+            codeVerifier: started._internal.codeVerifier,
+            dpopPrivateJwk: started._internal.dpopPrivateJwk,
+            // ⚠️ 必须带 ref：`completeLogin` 按它分文件落盘。缺省会让新账号的
+            // 凭据写进公共 `session.json`，覆盖其他账号的凭据（多账号共存的前提）。
+            credentialRef: refName,
+          })
+
+          // ⚠️ 宿主侧**直接拉起无痕窗口**：华为 authui 会静默复用浏览器已有会话
+          // ⇒ 带 cookie 打开授权页看不到登录框 ⇒「新建账号」永远只能建出同一个号。
+          // 客户端无法自己做（`window.open` 不能请求无痕），故由宿主 spawn。
+          // 打开失败返回 false，客户端据此回退到自己的 `window.open`（行为不变）。
+          const incognitoOpened = openIncognitoWindow(started.authorizeUrl)
+
+          return {
+            ok: true,
+            value: {
+              accountId: id,
+              // ⚠️ 仍然回 URL（客户端在 `incognitoOpened === false` 时用它开窗）。
+              loginUrl: started.authorizeUrl,
+              ...incognitoOpened ? { openedByHost: true } : {},
+            },
+          }
+        } else if (provider === ACCIO.id) {
+          /**
+           * Accio（阿里 Accio Work）走**标准 OAuth 2.0 + PKCE**（公开客户端
+           * `accio-work`、无 secret），本地回调服务器收 code 后换 token。
+           *
+           * ⚠️ 两步式（同 gemini / zcode）：`window.open` 只在用户手势窗口内有效，
+           * 等授权完成才返回 URL 会被拦截 —— 先返回 loginUrl，后台等回调。
+           *
+           * ⚠️ **占位条目的登记与清理都在 `AccioAuth.startLogin` 内部**（它拿到
+           * `pool` + `accountId` 就自己管）：成功回填昵称/有效期/可续期标记，
+           * 失败删占位不留幽灵账号。故这里**不要**再 addAccount / removeAccount
+           * 一遍 —— 两处各写一份必然漂移（本仓库在别处踩过）。
+           */
+          pendingLoginFailures.delete(id)
+          let started: Awaited<ReturnType<AccioAuth['startLogin']>>
+          try {
+            started = await accio.startLogin({ refName, pool, accountId: id })
+          } catch (error) {
+            // startLogin 内部已删占位条目，这里只如实报错。
+            const reason = error instanceof Error ? error.message : String(error)
+            throw new Error(`无法启动 Accio 登录（本地回调服务启动失败）：${reason}`)
+          }
+
+          // 与 gemini 同款：不 await result，让它后台落定；失败原因进
+          // `pendingLoginFailures`，由 `login.poll` 作为**业务终态**报给前端。
+          started.result.then(() => {
+            pendingLoginFailures.delete(id)
+          }).catch((error: unknown) => {
+            const reason = error instanceof Error ? error.message : String(error)
+            ctx.logger.warn(`[channel-pack] background ${ACCIO.id} login failed for ${id}: ${reason}`)
+            pendingLoginFailures.set(id, reason.slice(0, 500))
+          })
+
+          return { ok: true, value: { accountId: id, loginUrl: started.loginUrl } }
         } else {
           return { ok: false, error: { code: 'bad-request', message: `unknown provider: ${provider}` } }
         }
@@ -2087,6 +2311,22 @@ function registerChannelPackEndpoints(
               // ⚠️ Google 会**轮换 refresh_token**，`GeminiAuth` 内部已回写新值。
               await gemini.refreshAccountCredential(entry.credentialRef, pool, entry.id)
               break
+            case OFFICEACE.id:
+              // OfficeAce 有真续期：STS 寿命约 2 小时，走华为 STS 换新。
+              // ⚠️ 它是**模块级函数**，且第 4 个形参是 `CredentialStore` ——
+              // 与其余渠道的 Service 方法签名不同，不能照抄。
+              // ⚠️ 必须传 pool + entry.id：续期后要把新凭据写回账号池，
+              // 否则 UI 一直显示旧状态而实际已换过。
+              await officeace.refreshAccountCredential(
+                entry.credentialRef, pool, entry.id, ctx.credentials as never,
+              )
+              break
+            case ACCIO.id:
+              // Accio 有真续期（refresh_token grant）。
+              // ⚠️ 必须传 pool + entry.id：续期后要把新 `expiresAt` 写回账号池，
+              // 否则 UI 一直显示「已过期」而实际能正常发消息（上游 issue !IKIRTT）。
+              await accio.refreshAccountCredential(entry.credentialRef, pool, entry.id)
+              break
             default:
               throw new Error(`Unknown provider: ${entry.provider}`)
           }
@@ -2160,6 +2400,23 @@ function registerChannelPackEndpoints(
         const accounts = await pool.listAllAccounts()
         const entry = accounts.find((a) => a.id === req.accountId)
         if (!entry) return { ok: true, value: { done: false } }
+        // OfficeAce：登录走「云侧签发的 state + 一次性 code」，与其余渠道的
+        // 「轮询凭据是否已写入」形态不同，必须在凭据检查**之前**分道。
+        if (entry.provider === OFFICEACE.id) {
+          const pending = pendingOfficeAceState.get(req.accountId)
+          if (pending === undefined) return { ok: true, value: { done: false } }
+          // ⚠️ **单飞**：客户端 `setInterval` 没有 in-flight 闸门，而一次交换含多次
+          // 网络往返 ⇒ 两拍重叠几乎必然。同一个 code 只能换一次，让后一拍复用前一拍。
+          const shared = officeAceExchangeInFlight.get(req.accountId)
+          if (shared !== undefined) return { ok: true, value: await shared }
+          const task = exchangeOfficeAceLogin(req.accountId, entry, pending)
+          officeAceExchangeInFlight.set(req.accountId, task)
+          void (async () => {
+            try { await task } catch { /* 结果由 task 自身承载 */ }
+            finally { officeAceExchangeInFlight.delete(req.accountId) }
+          })()
+          return { ok: true, value: await task }
+        }
         // 检查凭据是否已实际写入（占位条目没有凭据）。
         //
         // ⚠ **不能只判「resolve 出了非空字符串」**（审查发现）：占位条目被
@@ -2358,7 +2615,11 @@ function registerChannelPackEndpoints(
         const lockResponse = (): RpcPermanentLockResponse => ({
           provider,
           locked: pool.permanentLocked(provider),
-          ...(provider === CODEBUDDY.id || provider === WORKBUDDY.id
+          // ⚠️ 凡「按到期时间分桶」的渠道都要回传窗口天数，且与
+          // `credits.balances` 那条**同一判据** —— 两处不一致会让前端在
+          // 「读余额」与「拨开关」两个路径上看到不同的分桶口径。
+          // OfficeAce 与 buddy 系同构（`splitOfficeAceCreditsByExpiry`）。
+          ...(provider === CODEBUDDY.id || provider === WORKBUDDY.id || provider === OFFICEACE.id
             ? { windowDays: buddyExpiringWindowDays() }
             : {}),
         })
@@ -3305,6 +3566,115 @@ function registerChannelPackEndpoints(
                * 前端需要按模型逐行渲染、缺桶的模型显示占位。
                */
               balance: buildZcodeBalance(result),
+            })
+          }
+          return { ok: true, value: { accounts: values } satisfies RpcCreditsBalancesResponse }
+        }
+        if (req.provider === OFFICEACE.id) {
+          // ⚠️ 用可选链取 auth：多条单测用**空桩 auths**（`{}`）遍历 registry，
+          // 缺 `officeace` 键时直接取属性会抛 TypeError ⇒ 整个 case 冒泡成
+          // `ok:false`。取不到就如实回「查询失败」，与网络失败同一条降级路径。
+          const fetchSummary = officeace?.fetchSubscriptionSummary
+          // ⚠️ **逐账号查询，不共享一份结果**（上游 2026-10-13 修的真实缺陷）：
+          // 原实现只查一次就拿去填所有卡片 ⇒ N 个账号显示同一个余额，
+          // 面板合计被放大 N 倍（实测两个账号显示 13000 = 6500×2）。
+          const values: RpcCreditsBalancesResponse['accounts'] = []
+          for (const account of accounts) {
+            const subscription = fetchSummary === undefined
+              ? undefined
+              : await fetchSummary.call(
+                officeace,
+                48,
+                account.credentialRef,
+                undefined,
+                ctx.credentials as never,
+              ).catch(() => undefined)
+            if (subscription === undefined) {
+              values.push({
+                accountId: account.id,
+                nickname: account.nickname,
+                balance: null,
+                error: '积分查询失败（华为云订阅接口不可达或凭据已失效）',
+              })
+              continue
+            }
+            values.push({
+              accountId: account.id,
+              nickname: account.nickname,
+              balance: {
+                total: subscription.totalCredits,
+                packages: subscription.creditGroups.map((group) => ({
+                  name: group.name,
+                  unit: OFFICEACE.quotaUnit,
+                  remaining: group.remaining,
+                  total: group.total,
+                  used: group.used ?? 0,
+                  active: !group.expired,
+                  cycleStartTime: '',
+                  cycleEndTime: '',
+                  expiredTime: group.expiresAt ?? '',
+                  // 分桶判据字段：订阅套餐包无固定到期（永久桶），活动/签到包有明确到期。
+                  ...(group.expiresAt !== undefined && group.expiresAt !== null
+                    ? { deductionEndTime: new Date(group.expiresAt).getTime() }
+                    : {}),
+                })),
+                expiredTotal: subscription.creditGroups.filter((g) => g.expired).length,
+              },
+            })
+          }
+          return {
+            ok: true,
+            value: {
+              accounts: values,
+              // ⚠️ **成功/失败都要回传 `windowDays`**：它表达的是「本渠道按到期时间
+              // 分桶」，与本次读数成功与否**无关**。只在成功路径带它会让
+              //「空账号池 / 查询失败」时形状不一致，守卫用例遍历 registry 时正会红。
+              windowDays: buddyExpiringWindowDays(),
+            } satisfies RpcCreditsBalancesResponse,
+          }
+        }
+        if (req.provider === ACCIO.id) {
+          // 余额来自云侧订阅/额度端点（`fetchAccioBalanceDetailed`，只读、不扣积分）。
+          // ⚠️ **逐账号查询，不共享一份结果**（与 officeace 同一条纪律）：
+          // 只查一次拿去填所有卡片 ⇒ N 个账号显示同一个余额、合计被放大 N 倍。
+          const values: RpcCreditsBalancesResponse['accounts'] = []
+          for (const account of accounts) {
+            const resolved = await ctx.credentials.resolve(credentialRef(account.credentialRef))
+            if (!resolved) {
+              values.push({
+                accountId: account.id, nickname: account.nickname,
+                balance: null, error: '凭据未配置',
+              })
+              continue
+            }
+            let credential: AccioCredential
+            try {
+              credential = JSON.parse(resolved.value) as AccioCredential
+            } catch {
+              values.push({
+                accountId: account.id, nickname: account.nickname,
+                balance: null, error: '凭据解析失败',
+              })
+              continue
+            }
+            // ⚠️ 与 officeace 的 `fetchSubscriptionSummary` 同款：RPC 的余额读取走
+            // 模块级函数的默认 fetch（出口代理只包在适配器/服务的推理路径上）——
+            // 这是本 fork 既有的边界，不在这里单方面改变。
+            const detail = await fetchAccioBalanceDetailed(credential)
+              .catch((error: unknown) => ({
+                balance: null,
+                error: `积分查询失败：${error instanceof Error ? error.message : String(error)}`,
+              }))
+            values.push({
+              accountId: account.id,
+              nickname: account.nickname,
+              balance: detail.balance,
+              // ⚠️ `error` 与 `extra` 都要**如实传播**（照 gemini / officeace 的既有约定）：
+              // `error` 区分「未登录」「上游拒绝」与「查询失败」；`extra.accountTier`
+              // 是账号档位（Free / Pro / Ultra）—— 它取不到时整行不渲染，**不是错误**。
+              // 第一版把 `extra` 漏掉了 ⇒ 面板少一栏本可显示的档位信息（静默降级）。
+              ...detail.error === undefined ? {} : { error: detail.error },
+              ...detail.extra === undefined ? {} : { extra: detail.extra },
             })
           }
           return { ok: true, value: { accounts: values } satisfies RpcCreditsBalancesResponse }

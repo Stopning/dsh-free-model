@@ -295,6 +295,32 @@ export function errorDetail(body: string): string {
   return body
 }
 
+/**
+ * 错误体里 `detail` 字段的取值（**只读**，不改任何既有判据）。
+ *
+ * 上游代理的 `{"error":"…","detail":"<真实原因>"}` 形态（上游 issue IKLBSH A1）。
+ *
+ * ⚠️ **证据强度如实标注（引上游，本 fork 未实测）**：上游扫了 866 个真实会话
+ * （解压后 3.0 GB）里 `"detail"` **零命中** —— 该形态的依据是上游代理类实现的
+ * 既有惯例 + harness 的 `dsh-llm-deepseek` 确实**产出** `{message, detail}` 这一对。
+ * 属于「结构上必然可达、但未实测」的一条腿。
+ *
+ * ⚠️ **只加不减**：它只影响原先「所有腿都落空 ⇒ 退回整段裸 JSON」那一种形态，
+ * 且必须排在**最后**一条腿 —— 既有腿的优先级与产出逐字节不变。
+ * ⚠️ 嵌套对象只认 `message`：整对象 stringify 会把 `{code,…}` 又变回一坨
+ * 不可读的裸 JSON，与这条腿的目的相反。
+ */
+export function detailFieldText(value: unknown): string | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const detail = (value as Record<string, unknown>).detail
+  if (typeof detail === 'string') return detail.length > 0 ? detail : undefined
+  if (detail !== null && typeof detail === 'object' && !Array.isArray(detail)) {
+    const message = (detail as Record<string, unknown>).message
+    if (typeof message === 'string' && message.length > 0) return message
+  }
+  return undefined
+}
+
 /** 将 HTTP 状态码映射为 harness 错误码。 */
 export function httpErrorCode(status: number): string {
   if (status === 401 || status === 403) return 'AUTH'

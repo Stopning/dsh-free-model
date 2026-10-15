@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "模型接入",
-    "description": "把各家的免费额度接进 DeepSeek Harness：登录一次，十三个渠道（CodeArts、CodeBuddy / WorkBuddy、LobsterAI、Qoder、TRAE、Cline、Loomy、Raccoon、MiniMax、ZCode、Gemini）的模型就出现在选择器里，附 Token 看板、逐条请求日志与本地 OpenAI 兼容网关。"
+    "description": "把各家的免费额度接进 DeepSeek Harness：登录一次，十五个渠道（CodeArts、CodeBuddy / WorkBuddy、LobsterAI、Qoder、TRAE、Cline、Loomy、Raccoon、MiniMax、ZCode、Gemini、OfficeAce、Accio Work）的模型就出现在选择器里，附 Token 看板、逐条请求日志与本地 OpenAI 兼容网关。"
   }
 }

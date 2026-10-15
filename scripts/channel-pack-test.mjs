@@ -73,7 +73,18 @@ try {
   apply(ctx, { disableOpencode: true })
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(adapters.has('opencode'), false, 'disabled account provider is not registered')
-  assert.equal(adapters.size, 13, 'all other account providers remain registered')
+  // 13 个原有渠道 + officeace + accio（2026-10-15 从 gitee 上游移植的两个云端渠道）。
+  assert.equal(adapters.size, 15, 'all other account providers remain registered')
+  assert.ok(adapters.has('officeace'), 'officeace（移植渠道）必须注册')
+  assert.ok(adapters.has('accio'), 'accio（移植渠道）必须注册')
+  // ⚠️ 四条**接线**必须真的接上 —— 这是上游 IKLTHB「哑锁」的形态：
+  // 面板渲染了开关，但没有任何执行代码读它 ⇒ 开关与关闭完全一致，且**不报错**。
+  // 漏装配的症状全是静默的，故这里逐条断言（`options` 在运行时可达）。
+  const officeAceOptions = adapters.get('officeace').options ?? {}
+  for (const key of ['credentialProvider', 'probeCredential', 'refresh', 'readImage']) {
+    assert.equal(typeof officeAceOptions[key], 'function',
+      `officeace 的 ${key} 必须由 index.ts 装配（漏接是静默失效）`)
+  }
   verifyChannelImagePricing(adapters)
   console.log('ok  十三渠道同步图片计价：缺失及默认方法兜底，厂商计价优先，重复图片与已卸载图片正确计数')
   assert.equal(writes.length, 0, 'mount neither creates nor deletes credentials')
@@ -101,7 +112,7 @@ try {
   }
   assert.equal((await call('account.list', { provider: 'opencode' })).value.accounts.length, 1)
   assert.equal(writes.length, 0, 'rejected RPCs leave credentials untouched')
-  console.log('ok  generated pack: 13 providers, no OpenCode registration/warmup, historical data retained, account RPCs refused')
+  console.log('ok  generated pack: 15 providers (13 + officeace + accio), no OpenCode registration/warmup, historical data retained, account RPCs refused')
   await verifyChannelCreditsRpc({ ctx, call, creds })
   console.log('ok  实际渠道 RPC：七渠道仅账号池凭据即可查余额，ZCode 账号池回退及缺凭据反馈')
 
@@ -160,10 +171,10 @@ try {
     visit(node.children)
   }
   visit(tree)
-  assert.equal(cards.length, 13)
+  assert.equal(cards.length, 15)
   assert.equal(cards.includes('opencode'), false)
   assert.deepEqual([...cards].sort(), [...adapters.keys()].sort(), 'UI and mounted account providers agree')
-  console.log('ok  actual channel page: 13 account cards, OpenCode removed')
+  console.log('ok  actual channel page: 15 account cards (13 + officeace + accio), OpenCode removed')
   await verifyChannelModelActions()
   await verifyChannelCreditsUi()
   console.log('ok  共享渠道余额：十三渠道能力、失败原因、重试、签到反馈和请求交错')

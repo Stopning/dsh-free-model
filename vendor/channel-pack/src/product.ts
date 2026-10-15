@@ -315,11 +315,39 @@ const WORKBUDDY_FALLBACK_MODELS: readonly BuddyFallbackModel[] = [
     id: 'hy3', name: 'Hy3', contextWindow: 192_000, supportsImages: true,
     reasoningEfforts: ['low', 'high'], defaultReasoningEffort: 'high', maxOutputTokens: 64_000,
   },
-  { id: 'deepseek-v4.1-flash', name: 'Deepseek-V4.1-Flash', contextWindow: 1_000_000, supportsImages: true, reasoningEfforts: ['high'], defaultReasoningEffort: 'high', maxOutputTokens: 128_000 },
+  {
+    // ⚠️ 档位取 5 档（上游 issue IKJQSH，2026-10-06 实测）。本表是这两个模型的
+    // **唯一档位来源**：国际版 `/v3/config` 对它们**不下发 supportedEfforts**，
+    // 只给一个单值 `reasoning: {effort:"high", summary:"auto"}`（即「固定 high、
+    // 不提供选择」）。而 `parseModelMeta`（src/buddy.ts）只认 `supportedEfforts`
+    // 数组与 `defaultEffort`，**不认识 `effort`** —— 故远端这个表态会被静默忽略，
+    // 最终落到本表。写 `['high']` 意味着用户永远只有 high 可选，max 从未出现过。
+    //
+    // 实测（真实登录态直打 www.workbuddy.ai，同一条长前缀提示）：
+    //   low/medium/high/xhigh/max 五档**全部 HTTP 200 且都有真实 reasoning_content**
+    //   （4093 / 8670 / 9023 / 4105 / 10559 字符）；拼错的 `banana` 被拒：
+    //   HTTP 400 `code:11133` / `extError.code=model_param_invalid`。
+    // ⇒ 服务端**确实校验档位枚举**，故这 5 档是「实测可行」而非推测。
+    // ⚠️ 强度序**不可**从思考长度反推：xhigh(4105) 实测比 low(4093) 还短。
+    //
+    // ⚠️ 若将来 scoped 端点（/console/enterprises/personal/models）恢复并为这两个
+    // 模型下发列表，`mergeRemoteModels` 会以 scoped 为准（只比 id、不逐字段补齐），
+    // 本表才真正退居「远端缺失时补位」—— 但仍应保持这 5 档：它是「远端没表态时
+    // 我们对外的承诺」。
+    id: 'deepseek-v4.1-flash', name: 'Deepseek-V4.1-Flash', contextWindow: 1_000_000, supportsImages: true,
+    reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultReasoningEffort: 'high', maxOutputTokens: 128_000,
+  },
   {
     // 2026-09 补录：新加坡区的同代模型（-sg 后缀），远端下发且实测能看图。
+    // 档位依据同上：国际版 `/v3/config` 对它同样只给 `reasoning.effort:"high"`、
+    // 不下发列表，故本表是唯一来源。实测五档同样全部 200 且有思考输出
+    // （3833 / 3761 / 5020 / 6345 / 16947 字符），`banana` 同样被 400 拒绝。
+    //
+    // ⚠️ 与 CodeBuddy 的 `-sg` 不是一回事：中国版端点上该模型不存在
+    // （实测 `code:11102 service info not found`），故 CODEBUDDY 兜底表未收录它。
+    // 这里是国际版专属条目，不要照抄到 CODEBUDDY 那张表。
     id: 'deepseek-v4.1-flash-sg', name: 'Deepseek-V4.1-Flash', contextWindow: 1_000_000, supportsImages: true,
-    reasoningEfforts: ['high'], defaultReasoningEffort: 'high', maxOutputTokens: 128_000,
+    reasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max'], defaultReasoningEffort: 'high', maxOutputTokens: 128_000,
   },
   {
     id: 'gpt-6-astra', name: 'GPT-6-Astra', contextWindow: 1_000_000, supportsImages: true,

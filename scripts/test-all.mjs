@@ -45,6 +45,29 @@ const suites = [
   ['egress', 'egress-test.mjs', []],
   // The absorbed pack: mount, provider set, credits, image pricing, proxy rules.
   ['channel-pack', 'channel-pack-test.mjs', []],
+  // ...and the metadata it feeds the picker: effort tables, context windows, and
+  // the declared effort order. These are silent-mismatch defects — a wrong value
+  // shows up as a missing effort or a mysteriously truncated long session, never
+  // as an error pointing at the declaration.
+  ['channel-model-metadata', 'channel-model-metadata-test.mjs', []],
+  // ...and the catalog plumbing: broadcast on landing, "complete" vs "got", and
+  // the bounded cold-start prewarm. All three fail silently — the user sees
+  // "fewer models" or "only fixed by a restart", never an error.
+  ['channel-catalog', 'channel-catalog-test.mjs', ['--experimental-strip-types']],
+  // ...and, behaviourally: a partial catalog must heal on the next read. This is
+  // the layer that catches "complete was passed correctly but the short-circuit
+  // still swallowed the retry" — the defect the unit-level checks cannot see.
+  ['channel-catalog-heal', 'channel-catalog-heal-test.mjs', []],
+  // ...and the gateway's own contract fixes: the source kind must match dsh-llm's
+  // module-augmented vocabulary, and the Cline models.dev loader must be a
+  // conditional request with a 304 fallback (never a silent empty catalog).
+  ['channel-gateway-source', 'channel-gateway-source-test.mjs', []],
+  ['channel-cline-dev', 'channel-cline-dev-test.mjs', ['--experimental-strip-types']],
+  // The ported OfficeAce channel: its "lock permanent credits" switch must have a
+  // real execution path (upstream IKLTHB shipped it as a silent no-op switch).
+  ['channel-officeace-lock', 'channel-officeace-lock-test.mjs', ['--experimental-strip-types']],
+  ['channel-officeace-login', 'channel-officeace-login-test.mjs', []],
+  ['channel-accio', 'channel-accio-test.mjs', ['--experimental-strip-types']],
   ['channel-network', 'channel-network-test.mjs', []],
 ].filter(([name]) => only === null || name.startsWith(only))
 

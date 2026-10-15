@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Model Access",
-    "description": "Bring your own free-tier accounts into DeepSeek Harness: log in once and the models of thirteen channels (CodeArts, CodeBuddy / WorkBuddy, LobsterAI, Qoder, TRAE, Cline, Loomy, Raccoon, MiniMax, ZCode, Gemini) appear in the picker, with a token dashboard, a per-request log and a local OpenAI-compatible gateway."
+    "description": "Bring your own free-tier accounts into DeepSeek Harness: log in once and the models of fifteen channels (CodeArts, CodeBuddy / WorkBuddy, LobsterAI, Qoder, TRAE, Cline, Loomy, Raccoon, MiniMax, ZCode, Gemini, OfficeAce, Accio Work) appear in the picker, with a token dashboard, a per-request log and a local OpenAI-compatible gateway."
   }
 }

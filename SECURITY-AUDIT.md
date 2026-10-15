@@ -10,15 +10,19 @@
 
 | 文件 | sha256 |
 | --- | --- |
-| `index.js` | `179e679a7932fc0993d3bbc10785133d18304e583fb872e07e0322cbbd0aaec9` |
-| `client.js` | `585ffeb810fb3bd7275e1ac7a8b5edd604e5955370ea94725c3c39fa19240bba` |
-| `vendor/channel-pack/pack.js` | `18c7629f2e65c894b46e24e95b6dfa45397fa1f4490590a645c1e1058264daa9` |
+| `index.js` | `a932bcb6bdeef608496071a60d1f9e8499997fca52765e0eb300171d8728aa57` |
+| `client.js` | `13332f9b4102e5cc7125998983126df7b50cfa6a32ef5e20aefc51aca0a5e820` |
+| `vendor/channel-pack/pack.js` | `e1e63e95d0aeddb882748c3961391a2583dcbeb5f71104c418797989030f4425` |
+
+⚠️ `pack.js` 的指纹随每次「刷新模型数据 / 移植上游修复」而变（它是构建产物）。
+上面的值对应**模型元数据刷新与目录完整性移植之后**的版本；域名面结论未变，
+`scripts/egress-audit.mjs` 可随时重跑复验。
 
 ## 结论
 
 **是直连对应服务提供商。** 全部业务出网都是 HTTPS 到厂商自家域名，TLS 证书主体为厂商本人；**没有第三方中转、没有回传作者服务器、没有遥测**。仅有两处外部辅助调用（模型能力元数据、出口 IP 探测），都不携带账号凭据。
 
-## 一、13 个渠道的出网域名与证书主体
+## 一、15 个渠道的出网域名与证书主体
 
 下表"证书主体"取自**本机直连握手**（域名 → TLS 证书的 Subject/Issuer），用来证明流量终点不是中间人。
 
@@ -35,6 +39,8 @@
 | MiniMax Code | `agent.minimax.cn`、`account.minimax.cn` | `*.minimax.cn`（DNSPod DV） |
 | ZCode（智谱 z.ai） | `zcode.z.ai`、`api.z.ai`、`chat.z.ai` | `*.z.ai`（Sectigo DV） |
 | Gemini（Google） | `daily-cloudcode-pa.googleapis.com`、`daily-cloudcode-pa.sandbox.googleapis.com`、`www.googleapis.com`、`oauth2.googleapis.com`、`accounts.google.com` | Google（**本机直连不通**，需代理才能握手；域名与用途由源码与官方 SDK 对齐） |
+| Accio Work（阿里，2026-10-15 移植） | `phoenix-gw.alibaba.com`（gateway，两区域同一个）、登录页 `www.accio-ai.com`（国际）/ `zh.accio.com`（中国） | `*.alibaba.com` / `*.accio-ai.com` / `*.accio.com`，签发方 GlobalSign **OV**（已验证组织身份）—— 网关证书主体即 `*.alibaba.com`，直接证明流量终点是阿里本身而非中间人 |
+| OfficeAce（华为云 ModelArts MaaS，2026-10-15 移植） | `officeace.cn-southwest-2.huaweicloud-agentarts.com`、`agentarts.cn-southwest-2.myhuaweicloud.com`、`api.modelarts-maas.com`；登录复用 `auth.huaweicloud.com` + `sts.cn-north-4.myhuaweicloud.com`（与 CodeArts 同两家） | `*.cn-southwest-2.huaweicloud-agentarts.com` / `*.cn-southwest-2.myhuaweicloud.com` / `*.modelarts-maas.com`，签发方均为 GlobalSign RSA OV（OV = 已验证组织身份，与华为云其余端点同一 CA 策略） |
 
 ## 二、仅有的外部（非厂商）调用
 
@@ -81,7 +87,7 @@
 - **产物有、源码无**：只有 `github.com`（注释里的参考仓库）与 WHATWG/W3C/IETF 规范链接（错误信息格式化用）。
 - **源码有、产物无**：`www.codebuddy.cn`（仅登录页常量 `WEBSITE_HOME`，源码里未被引用，被 tree-shake）、`blog.csdn.net`/`bigmodel.cn`（注释）。
 
-这一步只能证明**域名面**一致，加上行为套件（13 家注册、无 OpenCode 预热、RPC 失败关闭）。**不能从字节上证明 `pack.js` 与源码逐行等价**。
+这一步只能证明**域名面**一致，加上行为套件（15 家注册、无 OpenCode 预热、RPC 失败关闭）。**不能从字节上证明 `pack.js` 与源码逐行等价**。
 
 ## 七、边界与已知风险（要知情）
 

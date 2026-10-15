@@ -325,6 +325,15 @@ export interface ZcodeAdapterOptions {
    *   「尚未接线」，也别照着那样的说法再「补」一次注入。
    */
   log?: (message: string) => void
+  /**
+   * 目录**落地后**的通知回调（通常是广播 `llm/adapters-updated`）。
+   *
+   * ⚠️ 必须注入：DSH 的模型目录是**推送式**的（客户端把 catalog 缓存在
+   * `status === 'ready'` 的短路 store 里，只在收到 `llm/adapters-updated`
+   * 等事件时才重读）。不广播 = 注册成功、`listModels` 也正常，但模型选择器里
+   * 可能一直停在**兜底表**上（上游 issue IKJVTF 的缺陷①）。
+   */
+  onCatalogLoaded?: () => void
 }
 
 /** ZCode 模型适配器。 */
@@ -335,7 +344,7 @@ export class ZcodeAdapter extends LlmAdapter {
   private readonly fallbackIndex: ReadonlyMap<string, ZcodeFallbackModel>
   private remoteModels: ZcodeRemoteModel[] | undefined
   /** 目录加载闸门：并发去重 + 失败/空结果冷却（见 `remote-catalog-gate.ts`）。 */
-  private readonly catalogGate = new RemoteCatalogGate()
+  private readonly catalogGate: RemoteCatalogGate
   /** 自建的常驻浏览器（仅当调用方没注入 `mintCaptcha` 时用）。 */
   private captchaBrowser: ZcodeCaptchaBrowser | undefined
   /** captcha 配置缓存（配置很少变，但与凭据一样**不长期缓存**）。 */
@@ -354,6 +363,9 @@ export class ZcodeAdapter extends LlmAdapter {
 
   constructor(private readonly options: ZcodeAdapterOptions) {
     super()
+    this.catalogGate = new RemoteCatalogGate(
+      options.onCatalogLoaded === undefined ? {} : { onLoaded: options.onCatalogLoaded },
+    )
     this.product = options.product ?? ZCODE
     this.fetchImpl = options.fetchImpl ?? fetch
     this.fallbackIndex = new Map(this.product.fallbackModels.map((model) => [model.id, model]))
