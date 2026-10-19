@@ -39,6 +39,16 @@ registerHooks({
 })
 process.env.DSH_CHANNEL_PACK_STATE_DIR = scratch
 process.env.DSH_HOME = scratch
+// ⚠️⚠️ **OfficeAce 的用户级目录必须进程级隔离**（2026-10-19 事故修复）。
+//    `officeace-auth.ts` 的三条用户级路径（`~/.dsh-officeace` 凭据、兼容
+//    `session.json`、`~/.office-claw` cookie）**只认 `DSH_OFFICEACE_HOME`**，
+//    `DSH_HOME` 管不到它。不隔离的后果：`persistLogin()` 顺手写的那份兼容文件
+//    落到**真实 home**，而 `apply()` 里有 fire-and-forget 的续期链、空池时回落到
+//    读本机凭据 ⇒ 真实 DSH 每 30 分钟拿那份**桩 token** 去打华为云 STS，
+//    日志刷 `STS5.1806 invalid refresh token: 'decode jwt header failed'`。
+//    ⇒ 只能进程级（与 gitee 上游 `tests/setup-isolation.ts` 同款做法）。
+process.env.DSH_OFFICEACE_HOME = path.join(scratch, 'officeace')
+
 process.env.DSH_OPENAI_GATEWAY_ENABLED = '1'
 // 固定密钥 + 端口（避免生成文件、避免撞已占用端口）。
 // 夹具值：env 路径只要求非空（不校验形态），故刻意用**明显是假数据**的短值 ——

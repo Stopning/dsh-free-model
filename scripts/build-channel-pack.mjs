@@ -21,7 +21,7 @@
  * Run after editing/re-vendoring `src/`; requires esbuild (devDependency, or any
  * checkout that has it on the resolution path).
  */
-import { readFileSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -48,6 +48,41 @@ try {
   process.exit(1)
 }
 
+/**
+ * 收集「能让 `jose` / `undici` 被解析到」的 node_modules 目录。
+ *
+ * esbuild 按**入口文件所在目录**向上找，而这两个包既不在本仓库也不在
+ * `OFM_ESBUILD_DIR`（那里只放 esbuild）—— 历史上它们来自宿主 checkout。
+ * 故按候选顺序探测，返回第一个同时含这两者的目录。
+ */
+function resolveInlineDeps() {
+  const candidates = [
+    process.env.OFM_DEPS_DIR,
+    path.join(root, 'node_modules'),
+    path.join(process.cwd(), 'node_modules'),
+    // 宿主 dsh 本体：`@deepseek-ai/dsh` 自带这两个依赖。
+    // ⚠️ 不能用 `createRequire().resolve('@deepseek-ai/dsh/...')` —— 那是**全局**
+    //    安装，从本仓库解析必然 `MODULE_NOT_FOUND`（实测）。故由 node 可执行文件
+    //    的位置推全局 node_modules（`<prefix>/lib/node_modules`）。
+    (() => {
+      const prefix = path.dirname(path.dirname(process.execPath))
+      for (const lib of ['lib', 'lib64']) {
+        const dir = path.join(prefix, lib, 'node_modules', '@deepseek-ai', 'dsh', 'node_modules')
+        if (existsSync(dir)) return dir
+      }
+      return undefined
+    })(),
+    // 最后一条：NODE_PATH（部分环境把共享依赖放这里）。
+    ...(process.env.NODE_PATH ?? '').split(path.delimiter).filter(Boolean),
+  ].filter(Boolean)
+  for (const dir of candidates) {
+    if (existsSync(path.join(dir, 'jose')) && existsSync(path.join(dir, 'undici'))) return [dir]
+  }
+  console.error('build-channel-pack: cannot find `jose` / `undici` to inline.')
+  console.error('  point OFM_DEPS_DIR at a node_modules containing both (they are bundled, not external).')
+  process.exit(1)
+}
+
 const result = await esbuild.build({
   entryPoints: [entry],
   outfile,
@@ -57,6 +92,14 @@ const result = await esbuild.build({
   target: ['node22'],
   // The kernel's own modules must resolve at run time, to the host's copies.
   external: ['@deepseek-ai/*', 'node:*'],
+  // ⚠️ `jose` / `undici` 是**内联**依赖（见上方说明），但本包不把它们列为
+  //    devDependency —— 历史上它们来自宿主 checkout 的 node_modules。
+  //    2026-10-19 重建时踩到：换了构建目录（`OFM_ESBUILD_DIR`）后 esbuild
+  //    从**入口文件所在目录**向上解析，找不到这两个 ⇒ 构建失败
+  //    （`Could not resolve "jose"` / `"undici"`）。
+  //    故这里动态收集候选 node_modules（含 `OFM_DEPS_DIR`），逐个试到能解析为止；
+  //    一个都解析不到就明确报错，而不是把未解析的裸 import 留在产物里。
+  nodePaths: resolveInlineDeps(),
   sourcemap: false,
   legalComments: 'none',
   logLevel: 'warning',

@@ -26,6 +26,24 @@ Cline、Loomy、Raccoon、MiniMax Code、ZCode、Gemini、OfficeAce、Accio Work
 | `officeace-*.ts`（5 个）、`dsml.ts` | 原样移植（新渠道 OfficeAce，华为云 ModelArts MaaS 云端直连）|
 | `accio-*.ts`（7 个）、`model-catalog.ts`、`canonical-models.ts`、`session-title.ts` | 原样移植（新渠道 Accio Work，阿里；后三个是 Accio 的依赖）—— `accio-credits.ts` 的 `ProviderBalanceDetail` 改为**本地声明**（不搬上游 794 行的 provider-runtime 注册表），`openai-compat.ts` 补 `detailFieldText`（Accio 错误体的一条腿）|
 
+### 后续单点修复移植（2026-10-19）
+
+`2d8deab` 之后上游又修了两处 OfficeAce 凭据缺陷，本 fork 只挑这两条搬入
+（**不整包换源**；上游同期的签到重构 / 登录去重 / 无痕隔离等大改未搬）：
+
+| 上游提交 | 修的是什么 | 本地改动 |
+| --- | --- | --- |
+| `d465c40`（IKM741） | `readCredential()` 的兜底**漏传 `ref`** ⇒ 库里无该 ref 时回落**全局** `session.json`，N 个账号各拿同一份一次性 `refresh_token` 去续 ⇒ 第一个消费掉、其余全 `STS5.1806 has been used`（危害**跨账号**）| 兜底改 `readStoredCredential(ref)`，逐字 |
+| `6119033`（P0） | 三处 `credential.access.length === 0` 只判「空串」不判「缺失」⇒ `access` 为 `undefined` 时 `.length` 抛 `TypeError`，被调用方空 `catch` 吞掉 ⇒ 零留痕 + 余额查询被跳过 | 新增 `credentialUsable()` 并替换三处，逐字；**未搬**该提交同批的 `ClaimBonusResult` 重构（本 fork 的 `claimDailyBonus` 仍是数组返回形态）|
+
+⚠️ 同批还补了一条**测试隔离**（上游 `tests/setup-isolation.ts` 的做法）：本 fork 的
+`scripts/*.mjs` 原先只设 `DSH_HOME` / `DSH_CHANNEL_PACK_STATE_DIR`，而 OfficeAce 的
+三条用户级路径（`~/.dsh-officeace` 凭据与兼容 `session.json`、`~/.office-claw` cookie）
+**只认 `DSH_OFFICEACE_HOME`** ⇒ 登录套件把桩凭据写进了**真实 home**，真实 DSH 每 30 分钟
+拿那份桩 `refreshToken`（字面量 `RT-1`）去打华为云 STS，日志刷
+`STS5.1806 invalid refresh token: 'decode jwt header failed'`（2026-10-19 实发）。
+现全部脚本进程级隔离该变量。
+
 ⚠️ **移植一个带「锁定永久积分」的渠道，必须同时登记 `channel-pack-rpc.ts` 的
 `PERMANENT_LOCK_PROVIDERS`** —— 上游那个 issue 的缺陷是「UI 有按钮、执行代码没有」，
 而**只接执行代码、漏登记白名单是它的镜像**：写入被白名单先一步拒掉 ⇒

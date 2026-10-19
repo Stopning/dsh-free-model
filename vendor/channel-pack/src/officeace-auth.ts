@@ -170,6 +170,34 @@ function storeFileFor(ref?: string): string {
   return path.join(officeaceHome(), `session-${safe}.json`)
 }
 
+/**
+ * 凭据是否**足以发起云侧签名请求**（`access` + `securityToken` 都在且非空）。
+ *
+ * ⚠️⚠️ **必须用可选链判「缺失」，不能只判「空串」**（gitee 上游 `6119033`
+ * 审计实测的 P0，2026-10-18；本 fork 于 2026-10-19 移植）。
+ *
+ * 修前是三处一模一样的 `credential.access.length === 0`（`fetchModelTokenRates`
+ * / `fetchCloudSubscriptionFor` / `claimDailyBonus`），而 `readStoredCredential`
+ * **只校验 `modelAppKey`** ⇒ 一份 `access` 字段**缺失**（`undefined`）的凭据
+ * 能一路读到这里，于是 `.length` 在 `try` 之外抛
+ * `TypeError: Cannot read properties of undefined (reading 'length')`：
+ *
+ * - 在 `claimDailyBonus` 里它 escape 出函数 ⇒ 调用方拿到的不是「空数组」
+ *   而是 reject ⇒ 异常被调用方的空 `catch` 静默吞掉 ⇒
+ *   **既没有留痕、余额查询也一并被跳过**（面板该次刷新零网络请求）。
+ * - 那正是「静默 + 阻断」形态在另一条支路上的复现。
+ *
+ * ⚠️ 同义判据只留**这一份**：三处各自写一遍必然漂移（本仓库明列的坑），
+ *   新增第四处时也必须走它。
+ */
+function credentialUsable(credential: OfficeAceCredential | undefined): credential is OfficeAceCredential {
+  return (
+    credential !== undefined
+    && typeof credential.access === 'string' && credential.access.length > 0
+    && typeof credential.securityToken === 'string' && credential.securityToken.length > 0
+  )
+}
+
 /** 读当前凭据；不存在/损坏返回 undefined。 */
 export function readStoredCredential(ref?: string): OfficeAceCredential | undefined {
   try {
@@ -483,7 +511,7 @@ export async function fetchModelTokenRates(): Promise<Map<string, number>> {
   const out = new Map<string, number>()
   try {
     const credential = readStoredCredential()
-    if (credential === undefined || credential.access.length === 0 || credential.securityToken.length === 0) {
+    if (!credentialUsable(credential)) {
       return out
     }
     const raw = await signAndGet(
@@ -610,10 +638,43 @@ export interface CredentialStore {
 }
 
 /**
- * 按 ref 读凭据（**优先 DSH 凭据库**，回落默认文件）。
+ * 按 ref 读凭据（**优先 DSH 凭据库**，再回落**本 ref** 的兼容文件）。
  *
  * ⚠️ 这个次序不能反：多账号下每个账号的凭据在凭据库里按 ref 索引，
  *    `session.json` 只是老数据的兼容兜底 —— 先读文件会串号。
+ *
+ * ## ⚠️⚠️ 兜底**必须带 `ref`**（gitee 上游 IKM741，2026-10-16 实测确证；
+ *    本 fork 于 2026-10-19 移植）
+ *
+ * 这里原先写的是 `readStoredCredential()` —— **漏传了 `ref`**，于是它读的是那份
+ * **全局唯一**的 `session.json`（语义 =「最后一次登录的那个账号」）。而本函数
+ * 的**每一个**调用方都传了 ref（`refreshAccountCredential` / `latestAfterFailedRefresh`
+ * / `fetchSubscriptionSummary` / `index.ts` 的两处）⇒ 这个「不带 ref 的兜底」
+ * 没有任何调用方需要它，纯粹是串号源。这正是本仓库记的
+ * 「位置/键错位」那一类缺陷的又一次复发（把 ref 丢在调用边上）。
+ *
+ * 实测后果：
+ *
+ * | 情形 | 修前 | 修后 |
+ * |---|---|---|
+ * | 库里**有**该 ref | 用它 | 用它（不变） |
+ * | 库里**无**该 ref，但有 `session-<ref>.json` | 读它（不变） | 读它（不变） |
+ * | 库里**无**该 ref，也没有该 ref 的兼容文件 | **读全局 `session.json`** ⇒ 把**别的账号**的凭据当成本账号的 | `undefined`（如实报「本账号无凭据」） |
+ *
+ * 第三格是三条真实故障的**同一个根因**：
+ *
+ * 1. **跨账号烧一次性 `refresh_token`**：`refresh_token` 是一次性的，而
+ *    `session.json` 是全局单份 ⇒ N 个「有账号无凭据」的账号各自回落到**同一份**
+ *    token、各自拿它去续期 ⇒ 第一个消费掉，其余全部收到
+ *    `STS5.1806 has been used`。危害是**跨账号**的：一份坏账号能把别的健康账号的路堵掉。
+ * 2. **读数串号**：`fetchSubscriptionSummary(48, ref, …)` 拿全局凭据走云侧直读
+ *    ⇒ 把最后一个登录账号的余额显示成本账号的余额。
+ * 3. **`expiresAt` 串号**：`account.list` 的逐账号回填读到的是全局那份。
+ *
+ * ⚠️ 兼容性：改成按 ref 后，**单凭据老用户零行为变化** —— 那条路径本来就
+ *    不经过本函数（它由 `readStoredCredential()` 无参调用点承担，如
+ *    `probeOfficeAce` / `readOfficeAceCredential` / `fetchModelTokenRates`）。
+ *    本函数只服务多账号路径，而多账号路径**必须**按 ref。
  */
 export async function readCredential(
   ref: string,
@@ -626,9 +687,9 @@ export async function readCredential(
         const parsed = JSON.parse(resolved.value) as OfficeAceCredential
         if (typeof parsed.modelAppKey === 'string' && parsed.modelAppKey.length > 0) return parsed
       }
-    } catch { /* 解析失败 → 回落文件 */ }
+    } catch { /* 解析失败 → 回落**本 ref** 的兼容文件（见上方注释） */ }
   }
-  return readStoredCredential()
+  return readStoredCredential(ref)
 }
 
 // ────────────────────────── 刷新 ──────────────────────────
@@ -1333,7 +1394,7 @@ async function fetchCloudSubscription(ref?: string): Promise<OfficeAceSubscripti
 async function fetchCloudSubscriptionFor(
   credential: OfficeAceCredential | undefined,
 ): Promise<OfficeAceSubscriptionSummary | undefined> {
-  if (credential === undefined || credential.access.length === 0 || credential.securityToken.length === 0) {
+  if (!credentialUsable(credential)) {
     return undefined
   }
   const body = await signAndGet(
@@ -1413,7 +1474,7 @@ async function fetchCloudSubscriptionFor(
 export async function claimDailyBonus(
   credential: OfficeAceCredential,
 ): Promise<Array<{ activityId: string; activityName: string; points: number }>> {
-  if (credential === undefined || credential.access.length === 0 || credential.securityToken.length === 0) {
+  if (!credentialUsable(credential)) {
     return []
   }
   try {

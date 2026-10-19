@@ -146,12 +146,18 @@ try {
   const products = [pack]
   for (const [productIndex, product] of products.entries()) await check(`${productIndex === 0 ? '插件' : '独立端'}实际渠道包：OAuth 落定、续期、项目探测与推理共用代理`, async () => {
     const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ofm-network-'))
-    const keys = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy', 'ALL_PROXY', 'all_proxy', 'DSH_HOME', 'DSH_CHANNEL_PACK_STATE_DIR', 'DSH_OPENAI_GATEWAY_ENABLED', 'QODER_RUNTIME_INFO', 'QODER_MACHINE_TOKEN_PATH']
+    // ⚠️ `DSH_OFFICEACE_HOME` 必须与其余隔离项**一起**进出这份清单：
+    //    本块是「按键保存→清空→设桩→事后恢复」，漏进清单的变量既不会被清、
+    //    也不会被恢复 ⇒ 桩值泄漏到后续用例（2026-10-19 补）。
+    const keys = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy', 'ALL_PROXY', 'all_proxy', 'DSH_HOME', 'DSH_CHANNEL_PACK_STATE_DIR', 'DSH_OFFICEACE_HOME', 'DSH_OPENAI_GATEWAY_ENABLED', 'QODER_RUNTIME_INFO', 'QODER_MACHINE_TOKEN_PATH']
     const savedEnv = Object.fromEntries(keys.map(key => [key, process.env[key]]))
     for (const key of keys) delete process.env[key]
     process.env.HTTPS_PROXY = 'http://fixture-proxy.invalid:7890'
     process.env.DSH_HOME = scratch
     process.env.DSH_CHANNEL_PACK_STATE_DIR = scratch
+    // ⚠️ 本用例会真的 `apply()` 渠道包，而 `apply()` 里有 fire-and-forget 的续期链：
+    //    空池时回落到「续期本机那一份凭据」⇒ 不隔离就会读**真实** `~/.dsh-officeace`。
+    process.env.DSH_OFFICEACE_HOME = path.join(scratch, 'officeace')
     process.env.DSH_OPENAI_GATEWAY_ENABLED = '0'
     process.env.QODER_RUNTIME_INFO = path.join(scratch, 'missing-runtime.exe')
     process.env.QODER_MACHINE_TOKEN_PATH = path.join(scratch, 'missing-token.json')
