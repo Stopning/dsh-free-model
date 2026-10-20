@@ -62,6 +62,7 @@ export interface MinimaxFallbackModel {
   thinkingMode?: string
 }
 
+// OFM-MODELS:BEGIN minimax-product.ts::MINIMAX_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录（4 条，顺序**照抄远端 `model_order`**）。
  *
@@ -117,6 +118,7 @@ const MINIMAX_FALLBACK_MODELS: readonly MinimaxFallbackModel[] = [
     thinkingMode: 'forced_on',
   },
 ]
+// OFM-MODELS:END
 
 /** MiniMax Code 产品配置。 */
 export interface MinimaxProduct {

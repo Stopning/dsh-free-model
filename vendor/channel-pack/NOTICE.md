@@ -44,6 +44,23 @@ Cline、Loomy、Raccoon、MiniMax Code、ZCode、Gemini、OfficeAce、Accio Work
 `STS5.1806 invalid refresh token: 'decode jwt header failed'`（2026-10-19 实发）。
 现全部脚本进程级隔离该变量。
 
+### 后续单点修复移植（2026-10-21）
+
+| 上游 | 修的是什么 | 本地改动 |
+| --- | --- | --- |
+| `83ced0d`（IKM3A0） | `officeace-product.ts` 的 `contextWindow` 初版**全是估值**（GLM 三行 202_752 抄自 CodeArts 表、`deepseek-v4.1-flash` 196_608 查无出处）⇒ 比真实上限小 5.3 倍，DSH 压缩阈值 `0.8×contextWindow` 提前触发，**1M 能力永远吃不到**（静默降级，不报错）| 逐字覆盖为上游真机取证值（glm-5.3/deepseek-v4.1-flash `1_048_576`、glm-5.2/deepseek-v4-flash `1_044_480`、kimi-k2.6 `262_144`，含取证注释整段）|
+| `b554b73`+`eeda381`+`510bf91`+`7b24e23`（IKM73W/IKM7SG） | WorkBuddy 的 `send()` **缺 `X-Conversation-*` 三头** ⇒ 特定账号每轮 `HTTP 400 {"code":11128,"msg":"request illegal"}`，**整条渠道全灭**（真机探针复现：无三头 400 → 带三头 200）；且 11128 不满足 `isRateLimited` ⇒ 落进「非限流即抛」，换号救不了 | `send()` 补三头（根因）；`buddy-adapter.ts` 搬入渠道校验判据三条腿 + 排除腿（`isContentRejection` 不再把 11128 误判成 11140 而误封可用账号 30 分钟）+ 四处集成（认证/限流两换号循环、两处出口、流内帧），调用点 7 处与上游对齐 |
+
+⚠️ 11128 判据**必须按 `msg` 措辞、绝不按 `code===11128` 放宽**：同码至少四族子原因
+（渠道校验=换号 / unapproved channel=改内容 / 非 system 首条=补 system / 内容指纹=改写），
+按 code 会把后几族也拖进换号 ⇒ 误伤。回归钉子：`scripts/channel-buddy-conv-test.mjs`
+（三头非空 / 单账号 11128 报 PERMISSION_DENIED 不写冷却 / 换号 / 11140 仍写冷却；
+两条变异验证过有牙）。
+
+⚠️ 本轮还修了测试桩 `scripts/lib/channel-pack-kernel.mjs` 的一个错位：`LlmError`
+形参写成 `(code, message)`，真实签名是 `(message, code)` ⇒ 桩不校验，任何断言
+`err.code` 的用例拿到的都是 message。桩对齐真实签名后 4 条断言才可信。
+
 ⚠️ **移植一个带「锁定永久积分」的渠道，必须同时登记 `channel-pack-rpc.ts` 的
 `PERMANENT_LOCK_PROVIDERS`** —— 上游那个 issue 的缺陷是「UI 有按钮、执行代码没有」，
 而**只接执行代码、漏登记白名单是它的镜像**：写入被白名单先一步拒掉 ⇒

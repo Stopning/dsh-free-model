@@ -5,7 +5,11 @@ export class Service {
 }
 export class LlmAdapter {}
 export class LlmError extends Error {
-  constructor(code, message) { super(message); this.code = code }
+  // ⚠️ 形参顺序对齐真实 `@deepseek-ai/dsh-llm` 的 `LlmError(message, code, options)`
+  //（2026-10-21 修正：原先写成 `(code, message)` 是反的 —— 桩不校验，
+  //  于是 `err.code` 拿到 message、`err.message` 拿到 code，
+  //  任何断言错误码的用例都会拿到对调的值）。
+  constructor(message, code) { super(message); this.code = code }
 }
 export const credentialRef = value => value
 export const ReasoningEffortId = value => value

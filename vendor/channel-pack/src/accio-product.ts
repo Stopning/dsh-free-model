@@ -105,6 +105,7 @@ const LOGIN_BASE: Readonly<Record<AccioRegion, string>> = Object.freeze({
   global: 'https://zh.accio.com',
 })
 
+// OFM-MODELS:BEGIN accio-product.ts::FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型表 —— **2026-10-12 实测的 15 个可见模型**，按倍率升序。
  *
@@ -128,6 +129,7 @@ const FALLBACK_MODELS: readonly AccioFallbackModel[] = Object.freeze([
   { id: '1Orbit-I9eY4tK8bW1f', name: 'Professional', contextWindow: 1_000_000, supportsImage: true, multiple: 1 },
   { id: '1Orbit-Q7hN3xR6cP2m', name: 'Ultimate', contextWindow: 1_000_000, supportsImage: true, multiple: 2.8 },
 ])
+// OFM-MODELS:END
 
 export const ACCIO: AccioProduct = {
   id: 'accio',

@@ -187,6 +187,7 @@ export const TRAE_OAUTH_HOST = 'https://api.trae.com.cn'
 /** 登录门户基址。 */
 export const TRAE_CONSOLE_HOST = 'https://www.trae.cn'
 
+// OFM-MODELS:BEGIN trae-product.ts::TRAE_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录（32 个，对齐 Go 端 staticModels）。
  *
@@ -227,6 +228,7 @@ const TRAE_FALLBACK_MODELS: readonly TraeFallbackModel[] = [
   { id: 'explore_sub_agent_v2', name: 'Explore Sub Agent V2', contextWindow: 200_000, isHidden: true },
   { id: 'summary', name: 'Summary', contextWindow: 200_000, isHidden: true },
 ]
+// OFM-MODELS:END
 
 /**
  * **可调用通道白名单**（顺序即优先级，详见 `TraeProduct.channels` 的注释）。

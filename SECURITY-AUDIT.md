@@ -12,12 +12,12 @@
 | --- | --- |
 | `index.js` | `a932bcb6bdeef608496071a60d1f9e8499997fca52765e0eb300171d8728aa57` |
 | `client.js` | `13332f9b4102e5cc7125998983126df7b50cfa6a32ef5e20aefc51aca0a5e820` |
-| `vendor/channel-pack/pack.js` | `3dd4a6c5d433837a55c96efb7a0c14b4feda999aa581733ab9d324d803d8be9d` |
+| `vendor/channel-pack/pack.js` | `6ab1bc17a4e5f8b02fa448cfc04dbf7bf5de83b4e1c2d2a48ba08df1c31cd82a` |
 
 ⚠️ `pack.js` 的指纹随每次「刷新模型数据 / 移植上游修复」而变（它是构建产物）。
-上面的值对应**OfficeAce 凭据兜底修复（移植上游 IKM741 + `6119033`）之后**的版本；
+上面的值对应**WorkBuddy 三头 + 渠道校验移植与 OfficeAce 窗口取证值刷新（2026-10-21）之后**的版本；
 域名面结论未变，`scripts/egress-audit.mjs` 可随时重跑复验。
-（上一版 `e1e63e95…` 是模型元数据刷新后的产物。）
+（上一版 `3dd4a6c5…` 是 OfficeAce 凭据兜底修复后的产物。）
 
 ## 结论
 

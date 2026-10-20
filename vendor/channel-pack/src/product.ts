@@ -155,6 +155,7 @@ export interface BuddyProduct {
   imagePixelBudget?: number
 }
 
+// OFM-MODELS:BEGIN product.ts::CODEBUDDY_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * CodeBuddy（腾讯 CodeBuddy，中国版），platform = ide。
  *
@@ -264,6 +265,7 @@ const CODEBUDDY_FALLBACK_MODELS: readonly BuddyFallbackModel[] = [
     maxOutputTokens: 64_000,
   },
 ]
+// OFM-MODELS:END
 
 export const CODEBUDDY: BuddyProduct = {
   id: 'buddy',
@@ -283,6 +285,7 @@ export const CODEBUDDY: BuddyProduct = {
   fallbackModels: CODEBUDDY_FALLBACK_MODELS,
 }
 
+// OFM-MODELS:BEGIN product.ts::WORKBUDDY_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * WorkBuddy 国际版的内置模型目录。
  *
@@ -393,6 +396,7 @@ const WORKBUDDY_FALLBACK_MODELS: readonly BuddyFallbackModel[] = [
   },
   { id: 'kimi-k2.6', name: 'Kimi-K2.6', contextWindow: 256_000, supportsImages: true, reasoningEfforts: ['medium'], maxOutputTokens: 32_000 },
 ]
+// OFM-MODELS:END
 
 /**
  * WorkBuddy 国际版（腾讯 WorkBuddy AI），platform = workbuddy-ai。

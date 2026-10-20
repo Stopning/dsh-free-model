@@ -68,6 +68,9 @@ const suites = [
   ['channel-officeace-lock', 'channel-officeace-lock-test.mjs', ['--experimental-strip-types']],
   ['channel-officeace-login', 'channel-officeace-login-test.mjs', []],
   ['channel-accio', 'channel-accio-test.mjs', ['--experimental-strip-types']],
+  // WorkBuddy/CodeBuddy：`X-Conversation-*` 三头（缺则特定账号整条渠道 400/11128 全灭）
+  // 与渠道校验档（换号、不写冷却、PERMISSION_DENIED 指向账号）。
+  ['channel-buddy-conv', 'channel-buddy-conv-test.mjs', []],
   ['channel-network', 'channel-network-test.mjs', []],
 ].filter(([name]) => only === null || name.startsWith(only))
 

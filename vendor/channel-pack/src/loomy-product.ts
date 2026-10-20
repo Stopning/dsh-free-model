@@ -191,6 +191,7 @@ export function loomyContextWindow(modelId: string, declared: number): number {
   return LOOMY_CONTEXT_WINDOW_OVERRIDES[loomyCatalogKey(modelId)] ?? declared
 }
 
+// OFM-MODELS:BEGIN loomy-product.ts::LOOMY_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 const LOOMY_FALLBACK_MODELS: readonly LoomyFallbackModel[] = [
   { id: 'deepseek-v4-flash-0731', name: 'DeepSeek V4 Flash 0731 · x3.0', contextWindow: 1_048_576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: 'MiniMax-M3', name: 'MiniMax M3 · x4.0', contextWindow: 1_048_576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
@@ -201,6 +202,7 @@ const LOOMY_FALLBACK_MODELS: readonly LoomyFallbackModel[] = [
   { id: 'spark-x', name: 'Spark X2.5 · x0.1', contextWindow: 262_144, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
   { id: 'mimo-v2.5', name: 'MiMo V2.5 · x3.3', contextWindow: 1_048_576, efforts: [...LOOMY_EFFORTS], defaultEffort: LOOMY_DEFAULT_EFFORT },
 ]
+// OFM-MODELS:END
 
 /**
  * Loomy provider 配置。

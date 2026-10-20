@@ -168,6 +168,7 @@ export interface LobsteraiProduct {
   fallbackModels: readonly LobsteraiFallbackModel[]
 }
 
+// OFM-MODELS:BEGIN lobsterai-product.ts::LOBSTERAI_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录（19 个）。
  *
@@ -201,6 +202,7 @@ const LOBSTERAI_FALLBACK_MODELS: readonly LobsteraiFallbackModel[] = [
   { id: 'glm-5v-turbo', name: 'glm-5v-turbo', contextWindow: 131_072 },
   { id: 'glm-5', name: 'glm-5', contextWindow: 131_072 },
 ]
+// OFM-MODELS:END
 
 /**
  * LobsterAI provider 配置。

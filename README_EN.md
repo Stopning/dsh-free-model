@@ -95,7 +95,7 @@ Four settings pages (down from nine):
 
 Sizes: `src/` went from **58 modules to 5** (`store/key/chan-relay/egress/trust`), the host `index.js`
 from **2343 to 684 lines**, the browser half `client.js` from **5992 to 2538 lines**, and the offline
-suites from 45 to **16**. Every `animation` and `@keyframes` rule is gone as well.
+suites from 45 to **17**. Every `animation` and `@keyframes` rule is gone as well.
 
 ## Configuration
 
@@ -148,7 +148,7 @@ the browser half talks to it over the shell's `connection` RPC (`usage.tokenLedg
 ## Tests
 
 ```bash
-npm test                            # 16 offline suites: no network, no quota
+npm test                            # 17 offline suites: no network, no quota
 node scripts/host-smoke-test.mjs     # the host HTTP surface only
 node scripts/client-lint.mjs         # the browser half only (dictionary keys, CSS reachability)
 ```
@@ -166,6 +166,7 @@ node scripts/client-lint.mjs         # the browser half only (dictionary keys, C
 | `channel-cline-dev` | Cline's models.dev catalog: `Accept-Encoding: br, gzip`, ETag conditional requests, **304 falling back to the previous result** (never an empty catalog), 60s timeout, and `supportsImage: false` preserved |
 | `channel-officeace-lock` / `channel-officeace-login` | The ported OfficeAce channel: the login loop really goes through RPC (authorize URL → poll → token → persisted); the lock **decision and its execution** are asserted case by case (unlocked keeps the old path verbatim, locked-with-only-permanent must throw and never fall back to the pool) |
 | `channel-accio` | The ported Accio channel: a callback-style login really goes through RPC (authorize page → local callback → token exchange → persisted under the **account's own ref**), plus the auto-renew table is asserted to cover accio / officeace (a missing entry = silently never renewed, with no log) |
+| `channel-buddy-conv` | WorkBuddy/CodeBuddy: `send()` must emit three non-empty `X-Conversation-*` headers (without them, certain accounts get the whole channel dead on `400/11128` every turn); the channel-verification tier rotates accounts, **writes no cooldown**, and reports `PERMISSION_DENIED` pointing at the account; a single-account pool must not misreport `QUOTA_EXCEEDED`; 11140 still writes its cooldown |
 
 The other 37 of upstream's 45 suites tested lanes this fork deletes. The suites run **from a checkout
 only** — the npm package does not ship `scripts/`.

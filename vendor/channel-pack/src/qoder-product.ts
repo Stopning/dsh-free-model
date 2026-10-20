@@ -305,6 +305,7 @@ export interface QoderProduct {
   fallbackModels: readonly QoderFallbackModel[]
 }
 
+// OFM-MODELS:BEGIN qoder-product.ts::QODER_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 模型目录（**实测数据**，2026-09-20）。
  *
@@ -434,6 +435,7 @@ const QODER_FALLBACK_MODELS: readonly QoderFallbackModel[] = [
   { id: 'dfmodel', name: 'DeepSeek-Flash', contextWindow: 1_000_000, supportsImage: true, supportsThinking: true, priceFactor: 0.1, efforts: ['high', 'max', 'low'], defaultEffort: 'max', supportsDisable: true },
   { id: 'mmodel', name: 'MiniMax-M3', contextWindow: 1_000_000, supportsImage: true, supportsThinking: false, priceFactor: 0.2 },
 ]
+// OFM-MODELS:END
 
 /** Qoder provider 配置（国际版）。 */
 export const QODER: QoderProduct = {
@@ -458,6 +460,7 @@ export const QODER: QoderProduct = {
   fallbackModels: QODER_FALLBACK_MODELS,
 }
 
+// OFM-MODELS:BEGIN qoder-product.ts::QODER_CN_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 中国版模型目录（**实测数据**，2026-09-27，设计文档 E6）。
  *
@@ -579,6 +582,7 @@ const QODER_CN_FALLBACK_MODELS: readonly QoderFallbackModel[] = [
   // ⚠️ 目录里也**没有 `thinking_config`** → 不可选档位（与 IDE「不支持」一致）。
   { id: 'mmodel', name: 'MiniMax-M2.7', contextWindow: 200_000, priceFactor: 0.2 },
 ]
+// OFM-MODELS:END
 
 /** Qoder provider 配置（**中国版**）。 */
 export const QODER_CN: QoderProduct = {

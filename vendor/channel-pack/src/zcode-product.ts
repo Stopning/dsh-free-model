@@ -146,6 +146,7 @@ export interface ZcodeProduct {
   toolCacheBreakpoint: boolean
 }
 
+// OFM-MODELS:BEGIN zcode-product.ts::ZCODE_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录。
  *
@@ -236,6 +237,7 @@ const ZCODE_FALLBACK_MODELS: readonly ZcodeFallbackModel[] = [
     defaultReasoningLevel: 'max',
   },
 ]
+// OFM-MODELS:END
 
 /** ZCode provider 配置。 */
 export const ZCODE: ZcodeProduct = {

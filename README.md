@@ -88,7 +88,7 @@ dsh plugin --profile web add dsh-our-free-model         # 回滚到上游 2.1.0
 | `packages/standalone/`（独立 Web 产品）、`worker/`（EAC 的 Cloudflare 授权网关）、`feed/` + `catalog/`（公告源与发布清单） | 三块卫星全部 `import` 被删车道，留着就是一套永远跑不起来的代码。 |
 
 规模变化：`src/` 从 **58 个模块 → 5 个**（`store/key/chan-relay/egress/trust`），宿主 `index.js` 从
-**2343 行 → 684 行**，浏览器半身 `client.js` 从 **5992 行 → 2531 行**，离线测试从 45 个套件 → **16 个**。
+**2343 行 → 684 行**，浏览器半身 `client.js` 从 **5992 行 → 2531 行**，离线测试从 45 个套件 → **17 个**。
 界面里所有 `animation` 与 `@keyframes` 也已删除。
 
 ## 配置
@@ -142,7 +142,7 @@ POST /chan-gateway/rotate  轮换中继密钥
 ## 测试
 
 ```bash
-npm test                            # 16 个离线套件，无需网络、不花额度
+npm test                            # 17 个离线套件，无需网络、不花额度
 node scripts/host-smoke-test.mjs     # 只跑宿主 HTTP 面
 node scripts/client-lint.mjs         # 只跑浏览器半身（字典键一一对应 + CSS 规则可达）
 ```
@@ -160,6 +160,7 @@ node scripts/client-lint.mjs         # 只跑浏览器半身（字典键一一�
 | `channel-cline-dev` | Cline 的 models.dev 目录：`Accept-Encoding: br, gzip`、ETag/条件请求、**304 回退成上次结果**（不许变空表）、超时 60s、`supportsImage: false` 保真 |
 | `channel-officeace-lock` / `channel-officeace-login` | 移植渠道 OfficeAce：登录闭环真走 RPC（authorize URL → poll → 换 token → 落库）；锁定分道的**判定与执行**逐条断言（未锁定逐字走旧路径、锁定+只剩永久桶必须抛错不回落）|
 | `channel-accio` | 移植渠道 Accio：真走 RPC 完成回调式登录（授权页 → 本地回调 → 换 token → 按**账号 ref** 落库），并断言自动续期表覆盖 accio / officeace（漏一项 = 静默不续期且零日志）|
+| `channel-buddy-conv` | WorkBuddy/CodeBuddy：`send()` 必发三枚非空 `X-Conversation-*`（缺则特定账号整条渠道 `400/11128` 全灭）；渠道校验档换号、**不写冷却**、报 `PERMISSION_DENIED` 指向账号；单账号池不误报 `QUOTA_EXCEEDED`；11140 仍写冷却 |
 
 上游的 45 个套件里，其余的都在测被删掉的车道，已一并移除。测试**只在仓库里跑**（npm 包不含 `scripts/`）。
 

@@ -129,6 +129,7 @@ export interface ClineProduct {
   fallbackModels: readonly ClineFallbackModel[]
 }
 
+// OFM-MODELS:BEGIN cline-product.ts::CLINE_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录（内嵌 `BUILTIN_MODEL_CATALOG.cline` 段 + 远端 `free` 数组实测）。
  *
@@ -193,6 +194,7 @@ const CLINE_FALLBACK_MODELS: readonly ClineFallbackModel[] = [
       + 'and early-stage agentic, multi-agent, and coding workflows.',
   },
 ]
+// OFM-MODELS:END
 
 /**
  * Cline 全 provider 统一的思考档位（**顺序即 UI 展示顺序**）。

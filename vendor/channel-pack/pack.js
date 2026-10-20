@@ -34709,8 +34709,65 @@ function errorMessage2(error) {
     return "unknown error";
   }
 }
+var ILLEGAL_CODE = /"code"\s*:\s*"?11128(?![\d.])/iu;
+var ILLEGAL_MSG = /"m(?:sg|essage)"\s*:\s*"[^"]{0,200}?request(?:[\s:_\-\p{Cf}]|\\[nrt])+illegal/iu;
+var CONTENT_BLOCKED_CODE = /"code"\s*:\s*"?11128(?![\d.])/iu;
+var CONTENT_BLOCKED_MSG = /"m(?:sg|essage)"\s*:\s*"[^"]{0,200}?illegal\s+api\s+invocation/iu;
+var CHANNEL_VERIFICATION_MSG_FIELD = /"m(?:sg|essage)"\s*:\s*"[^"]*conversation(?:[\s:_\-\p{Cf}]|\\[nrt])+id(?:[\s:_\-\p{Cf}]|\\[nrt])+missing/iu;
+var CHANNEL_VERIFICATION_BARE = /conversation(?:[\s:_\-\p{Cf}]|\\[nrt])+id(?:[\s:_\-\p{Cf}]|\\[nrt])+missing/iu;
+var CHANNEL_VERIFICATION_PHRASE = /"m(?:sg|essage)"\s*:\s*"[^"]*?(?:conversation(?:[\s:_\-\p{Cf}]|\\[nrt])+id(?:[\s:_\-\p{Cf}]|\\[nrt])+missing|request(?:[\s:_\-\p{Cf}]|\\[nrt])+illegal)/iu;
+function isChannelVerificationIllegalBody(body) {
+  return ILLEGAL_CODE.test(body) && ILLEGAL_MSG.test(body);
+}
+function isChannelVerificationBody(body) {
+  return ILLEGAL_CODE.test(body) && CHANNEL_VERIFICATION_PHRASE.test(body);
+}
+function isContentBlockedIllegalBody(body) {
+  return CONTENT_BLOCKED_CODE.test(body) && CONTENT_BLOCKED_MSG.test(body);
+}
+function isChannelVerificationRejection(body, status) {
+  if (body.length === 0) return false;
+  if (CHANNEL_VERIFICATION_MSG_FIELD.test(body)) return true;
+  if (isChannelVerificationIllegalBody(body)) return true;
+  if (status !== void 0 && status !== 400 && status !== 403) return false;
+  if (/"m(?:sg|essage)"\s*:/.test(body)) return false;
+  if (/^\s*\{/.test(body) && /"code"\s*:/.test(body)) return false;
+  return CHANNEL_VERIFICATION_BARE.test(body);
+}
+function redactUpstreamActionHints(text) {
+  const REDACTED = "\uFF08\u5DF2\u62B9\u53BB\u4E0A\u6E38\u7684\u884C\u52A8\u6307\u5F15\uFF09";
+  return text.replace(/请[^。；\n]{0,12}?(?:重新发送|重新傳送|重新传|重发)/g, REDACTED).replace(/\b(?:please\s+)?(?:re)?send\b[^.\n]{0,20}?(?:\bagain\b|from the official client)/gi, REDACTED);
+}
+function channelVerificationUpstreamId(body) {
+  try {
+    const data = JSON.parse(body);
+    const inner = typeof data.error === "object" && data.error !== null ? data.error : void 0;
+    const asText2 = (value) => typeof value === "string" || typeof value === "number" ? String(value) : void 0;
+    const code = asText2(data.code) ?? asText2(inner?.code);
+    const msg = asText2(data.msg) ?? asText2(data.message) ?? asText2(inner?.msg) ?? asText2(inner?.message);
+    const requestId = asText2(data.requestId) ?? asText2(inner?.requestId);
+    const parts = [
+      code === void 0 ? void 0 : `code ${code}`,
+      msg === void 0 ? void 0 : `msg ${msg}`,
+      requestId === void 0 ? void 0 : `requestId ${requestId}`
+    ].filter((value) => value !== void 0);
+    if (parts.length > 0) return redactUpstreamActionHints(parts.join(" / "));
+  } catch {
+  }
+  return redactUpstreamActionHints(errorDetail2(body).slice(0, 200));
+}
+function channelVerificationError(productId, status, body, rotated) {
+  const scope = rotated ? `\u5168\u90E8\u8D26\u53F7\u5747\u672A\u901A\u8FC7\u6E20\u9053\u6821\u9A8C\uFF08HTTP ${status}\uFF0C\u5DF2\u9010\u4E2A\u6362\u53F7\u91CD\u8BD5\uFF09` : `\u5F53\u524D\u8D26\u53F7\u672A\u901A\u8FC7\u6E20\u9053\u6821\u9A8C\uFF08HTTP ${status}\uFF0C\u6D41\u5185\u9519\u8BEF\u5E27\u4E0B\u53D1\uFF09`;
+  return new LlmError3(
+    `${productId}: ${scope}\u3002\u8BE5\u62D2\u7EDD\u6309\u8D26\u53F7\u751F\u6548\uFF08\u540C\u4E00\u8BF7\u6C42\u5728\u5176\u4ED6\u8D26\u53F7\u53EF\u6B63\u5E38\u8FD4\u56DE\uFF09\uFF0C\u4E14\u91CD\u53D1\u65E0\u6548 \u2014\u2014 \u8BF7\u5728 Channel Pack \u505C\u7528\u6216\u8C03\u6574\u8BE5\u8D26\u53F7\u7684\u987A\u5E8F\u540E\u91CD\u8BD5\uFF0C\u6216\u6539\u7528\u5176\u5B83 provider\u3002\u4E0A\u6E38\uFF1A${channelVerificationUpstreamId(body)}`,
+    "PERMISSION_DENIED",
+    { status }
+  );
+}
 function isContentRejection(body) {
   if (body.length === 0) return false;
+  if (isChannelVerificationBody(body)) return false;
+  if (isContentBlockedIllegalBody(body)) return false;
   return /"code"\s*:\s*11140/.test(body) || /request illegal/i.test(body) || /安全审核|safety review/i.test(body);
 }
 var BUDDY_POLICY_BLOCK_COOLDOWN_MS = 30 * 6e4;
@@ -35294,6 +35351,7 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
     if (!response.ok && (response.status === 401 || response.status === 403)) {
       const rejectedBody = await response.clone().text().catch(() => "");
       const contentRejected = isContentRejection(rejectedBody);
+      const channelRejected = isChannelVerificationRejection(rejectedBody, response.status);
       if (contentRejected) {
         console.warn(
           `[${this.product.id}] \u8D26\u53F7 ${currentAccountId || "(current)"} \u88AB\u5B89\u5168\u7B56\u7565\u62E6\u622A\uFF08HTTP ${response.status}\uFF0Ccode 11140\uFF09\uFF0C\u7EE7\u7EED\u6362\u53F7\uFF1A${errorDetail2(rejectedBody).slice(0, 200)}`
@@ -35327,6 +35385,9 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
       let sawContentRejection = contentRejected;
       let rejectionStatus = contentRejected ? authStatus : 0;
       let rejectionBody = contentRejected ? rejectedBody : "";
+      let sawChannelVerification = channelRejected;
+      let channelVerificationStatus = channelRejected ? authStatus : 0;
+      let channelVerificationBody = channelRejected ? rejectedBody : "";
       if ((response.status === 401 || response.status === 403) && this.options.accountPool !== void 0) {
         for (; ; ) {
           const next = await this.options.accountPool.getAvailableAccount(
@@ -35356,6 +35417,11 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
               options.model
             );
           }
+          if (isChannelVerificationRejection(rotatedBody, response.status)) {
+            sawChannelVerification = true;
+            channelVerificationStatus = response.status;
+            channelVerificationBody = rotatedBody;
+          }
           if (response.status !== 401 && response.status !== 403) break;
         }
       }
@@ -35368,6 +35434,14 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
             true
           );
         }
+        if (sawChannelVerification) {
+          throw channelVerificationError(
+            this.product.id,
+            channelVerificationStatus === 0 ? authStatus : channelVerificationStatus,
+            channelVerificationBody.length === 0 ? rejectedBody : channelVerificationBody,
+            true
+          );
+        }
         throw new LlmError3(`${this.product.id}: credential expired and refresh failed`, "AUTH", { status: authStatus });
       }
       if (response.status === 401 || response.status === 403) {
@@ -35377,6 +35451,14 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
             this.product.id,
             rejectionStatus === 0 ? authStatus : rejectionStatus,
             rejectionBody.length === 0 ? detail : rejectionBody,
+            true
+          );
+        }
+        if (sawChannelVerification || isChannelVerificationRejection(detail, authStatus)) {
+          throw channelVerificationError(
+            this.product.id,
+            channelVerificationStatus === 0 ? authStatus : channelVerificationStatus,
+            channelVerificationBody.length === 0 ? detail : channelVerificationBody,
             true
           );
         }
@@ -35412,12 +35494,16 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
           );
         }
       }
-      if (this.options.accountPool && isRateLimited(errorText, response.status)) {
+      const channelRejected = isChannelVerificationRejection(errorText, response.status);
+      if (this.options.accountPool && (isRateLimited(errorText, response.status) || channelRejected)) {
         const tried = /* @__PURE__ */ new Set();
         if (currentAccountId) tried.add(currentAccountId);
         let sawContentRejection = false;
         let contentRejectionStatus = 0;
         let contentRejectionBody = "";
+        let sawChannelVerification = channelRejected;
+        let channelVerificationStatus = channelRejected ? response.status : 0;
+        let channelVerificationBody = channelRejected ? errorText : "";
         const rateLimitMarked = /* @__PURE__ */ new Set();
         for (; ; ) {
           if (currentAccountId !== "" && isRateLimited(errorText, response.status) && !rateLimitMarked.has(currentAccountId)) {
@@ -35459,6 +35545,15 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
             );
             continue;
           }
+          if (isChannelVerificationRejection(errorText, response.status)) {
+            sawChannelVerification = true;
+            channelVerificationStatus = response.status;
+            channelVerificationBody = errorText;
+            console.warn(
+              `[${this.product.id}] \u8D26\u53F7 ${currentAccountId || "(current)"} \u672A\u901A\u8FC7\u6E20\u9053\u6821\u9A8C\uFF08HTTP ${response.status}\uFF0Ccode 11128\uFF09\uFF0C\u7EE7\u7EED\u6362\u53F7\uFF08\u4E0D\u5199\u51B7\u5374\uFF09\uFF1A${errorDetail2(errorText).slice(0, 200)}`
+            );
+            continue;
+          }
           if (response.status === 401 || response.status === 403) continue;
           if (!isRateLimited(errorText, response.status)) {
             throw new LlmError3(`${this.product.id}: ${errorDetail2(errorText)}`, httpErrorCode2(response.status, errorText), { status: response.status });
@@ -35469,6 +35564,14 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
             this.product.id,
             contentRejectionStatus || 403,
             contentRejectionBody,
+            true
+          );
+        }
+        if (sawChannelVerification) {
+          throw channelVerificationError(
+            this.product.id,
+            channelVerificationStatus || 400,
+            channelVerificationBody,
             true
           );
         }
@@ -35487,6 +35590,10 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
     headers.set(HTTP_HEADER_DOMAIN, this.product.apiDomain || credential.domain || "");
     headers.set(HTTP_HEADER_PRODUCT_CODE, this.product.productCode);
     headers.set("X-Agent-Purpose", "conversation");
+    const conversationId = crypto.randomUUID().replace(/-/g, "");
+    headers.set("X-Conversation-ID", conversationId);
+    headers.set("X-Conversation-Request-ID", conversationId);
+    headers.set("X-Conversation-Message-ID", conversationId);
     headers.set("X-IDE-Name", this.product.attributionName);
     headers.set("X-IDE-Type", this.product.attributionName);
     headers.set("X-IDE-Version", this.product.clientVersion);
@@ -35567,6 +35674,9 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
             data = JSON.parse(payload);
           } catch {
             continue;
+          }
+          if (data.choices === void 0 && isChannelVerificationRejection(payload, response.status)) {
+            throw channelVerificationError(this.product.id, 200, payload, false);
           }
           if (data.choices === void 0 && isContentRejection(payload)) {
             await markPolicyBlockedAccount(
@@ -56300,12 +56410,12 @@ var OFFICEACE = {
   chunkTimeoutMs: 3e5
 };
 var OFFICEACE_MODELS = [
-  { id: "glm-5.3", name: "GLM-5.3", contextWindow: 202752, maxTokens: 131072 },
-  { id: "glm-5.2", name: "GLM-5.2", contextWindow: 202752, maxTokens: 131072 },
-  { id: "glm-5.1", name: "GLM-5.1", contextWindow: 202752, maxTokens: 131072 },
-  { id: "deepseek-v4.1-flash", name: "DeepSeek-V4.1-Flash", contextWindow: 196608, maxTokens: 131072, multimodal: true },
-  { id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash", contextWindow: 196608, maxTokens: 131072 },
-  { id: "kimi-k2.6", name: "Kimi-K2.6", contextWindow: 196608, maxTokens: 131072, multimodal: true },
+  { id: "glm-5.3", name: "GLM-5.3", contextWindow: 1048576, maxTokens: 131072 },
+  { id: "glm-5.2", name: "GLM-5.2", contextWindow: 1044480, maxTokens: 131072 },
+  { id: "glm-5.1", name: "GLM-5.1", contextWindow: 196608, maxTokens: 131072 },
+  { id: "deepseek-v4.1-flash", name: "DeepSeek-V4.1-Flash", contextWindow: 1048576, maxTokens: 393216, multimodal: true },
+  { id: "deepseek-v4-flash", name: "DeepSeek-V4-Flash", contextWindow: 1044480, maxTokens: 393216 },
+  { id: "kimi-k2.6", name: "Kimi-K2.6", contextWindow: 262144, maxTokens: 131072, multimodal: true },
   { id: "qwen3-32b", name: "Qwen3-32B", contextWindow: 131072, maxTokens: 65536 },
   { id: "qwen3-30b-a3b", name: "Qwen3-30B-A3B", contextWindow: 131072, maxTokens: 65536 }
 ];

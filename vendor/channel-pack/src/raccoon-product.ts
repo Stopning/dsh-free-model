@@ -209,6 +209,7 @@ export interface RaccoonProduct {
   fallbackModels: readonly RaccoonFallbackModel[]
 }
 
+// OFM-MODELS:BEGIN raccoon-product.ts::RACCOON_FALLBACK_MODELS（与 gitee 上游同名常量逐字对齐；同步：node scripts/channel-model-sync.mjs）
 /**
  * 兜底模型目录（6 个 `visible:true` 模型）。
  *
@@ -279,6 +280,7 @@ const RACCOON_FALLBACK_MODELS: readonly RaccoonFallbackModel[] = [
     supportsImage: true,
   },
 ]
+// OFM-MODELS:END
 
 /**
  * 远端 `tags` 缺 `vision`、但**实测能看图**的模型。
