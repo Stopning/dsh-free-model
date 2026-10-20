@@ -163,6 +163,38 @@ interface ContentFingerprint {
  */
 const CONTENT_FINGERPRINTS: readonly ContentFingerprint[] = [
   {
+    // ★ **DSH 自己的 system 提示词首句**（2026-10-21 本机实测新增，issue 无此条）。
+    //
+    // 这条与其余几条**来源不同**：那几条是「外部客户端（ZCode / Claude Code）往
+    // system 里注了什么」，本条是 **DeepSeek Harness 自己**的 agent 提示词开头。
+    // 也就是说 —— 用 DSH 直连腾讯系渠道时，**每一轮都会带上它**，于是 CodeBuddy
+    // （国内 `copilot.tencent.com`）**整条渠道必然 400**，与用户内容无关。
+    //
+    // ## 实测（2026-10-21，国内站，真实账号）
+    //
+    // 触发判据是**逐字符 + 行首锚定**，比其余几条更窄：
+    //
+    // | 探针 | 结果 |
+    // |---|---|
+    // | `You are an AI agent powered by DeepSeek Harness.` | ❌ **400/11128** |
+    // | 前接 `Hello. `（同句移到句中） | ✅ 200 ⇒ **行首锚定** |
+    // | 只留 `You are an AI agent powered by` | ✅ 200 ⇒ 缺后半句不触发 |
+    // | 只留 `powered by DeepSeek Harness` | ✅ 200 ⇒ 同上 |
+    // | 只留 `DeepSeek Harness` / `You are an AI agent` | ✅ 200 ⇒ 单独词不触发 |
+    // | 同句第二句（`You are a coding agent powered by …`） | ✅ 200 ⇒ **只认这一句** |
+    //
+    // 改写后放行（3 个模型各验一遍，`deepseek-v4.1-flash` / `hy3` / `step-5-preview`）：
+    // 原句全部 ❌ 400，改 `running on` 后全部 ✅ 200。
+    //
+    // ⚠️ **只改这一个词**（`powered by` → `running on`）：语义不变、句长不变，
+    // 且不动后半句 —— 破坏 agent 提示词的语义比多拦一轮更糟。
+    // ⚠️ 匹配仍走本文件的**大小写不敏感 + 位置无关** replaceAll（行首锚定是
+    // 服务端的判据，不是我们的改写范围）—— 改写范围宁可略宽。
+    find: 'You are an AI agent powered by DeepSeek Harness.',
+    replace: 'You are an AI agent running on DeepSeek Harness.',
+    note: '2026-10-21 本机对 copilot.tencent.com 实测：原句 400/11128、改写后 200（3 模型复验）',
+  },
+  {
     // ZCode 内建常量：`$Js="Main branch (you will usually use this for PRs)"`。
     // 每个 git 仓库里的会话都会被注入（拼在 `Main branch … : <分支名>` 这一行）。
     find: 'Main branch (you will usually use this for PRs)',

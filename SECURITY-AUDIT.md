@@ -12,12 +12,12 @@
 | --- | --- |
 | `index.js` | `a932bcb6bdeef608496071a60d1f9e8499997fca52765e0eb300171d8728aa57` |
 | `client.js` | `13332f9b4102e5cc7125998983126df7b50cfa6a32ef5e20aefc51aca0a5e820` |
-| `vendor/channel-pack/pack.js` | `e1d8d46c772b8276c9e6f2d638ee21ea8100cd4fd2094053d24f27f172c16660` |
+| `vendor/channel-pack/pack.js` | `b0162b38daa781ff79f1a79fef0f2528e7101c7812339f721815c015f2186e72` |
 
 ⚠️ `pack.js` 的指纹随每次「刷新模型数据 / 移植上游修复」而变（它是构建产物）。
-上面的值对应**腾讯内容指纹改写到 assistant 正文（2026-10-21，会话报废根因）之后**的版本；
+上面的值对应**补上 DSH 自身 system 首句指纹（2026-10-21，CodeBuddy 国内版整条渠道 400 的根因）之后**的版本；
 域名面结论未变，`scripts/egress-audit.mjs` 可随时重跑复验。
-（上一版 `6ab1bc17…` 是 WorkBuddy 三头 + 渠道校验移植后的产物。）
+（上一版 `e1d8d46c…` 是腾讯指纹改写到 assistant 正文后的产物。）
 
 ## 结论
 

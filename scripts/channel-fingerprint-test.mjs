@@ -93,6 +93,16 @@ await step('④ assistant 与 system 两条路径都过改写（防「只改一�
     'system 产出点应过改写')
 })
 
+await step('⑥ DSH 自己的 system 首句也被改写（2026-10-21 国内版根因）', async () => {
+  // 这条与其余几条来源不同：不是外部客户端注入，而是 **DeepSeek Harness 自己的**
+  // agent 提示词开头 ⇒ 用 DSH 直连腾讯系渠道时**每一轮都带**，CodeBuddy 国内版
+  // 整条渠道必然 400（与用户内容无关）。真机实测：原句 400、改 `running on` 后 200。
+  assert.match(packSource, /You are an AI agent powered by DeepSeek Harness\./,
+    '规则表应含 DSH 首句原文')
+  assert.match(packSource, /You are an AI agent running on DeepSeek Harness\./,
+    '规则表应含其改写形态')
+})
+
 await step('⑤ 良性文本不被破坏', async () => {
   // 改写只认字面量，不许泛化成「凡 Main branch 都改」。
   assert.doesNotMatch(packSource, /Main branch.*?\.replace\(\/Main branch\/g/,
