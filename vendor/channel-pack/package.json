@@ -1,6 +1,5 @@
 {
   "name": "dsh-codearts-auth",
-  "version": "0.1.0",
   "description": "deepseek-harness plugin: CodeArts (Huawei Cloud) browser login, storing the temporary credential via ctx.credentials",
   "type": "module",
   "main": "lib/index.js",
@@ -110,5 +109,6 @@
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "//version": "本目录是上游渠道包的源码拷贝，版本号以本 fork 根 package.json 为准（此处刻意不写，避免两处漂移）"
 }
