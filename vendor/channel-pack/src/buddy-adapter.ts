@@ -44,6 +44,7 @@ import {
   registerAdapterIdempotent,
 } from './llm-register-compat.js'
 import { reportLedgerAccount } from './token-ledger.js'
+import { rewriteTencentContentFingerprints } from './openai-gateway/tencent-fingerprint.js'
 
 /**
  * CodeBuddy（中国版）的 chat completions 基址。
@@ -281,7 +282,8 @@ const TOOL_RESULT_IMAGE_TEXT = 'Attached image(s) from tool result:'
 
 function serializeMessages(
   messages: readonly { role: string; content: unknown }[],
-  imageUrls?: ReadonlyMap<string, string>,
+  imageUrls: ReadonlyMap<string, string> | undefined,
+  provider: string,
 ): Array<Record<string, unknown>> {
   const wire: Array<Record<string, unknown>> = []
 
@@ -342,7 +344,13 @@ function serializeMessages(
           typeof block === 'object' && block !== null && (block as { type?: unknown }).type === 'reasoning')
         .map((block) => String(block.text))
         .join('')
-      const text = contentToText(content)
+      // ⚠️ 腾讯系**内容级**风控指纹改写（上游 1731f5f）：assistant 正文里带着
+      // 某些模板句时，网关逐字符匹配并回 `400/11128 Illegal API invocation from
+      // an unapproved channel`。真机复现：同一句放 system ❌、放 assistant 正文 ❌、
+      // 放 user/tool ✅、放 reasoning_content/tool_calls.arguments ✅。
+      // 这类历史一旦落盘就**每轮原样重放** ⇒ 会话报废，且换任何腾讯系模型都一样
+      //（症状跟会话走、不跟模型走）。故直连路径也必须改，不能只在网关改。
+      const text = rewriteTencentContentFingerprints(contentToText(content), provider)
       // 挂起的工具结果图片必须在 assistant 之前发出（对齐官方适配器）：
       // 否则它们会漂到这条 assistant 之后，与产生它们的工具调用脱节。
       flushToolImages()
@@ -357,7 +365,7 @@ function serializeMessages(
     }
     if (message.role === 'system') {
       flushToolImages()
-      wire.push({ role: 'system', content: contentToText(message.content) })
+      wire.push({ role: 'system', content: rewriteTencentContentFingerprints(contentToText(message.content), provider) })
       continue
     }
     // user 角色：工具结果搭载在 harness 用户消息中；展开为独立的 role:'tool' 消息。
@@ -1517,9 +1525,15 @@ export class BuddyAdapter extends LlmAdapter {
         imageUrls.set(id, `data:${image.mediaType};base64,${Buffer.from(image.data).toString('base64')}`)
       }
     }
-    const messages = serializeMessages(options.messages, imageUrls)
+    const messages = serializeMessages(options.messages, imageUrls, this.product.id)
     if (options.system !== undefined && options.system.length > 0) {
-      messages.unshift({ role: 'system', content: options.system })
+      // ⚠️ 这条是 `serializeMessages` 之外的**第四个**产出点：`options.system`
+      // 不经过那个函数，漏掉它等于「走 messages 的会话被救了、走 system 的会话
+      // 照样被拦」（上游 1731f5f 明列的四处之一）。产品 id 就是 provider 参数。
+      messages.unshift({
+        role: 'system',
+        content: rewriteTencentContentFingerprints(options.system, this.product.id),
+      })
     }
     const tools = options.tools?.map((tool) => ({
       type: 'function' as const,

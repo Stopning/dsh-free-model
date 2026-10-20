@@ -34536,6 +34536,112 @@ function isPositiveFinite(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+// vendor/channel-pack/src/openai-gateway/tencent-fingerprint.ts
+var TENCENT_PROVIDERS = ["buddy", "workbuddy"];
+var CONTENT_FINGERPRINTS = [
+  {
+    // ZCode 内建常量：`$Js="Main branch (you will usually use this for PRs)"`。
+    // 每个 git 仓库里的会话都会被注入（拼在 `Main branch … : <分支名>` 这一行）。
+    find: "Main branch (you will usually use this for PRs)",
+    replace: "Main branch (PRs usually go here)",
+    note: "Gitee IKJNA1\uFF1B\u672C\u673A 2026-10-05 \u5BF9 workbuddy / CodeBuddy \u53CC\u7AEF\u70B9\u5B9E\u6D4B\u590D\u73B0"
+  },
+  {
+    // Claude Code 内建常量（v2.1.295 的 `yl`）：
+    // `"You are Claude Code, Anthropic's official CLI for Claude."`
+    //
+    // ⚠️ **`find` 刻意不带尾句点**，一条同时覆盖两个常量（本机实测两者改写后都放行）：
+    //   - `yl`  = `You are Claude Code, Anthropic's official CLI for Claude.`
+    //   - `sf`  = 同句 + `, running within the Claude Agent SDK.`
+    // 第三个常量 `af`（`You are a Claude agent, built on Anthropic's Claude Agent SDK.`）
+    // 实测**不被拦**，故刻意不登记（多一条就是替上游无谓改写用户提示词）。
+    //
+    // ## ⚠️⚠️ 本条的匹配语义**不是**「位置无关」，而是**行首锚定**（与 ZCode 那条相反）
+    //
+    // 2026-10-14 本机对两个端点的逐格实测（详见 `docs/agent-notes/providers-buddy.md`
+    // 「Claude Code 身份句」一节）：该指纹**只在文本绝对开头**被拦 ——
+    //   | 形态 | 结果 |
+    //   |---|---|
+    //   | 裸串 | ❌ 400/11128 |
+    //   | 前接空格 / 前换行 / 前接任意前言 | ✅ **200 放行** |
+    //   | 后接句点 / 破折号 / 中文句号 / 长正文 | ❌ 400/11128 |
+    // 即**前导字符一个都不容忍、后缀完全自由**，与 ZCode 那条的「位置无关」不同。
+    //
+    // 这不影响改写本身（下面 `replaceAll` 照样生效），但**影响怎么为新指纹做探针**：
+    // 只测「夹在句中」会得到「已放行」的**假阴性**（真因是锚点，不是这句不再触发）。
+    // 故本条的实测凭据必须含**贪心探针**（覆盖行首与非行首两侧），见
+    // `tests/e2e/buddy-fingerprint-roles.e2e.spec.ts` 的 Claude 段。
+    //
+    // ⚠️ **改成行首锚定的正则**（如 `^` 配 `m`）是**错**的：改写范围宁可略宽 ——
+    // 漏改一处就换来整轮 400，多改一处只是语义等价的措辞变化（原文已不存在
+    // 「位置无关」的相反证据）。故与上一条共用同一条实现路径。
+    find: "You are Claude Code, Anthropic's official CLI for Claude",
+    replace: "You are Claude Code, Anthropic's CLI for Claude",
+    note: "Gitee IKLS2L\uFF1B\u672C\u673A 2026-10-14 \u5BF9 workbuddy / CodeBuddy \u53CC\u7AEF\u70B9\u5B9E\u6D4B\uFF1Asystem \u4E0E assistant \u6B63\u6587\u4F4D\u7F6E\u5747 400/11128\uFF0C\u6539\u5199\u540E\u4E24\u7AEF\u70B9\u5747 200\uFF08\u542B SDK \u53D8\u4F53\uFF09"
+  },
+  {
+    // Claude Code system prompt 的「帮助 / 反馈」段默认句（Gitee issue IKLYCT）：
+    // `To give feedback, users should report the issue at
+    //  https://github.com/anthropics/claude-code/issues`
+    //
+    // ## 与上一条（身份句）不同：这一条**每轮必带**，不是概率性泄漏
+    //
+    // 身份句只有 cc-switch 的 `mrt()` 探测路径漏传 `skipSystemPromptPrefix` 时才注入
+    // （实测约 34%）；本句属于 Claude Code system prompt 的**固定段落**，
+    // 只要客户端把默认 system 整份发过来就必然带上 ⇒ **漏登记 = 必然命中**。
+    // 用户侧实测：单日 buddy/workbuddy 因它白撞 647 次。
+    //
+    // ## ⚠️ 匹配语义：**位置无关**（与身份句的「行首锚定」相反）
+    //
+    // 2026-10-18 本机对 `www.workbuddy.ai` + `copilot.tencent.com` 双端点逐格实测：
+    //   | 形态 | 结果 |
+    //   |---|---|
+    //   | 裸串 / 前接 `Note: ` / 前接行首 `  - ` | ❌ 400/11128 ⇒ 位置无关 |
+    //   | 后接换行 + 其他文本 | ❌ 400/11128 |
+    //   | 全大写 | ❌ 400/11128 ⇒ 与另两条同型（大小写不敏感） |
+    //   | 换 org/repo、换域名、改一个词、只留 URL | ✅ 200 ⇒ **逐字符** |
+    //   | **砍掉前半 / 砍掉后半** | ✅ 200 ⇒ **`find` 必须写整句** |
+    //
+    // ⚠️ 最后那一格是本条的**要害**：子串本身不触发，写短了等于空跑 ——
+    // 而空跑的症状是「登记了却仍每轮 400」，极难归因。
+    //
+    // ⚠️ 本条的 `find`（整句 99 字符）已经**贴着**上游屏蔽名单的粒度，
+    // 不要再按 ZCode 那条的思路去「缩短 find 覆盖更多变体」：实测换域名即放行。
+    // ⚠️⚠️ **「缩短/删字」这类变异只有实发能验，单测锁不住**：
+    //   单测能证明「砍掉半句时我们**不**改写」（那是真事实），但证明不了
+    //   「砍掉半句后上游**仍会拦**」—— 那只有 e2e 能验（见上面那两格）。
+    //   ⇒ 改本行时**必须**跑一遍 `DSH_BUDDY_FINGERPRINT_E2E=1` 那节。
+    //
+    // ⚠️ 与身份句同理**不做行首锚定**：改写宁可略宽（漏改 = 整轮 400，
+    // 多改 = 语义等价的措辞变化）。
+    find: "To give feedback, users should report the issue at https://github.com/anthropics/claude-code/issues",
+    // 实测两端点均 200（buddy / workbuddy，2026-10-18）。措辞与原文等义。
+    replace: "To give feedback, users should report the issue at the project issue tracker",
+    note: "Gitee IKLYCT\uFF1B\u672C\u673A 2026-10-18 \u5BF9 workbuddy / CodeBuddy \u53CC\u7AEF\u70B9\u5B9E\u6D4B\uFF1Asystem\uFF08\u542B\u975E\u9996\u4F4D\uFF09\u4E0E assistant \u6B63\u6587\u5747 400/11128\uFF0Cuser / reasoning_content / tool \u7ED3\u679C\u653E\u884C\uFF0C\u6539\u5199\u540E\u4E24\u7AEF\u70B9\u5747 200"
+  }
+];
+function escapeRegExp(literal) {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+var COMPILED = CONTENT_FINGERPRINTS.map((rule) => ({
+  replace: rule.replace,
+  findLower: rule.find.toLowerCase(),
+  // `g` = 全部出现都改写；`i` = 大小写不敏感（实测全小写 / 全大写同样被拦）。
+  pattern: new RegExp(escapeRegExp(rule.find), "gi")
+}));
+function isTencentContentFingerprintProvider(provider) {
+  return TENCENT_PROVIDERS.includes(provider);
+}
+function rewriteTencentContentFingerprints(text, provider) {
+  if (!isTencentContentFingerprintProvider(provider)) return text;
+  let out = text;
+  for (const rule of COMPILED) {
+    if (!out.toLowerCase().includes(rule.findLower)) continue;
+    out = out.replace(rule.pattern, rule.replace);
+  }
+  return out;
+}
+
 // vendor/channel-pack/src/buddy-adapter.ts
 function isDeepSeekModel(model) {
   return /^deepseek/i.test(model.trim());
@@ -34621,7 +34727,7 @@ function contentToText2(content) {
   return content.filter((block) => typeof block === "object" && block !== null && block.type === "text").map((block) => String(block.text)).join("");
 }
 var TOOL_RESULT_IMAGE_TEXT = "Attached image(s) from tool result:";
-function serializeMessages2(messages, imageUrls) {
+function serializeMessages2(messages, imageUrls, provider) {
   const wire = [];
   let pendingToolImages = [];
   const flushToolImages = () => {
@@ -34647,7 +34753,7 @@ function serializeMessages2(messages, imageUrls) {
         function: { name: String(block.name), arguments: normalizeToolArguments(String(block.arguments)) }
       }));
       const reasoning = content2.filter((block) => typeof block === "object" && block !== null && block.type === "reasoning").map((block) => String(block.text)).join("");
-      const text2 = contentToText2(content2);
+      const text2 = rewriteTencentContentFingerprints(contentToText2(content2), provider);
       flushToolImages();
       wire.push({
         role: "assistant",
@@ -34660,7 +34766,7 @@ function serializeMessages2(messages, imageUrls) {
     }
     if (message2.role === "system") {
       flushToolImages();
-      wire.push({ role: "system", content: contentToText2(message2.content) });
+      wire.push({ role: "system", content: rewriteTencentContentFingerprints(contentToText2(message2.content), provider) });
       continue;
     }
     const content = Array.isArray(message2.content) ? message2.content : [];
@@ -35305,9 +35411,12 @@ var BuddyAdapter = class _BuddyAdapter extends LlmAdapter2 {
         imageUrls.set(id, `data:${image.mediaType};base64,${Buffer.from(image.data).toString("base64")}`);
       }
     }
-    const messages = serializeMessages2(options.messages, imageUrls);
+    const messages = serializeMessages2(options.messages, imageUrls, this.product.id);
     if (options.system !== void 0 && options.system.length > 0) {
-      messages.unshift({ role: "system", content: options.system });
+      messages.unshift({
+        role: "system",
+        content: rewriteTencentContentFingerprints(options.system, this.product.id)
+      });
     }
     const tools = options.tools?.map((tool) => ({
       type: "function",
@@ -63450,39 +63559,6 @@ async function toImageBlock2(url, bridge, limits, already) {
   return { type: "image", attachment: ref };
 }
 
-// vendor/channel-pack/src/openai-gateway/tencent-fingerprint.ts
-var TENCENT_PROVIDERS = ["buddy", "workbuddy"];
-var CONTENT_FINGERPRINTS = [
-  {
-    // ZCode 内建常量：`$Js="Main branch (you will usually use this for PRs)"`。
-    // 每个 git 仓库里的会话都会被注入（拼在 `Main branch … : <分支名>` 这一行）。
-    find: "Main branch (you will usually use this for PRs)",
-    replace: "Main branch (PRs usually go here)",
-    note: "Gitee IKJNA1\uFF1B\u672C\u673A 2026-10-05 \u5BF9 workbuddy / CodeBuddy \u53CC\u7AEF\u70B9\u5B9E\u6D4B\u590D\u73B0"
-  }
-];
-function escapeRegExp(literal) {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-var COMPILED = CONTENT_FINGERPRINTS.map((rule) => ({
-  replace: rule.replace,
-  findLower: rule.find.toLowerCase(),
-  // `g` = 全部出现都改写；`i` = 大小写不敏感（实测全小写 / 全大写同样被拦）。
-  pattern: new RegExp(escapeRegExp(rule.find), "gi")
-}));
-function isTencentContentFingerprintProvider(provider) {
-  return TENCENT_PROVIDERS.includes(provider);
-}
-function rewriteTencentContentFingerprints(text, provider) {
-  if (!isTencentContentFingerprintProvider(provider)) return text;
-  let out = text;
-  for (const rule of COMPILED) {
-    if (!out.toLowerCase().includes(rule.findLower)) continue;
-    out = out.replace(rule.pattern, rule.replace);
-  }
-  return out;
-}
-
 // vendor/channel-pack/src/openai-gateway/messages.ts
 var OpenAiGatewayError = class extends Error {
   constructor(message2, status = 400, type = "invalid_request_error", code = "invalid_request") {
@@ -63624,7 +63700,7 @@ async function convertMessage(raw, provider, model, bridge, limits) {
     return createGatewayMessage("user", await partsFromContent(value.content, bridge, limits), { kind: "user" });
   }
   if (role === "assistant") {
-    const text = textFromContent(value.content);
+    const text = rewriteTencentContentFingerprints(textFromContent(value.content), provider);
     const content = text.length > 0 ? [{ type: "text", text }] : [];
     if (value.tool_calls !== void 0) content.push(...convertToolCalls(value.tool_calls));
     return createGatewayMessage("assistant", content, { kind: "model", provider, model });
@@ -64174,7 +64250,7 @@ async function toMessages(input, provider, model, bridge, limits) {
         continue;
       }
       if (raw.role === "assistant") {
-        const text = textFromContent(content);
+        const text = rewriteTencentContentFingerprints(textFromContent(content), provider);
         pushAssistant(text.length > 0 ? [{ type: "text", text }] : []);
         continue;
       }

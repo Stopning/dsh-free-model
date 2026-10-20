@@ -452,7 +452,10 @@ async function toMessages(
         continue
       }
       if (raw.role === 'assistant') {
-        const text = textFromContent(content)
+        // ⚠️ assistant 正文也在腾讯系风控扫描范围内（实测 400/11128）；与 Chat
+        // 路径同一判据，否则同一份历史在 `/v1/responses` 被拦、在 `/v1/chat/
+        // completions` 放行。
+        const text = rewriteTencentContentFingerprints(textFromContent(content), provider)
         pushAssistant(text.length > 0 ? [{ type: 'text', text }] : [])
         continue
       }

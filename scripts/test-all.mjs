@@ -71,6 +71,8 @@ const suites = [
   // WorkBuddy/CodeBuddy：`X-Conversation-*` 三头（缺则特定账号整条渠道 400/11128 全灭）
   // 与渠道校验档（换号、不写冷却、PERMISSION_DENIED 指向账号）。
   ['channel-buddy-conv', 'channel-buddy-conv-test.mjs', []],
+  // 腾讯系内容指纹改写：assistant 正文那格一旦漏改，带毒历史每轮重放 ⇒ 会话报废。
+  ['channel-fingerprint', 'channel-fingerprint-test.mjs', []],
   ['channel-network', 'channel-network-test.mjs', []],
 ].filter(([name]) => only === null || name.startsWith(only))
 
