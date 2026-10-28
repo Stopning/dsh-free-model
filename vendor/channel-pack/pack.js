@@ -34572,6 +34572,54 @@ var CONTENT_FINGERPRINTS = [
     note: "2026-10-21 \u672C\u673A\u5BF9 copilot.tencent.com \u5B9E\u6D4B\uFF1A\u539F\u53E5 400/11128\u3001\u6539\u5199\u540E 200\uFF083 \u6A21\u578B\u590D\u9A8C\uFF09"
   },
   {
+    // ★ **DSH 的 `@` 文件引用说明句**（上游 `82d007a6`；本 fork 2026-10-29 移植+真机复验）。
+    //
+    // ## ⚠️⚠️ 本条**不含任何品牌词** —— 这正是它被前一轮漏掉的原因
+    //
+    // 上一轮（2026-10-21）登记的是 `You are an AI agent powered by DeepSeek Harness.`
+    // 那条带品牌名，靠「找含 DeepSeek Harness 的句子」能扫到。而本条是**纯功能描述**：
+    // 没有 `DeepSeek`、没有 `dsh`、没有 `Harness` ⇒ 按品牌名普查**必然漏掉**。
+    // ⇒ **判据不是品牌名，是「`@` 路径引用语法说明」这个 DSH 独有写法。**
+    //    以后新增登记时请回来读这一行：**别只按品牌名普查**。
+    //
+    // ## 出处（极易被漏第二次，故写明）
+    //
+    // `@deepseek-ai/dsh-file-reference-local` 注入的 `context:file-reference` 段
+    // （`FILE_REFERENCE_PROMPT`）。它在 agent 有 `read` 工具时**恒非空** ⇒ **每轮必带**，
+    // 与加载了哪些插件 / skill **完全无关**（上游曾误判为 superpowers 撑大 system 所致，
+    // 实测删掉整段后仍被拦，该假设已证伪）。
+    //
+    // ## 本 fork 真机复验（2026-10-29，`copilot.tencent.com`，真实账号）
+    //
+    // | 探针 | 结果 |
+    // |---|---|
+    // | 中性基线 | ✅ 200 |
+    // | 原句 `Tokens prefixed with @ … workspace root` | ❌ **400/11128** |
+    // | 上游 `replace`（只调语序） | ✅ **200** |
+    //
+    // 且已确认**我们 DSH 的真实 system 里就有这句**（从 10-28 的会话日志逐字取出，
+    // 前半段与下方 `find` 完全一致）⇒ 不登记 = 腾讯系渠道每轮必拦。
+    //
+    // ## 上游的逐格实测要点（`82d007a6`，勿删，用来判「以后要不要再登记同族」）
+    //
+    // - 字面量 **111 字符**：110 前缀放行 / 111 拦 ⇒ **必须写满整句**；
+    // - 只发前半句（48 字符）或只发后半句（44 字符）**各自都放行** ⇒ 触发串
+    //   **跨句边界**，切一半会**空跑**（探针会得出「已放行」的假阴性）；
+    // - **位置无关**（裸串/前接空格/换行/中文/嵌在句中 全 ❌）——与本文件的
+    //   `Main branch …` 那条同型，区别于「Claude Code 身份句」的行首锚定；
+    // - **大小写不敏感**。
+    //
+    // ⚠️ 已知边界（上游明列）：服务端认**逐字符长字面量** ⇒ DSH 哪天改动这两句任一
+    // 字符，本规则会**静默停止匹配**（症状 = 该渠道整轮 400 复发，与「完全没登记」同形）。
+    // 守卫见 `scripts/channel-fingerprint-test.mjs`。
+    find: "Tokens prefixed with @ are paths the user explicitly referenced. Relative paths resolve from the workspace root",
+    // 只调整语序：`相对路径从工作区根解析` → `路径相对工作区根解析`。语义不变，
+    // 且**整句其余部分逐字不动** —— 后半段（目录 list / 用 read / 不得声称已读过 /
+    // 引号语法）是防模型编造文件内容的核心约束，一个字都不许删。
+    replace: "Tokens prefixed with @ are paths the user explicitly referenced. Paths resolve relative to the workspace root",
+    note: "\u4E0A\u6E38 82d007a6\uFF082026-10-28 \u771F\u5B9E\u62A5\u969C\uFF09+ \u672C\u673A 2026-10-29 \u590D\u9A8C\uFF1A\u539F\u53E5 400\u3001\u8C03\u8BED\u5E8F\u540E 200\uFF1B\u26A0\uFE0F \u672C\u6761\u4E0D\u542B\u54C1\u724C\u8BCD\uFF0C\u6309\u300C\u627E\u542B DeepSeek Harness \u7684\u53E5\u5B50\u300D\u666E\u67E5\u5FC5\u6F0F"
+  },
+  {
     // ZCode 内建常量：`$Js="Main branch (you will usually use this for PRs)"`。
     // 每个 git 仓库里的会话都会被注入（拼在 `Main branch … : <分支名>` 这一行）。
     find: "Main branch (you will usually use this for PRs)",

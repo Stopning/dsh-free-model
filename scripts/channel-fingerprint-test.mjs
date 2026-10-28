@@ -103,6 +103,17 @@ await step('⑥ DSH 自己的 system 首句也被改写（2026-10-21 国内版�
     '规则表应含其改写形态')
 })
 
+await step('⑦ DSH 的 @ 文件引用说明句也被改写（2026-10-28 上游报障）', async () => {
+  // ⚠️ 本条**不含品牌词** —— 按「找含 DeepSeek Harness 的句子」普查必然漏掉。
+  // 它是 `@deepseek-ai/dsh-file-reference-local` 注入的 context 段，agent 有
+  // read 工具时**每轮必带** ⇒ 不登记 = 腾讯系渠道每轮 400。
+  // 真机复验（2026-10-29）：原句 400、调语序后 200。
+  assert.match(packSource, /Tokens prefixed with @ are paths the user explicitly referenced\./,
+    '规则表应含 @ 文件引用说明句原文')
+  assert.match(packSource, /Paths resolve relative to the workspace root/,
+    '规则表应含其改写形态（只调语序）')
+})
+
 await step('⑤ 良性文本不被破坏', async () => {
   // 改写只认字面量，不许泛化成「凡 Main branch 都改」。
   assert.doesNotMatch(packSource, /Main branch.*?\.replace\(\/Main branch\/g/,
