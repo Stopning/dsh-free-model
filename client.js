@@ -1899,6 +1899,34 @@ window.__ModuleLoader__.load({
       }, [available, rpc])
 
       useEffect(() => { void loadStatus() }, [loadStatus])
+      // 渠道卡片排序用：累计请求数（全部历史）。只能靠这个 RPC 拿，
+      // provider.status 只告诉接入状态、不含用量。
+      const [usage, setUsage] = useState(undefined)
+      useEffect(() => {
+        if (!available) return
+        let cancelled = false
+        void (async () => {
+          try {
+            const value = await rpc('usage.tokenLedgerHistory', { sinceDays: 3650 }, 60_000)
+            if (cancelled) return
+            const byChannel = new Map()
+            for (const day of value?.history ?? []) {
+              for (const ch of day.channels ?? []) {
+                const prev = byChannel.get(ch.channel) ?? 0
+                let requests = 0
+                for (const provider of ch.providers ?? []) {
+                  for (const account of provider.accounts ?? []) {
+                    for (const model of account.models ?? []) requests += model.requests ?? 0
+                  }
+                }
+                byChannel.set(ch.channel, prev + requests)
+              }
+            }
+            setUsage(byChannel)
+          } catch { setUsage(new Map()) }
+        })()
+        return () => { cancelled = true }
+      }, [available, rpc])
       // A second poll loop, slow: the pack pushes nothing for accounts changed
       // in another window, and a stale count on this page is the kind of quiet
       // wrongness that reads as a bug. Local actions refresh immediately.
@@ -1919,6 +1947,21 @@ window.__ModuleLoader__.load({
       }, [t])
 
       const connected = statuses === undefined ? 0 : CHANNEL_PROVIDERS.filter(row => (statuses[row.id]?.accounts?.enabled ?? 0) > 0).length
+      // 四档排序：已接入且用过（按累计请求数降序）→ 已接入未用 → 有账号但未启用 → 未接入。
+      // 同档保持 CHANNEL_PROVIDERS 原顺序（sort 是稳定的），免得每次刷新卡片乱跳。
+      const rankOf = (id) => {
+        const enabled = (statuses?.[id]?.accounts?.enabled ?? 0) > 0
+        const total = (statuses?.[id]?.accounts?.total ?? 0) > 0
+        const requests = usage?.get(id) ?? 0
+        if (enabled) return requests > 0 ? 0 : 1
+        return total ? 2 : 3
+      }
+      const ordered = statuses === undefined || usage === undefined
+        ? CHANNEL_PROVIDERS
+        : [...CHANNEL_PROVIDERS].sort((a, b) => {
+          const d = rankOf(a.id) - rankOf(b.id)
+          return d !== 0 ? d : (usage.get(b.id) ?? 0) - (usage.get(a.id) ?? 0)
+        })
       const failed = !ready && pack.state === 'failed'
 
       return h('div', { className: 'ofm_page' },
@@ -1931,17 +1974,29 @@ window.__ModuleLoader__.load({
               h(Pill, { strong: true, tone: ready ? 'ok' : failed ? 'err' : 'warn' },
                 ready ? `${connected}/${CHANNEL_PROVIDERS.length} ${t('chan.state.on')}` : t('chan.state.off')),
               h(Pill, null, `${t('chan.meta.accounts')} ${statuses === undefined ? '—' : CHANNEL_PROVIDERS.reduce((sum, row) => sum + (statuses[row.id]?.accounts?.enabled ?? 0), 0)}`))),
-          auto == null ? null : h('div', { className: 'ofm_row' },
-            h(Switch, { checked: auto.enabled === true, label: t('chan.auto.title'), onChange: () => void toggleAuto() }),
-            h(Pill, { tone: auto.running === true ? 'warn' : auto.ranToday === true ? 'ok' : '' },
-              auto.running === true ? t('chan.auto.running') : auto.ranToday === true ? t('chan.auto.ran') : t('chan.auto.off')),
-            typeof auto.lastResult === 'string' && auto.lastResult !== '' ? h('span', { className: 'ofm_note', title: auto.lastResult }, t('chan.auto.last').replace('{result}', auto.lastResult.length > 60 ? `${auto.lastResult.slice(0, 60)}…` : auto.lastResult)) : null)),
+          auto == null ? null : h('div', null,
+            h('div', { className: 'ofm_row' },
+              h(Switch, { checked: auto.enabled === true, label: t('chan.auto.title'), onChange: () => void toggleAuto() }),
+              h(Pill, { tone: auto.running === true ? 'warn' : auto.ranToday === true ? 'ok' : '' },
+                auto.running === true ? t('chan.auto.running') : auto.ranToday === true ? t('chan.auto.ran') : t('chan.auto.off')),
+              typeof auto.lastResult === 'string' && auto.lastResult !== '' ? h('span', { className: 'ofm_note' }, t('chan.auto.last').replace('{result}', auto.lastResult)) : null),
+            Array.isArray(auto.channels) && auto.channels.length > 0 ? h('ul', { className: 'ofm_note', style: { listStyle: 'none', margin: '.35rem 0 0', padding: 0, display: 'grid', gap: '.15rem' } },
+              auto.channels.map(entry => h('li', { key: entry.provider },
+                h('span', { 'aria-hidden': 'true', style: { marginRight: '.4rem' } },
+                  entry.text.includes('失败') ? '❌'
+                    : entry.text.includes('已领') ? '✅'
+                      : entry.text.includes('暂不可领') ? '⚪'
+                        : entry.text.includes('手动') || entry.text.includes('试用') ? '✋' : '➖'),
+                `${CHANNEL_PROVIDERS.find(row => row.id === entry.provider)?.name ?? entry.provider}：${entry.text}`,
+                typeof entry.reason === 'string' && entry.reason !== ''
+                  ? h('span', { style: { opacity: .7 } }, ` — ${entry.reason.length > 120 ? `${entry.reason.slice(0, 120)}…` : entry.reason}`)
+                  : null))) : null)),
         failed ? h('div', { className: 'ofm_callout ofm_error' },
           h('div', null, t('chan.pack.failed').replace('{reason}', pack.error ?? ''), h('div', { className: 'ofm_note' }, t('chan.pack.hint')))) : null,
         !available ? h('div', { className: 'ofm_callout' }, h('div', null, t('chan.rpc.unavailable'))) : null,
         !ready ? h('div', { className: 'ofm_chanwrap' },
           [0, 1, 2].map(index => h('div', { className: 'ofm_skel', key: index, style: { minHeight: 168 } }))) : null,
-        ready ? h('div', { className: 'ofm_chanwrap' }, CHANNEL_PROVIDERS.map(channel => h(ChannelCard, {
+        ready ? h('div', { className: 'ofm_chanwrap' }, ordered.map(channel => h(ChannelCard, {
           key: channel.id,
           channel,
           status: statuses?.[channel.id],

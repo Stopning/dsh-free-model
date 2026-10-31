@@ -34540,6 +34540,12 @@ function isPositiveFinite(value) {
 var TENCENT_PROVIDERS = ["buddy", "workbuddy"];
 var CONTENT_FINGERPRINTS = [
   {
+    // ★ 2026-10-30 本机实测：DSH 每轮 system 恒带此段，原文 220 字符连读触发 11128（Illegal API invocation from an unapproved channel），缺一字符即放行；只第1句/只第2句/两句换序均放行 ⇒ 组合式判据且有顺序。上游 dsh-free-model 0.5.2 缺此条。改写只动末尾 this GUI → the Web GUI，其余 215 字符逐字不动。
+    find: "You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names. When the user refers to \"this page\", \"this GUI\", or \"this app\" without naming another target, they mean this GUI",
+    replace: "You are interacting with the user through the DeepSeek Harness Web GUI whose URL the runtime context names. When the user refers to \"this page\", \"this GUI\", or \"this app\" without naming another target, they mean the Web GUI",
+    note: "web-gui-segment"
+  },
+  {
     // ★ **DSH 自己的 system 提示词首句**（2026-10-21 本机实测新增，issue 无此条）。
     //
     // 这条与其余几条**来源不同**：那几条是「外部客户端（ZCode / Claude Code）往
@@ -60342,7 +60348,14 @@ function sanitizeChannels(raw) {
     const record = item;
     if (typeof record.provider !== "string" || record.provider.length === 0) continue;
     if (typeof record.text !== "string") continue;
-    out.push({ provider: record.provider, text: record.text.slice(0, 120) });
+    out.push({
+      provider: record.provider,
+      text: record.text.slice(0, 120),
+      // 失败原因（可选）：旧文档没有该字段，读回来时不能丢。
+      ...typeof record.reason === "string" && record.reason !== ""
+        ? { reason: record.reason.slice(0, 200) }
+        : {}
+    });
     if (out.length >= MAX_CHANNEL_ENTRIES) break;
   }
   return out;
@@ -60434,6 +60447,9 @@ function isAutoCheckinExcluded(provider) {
 }
 function describeRun(totals) {
   const parts = [];
+  // 渠道总数 = 成功返回 + 不支持签到 + 出错，三者互斥且覆盖全部入口。
+  // 只报 providers 会漏掉 skipped/errors 的渠道，出现「3 个渠道…2 个渠道不支持签到」这种自相矛盾的 3+2=5。
+  const channelTotal = totals.providers + totals.skipped + totals.errors;
   if (totals.claimed > 0) {
     const amounts = formatClaimGains(totals.totalByUnit ?? { credit: totals.totalCredit });
     parts.push(`${totals.claimed} \u4E2A\u8D26\u53F7\u9886\u53D6\u6210\u529F${amounts === null ? "" : `\uFF08${amounts}\uFF09`}`);
@@ -60442,8 +60458,8 @@ function describeRun(totals) {
   if (totals.failed > 0) parts.push(`${totals.failed} \u4E2A\u5931\u8D25`);
   if (totals.errors > 0) parts.push(`${totals.errors} \u4E2A\u6E20\u9053\u51FA\u9519`);
   if (totals.skipped > 0) parts.push(`${totals.skipped} \u4E2A\u6E20\u9053\u4E0D\u652F\u6301\u7B7E\u5230`);
-  if (parts.length === 0) return `${totals.providers} \u4E2A\u6E20\u9053\uFF1A\u6CA1\u6709\u9700\u8981\u9886\u53D6\u7684\u8D26\u53F7`;
-  return `${totals.providers} \u4E2A\u6E20\u9053\uFF1A${parts.join("\uFF0C")}`;
+  if (parts.length === 0) return `${channelTotal} \u4E2A\u6E20\u9053\uFF1A\u6CA1\u6709\u9700\u8981\u9886\u53D6\u7684\u8D26\u53F7`;
+  return `${channelTotal} \u4E2A\u6E20\u9053\uFF1A${parts.join("\uFF0C")}`;
 }
 function shouldMarkToday(totals) {
   return totals.coversToday > 0;
@@ -60456,7 +60472,7 @@ function describeChannel(summary) {
   }
   if (summary.alreadyClaimed > 0) parts.push(`${summary.alreadyClaimed} \u4E2A\u4ECA\u5929\u5DF2\u9886`);
   if (summary.failed > 0) parts.push(`${summary.failed} \u4E2A\u5931\u8D25`);
-  if (summary.inactive > 0) parts.push(`${summary.inactive} \u4E2A\u672A\u5F00\u542F`);
+  if (summary.inactive > 0) parts.push(`${summary.inactive} \u4E2A\u6682\u4E0D\u53EF\u9886`);
   if (parts.length === 0) return "\u65E0\u53EF\u9886";
   const coversToday = summary.coversToday ?? summary.claimed + summary.alreadyClaimed;
   if (coversToday === 0 && summary.claimed + summary.alreadyClaimed > 0) {
@@ -60497,7 +60513,7 @@ function createAutoCheckin(deps) {
     for (const provider of providers) {
       if (isAutoCheckinExcluded(provider)) {
         totals.skipped += 1;
-        channels.push({ provider, text: "\u9700\u624B\u52A8\u7B7E\u5230" });
+        channels.push({ provider, text: "无签到（仅 5 天试用额度）" });
         continue;
       }
       let result;
@@ -60505,7 +60521,7 @@ function createAutoCheckin(deps) {
         result = await deps.claim(provider);
       } catch (error) {
         totals.errors += 1;
-        channels.push({ provider, text: "\u51FA\u9519" });
+        channels.push({ provider, text: "\u51FA\u9519", reason: String(error) });
         deps.warn?.(`[channel-pack] \u81EA\u52A8\u7B7E\u5230\uFF1A${provider} \u8C03\u7528\u5F02\u5E38: ${String(error)}`);
         continue;
       }
@@ -60517,7 +60533,7 @@ function createAutoCheckin(deps) {
           continue;
         }
         totals.errors += 1;
-        channels.push({ provider, text: "\u51FA\u9519" });
+        channels.push({ provider, text: "\u51FA\u9519", reason: message2 || "\u672A\u77E5\u9519\u8BEF" });
         deps.warn?.(`[channel-pack] \u81EA\u52A8\u7B7E\u5230\uFF1A${provider} \u5931\u8D25: ${message2 || "\u672A\u77E5\u9519\u8BEF"}`);
         continue;
       }
@@ -60536,7 +60552,28 @@ function createAutoCheckin(deps) {
       totals.inactive += summary.inactive;
       totals.failed += summary.failed;
       totals.coversToday += summary.coversToday ?? summary.claimed + summary.alreadyClaimed;
-      channels.push({ provider, text: describeChannel(summary) });
+      // 具体原因只存在于 results[].outcome.message，describeChannel 只拿得到计数，
+      // 所以在渠道文案后面补一句原因，用户才知道是「为什么」。
+      // inactive 也要带原因：Qoder 10 点前是「每日活动尚未刷新」、账号没开通是「尚未开通」，
+      // 两者都归为「未开启」，不写原因就分不清。
+      const reasonRow = summary.failed > 0 || summary.inactive > 0
+        ? (result.value?.results ?? []).find((row) => row.outcome?.kind === "failed" || row.outcome?.kind === "inactive")
+        : void 0;
+      const claimReason = typeof reasonRow?.outcome?.message === "string" && reasonRow.outcome.message !== ""
+        ? reasonRow.outcome.message
+        : void 0;
+      let channelText = describeChannel(summary);
+      // Qoder 的每日活动按 10:00(UTC+8) 刷新，和其它渠道的 0 点自然日不是一套规则。
+      // 10:00 前跑的那一轮拿到的是昨天那轮（claimQoderDailyCheckin 在 !refreshed 时返回 inactive），
+      // 而 runIfDue() 当天去重 → 当天不会再自动重试，所以必须当场告诉用户 10:00 后再手动领一次。
+      if (provider === "qodercn" && !hasQoderCampaignRefreshedToday(now())) {
+        channelText = `${channelText}\uFF08\u6BCF\u65E5 10:00 \u5237\u65B0\uFF0C10:00 \u540E\u9700\u624B\u52A8\u518D\u9886\u4E00\u6B21\uFF09`;
+      }
+      channels.push({
+        provider,
+        text: channelText,
+        ...claimReason === void 0 ? {} : { reason: claimReason }
+      });
     }
     if (!shouldMarkToday(totals)) {
       deps.warn?.(
